@@ -334,7 +334,6 @@ export function Globe({
       }
       ctx.globalAlpha = 1;
       hitmap.current = hits;
-      (window as any).__globeHits = hits;
 
       // limb shading for sphere depth
       const limb = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
