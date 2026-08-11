@@ -7,9 +7,11 @@ import { EvidenceDrawer, staleness } from "@/components/EvidenceDrawer";
 import { opportunityDetailQuery } from "@/lib/detail-queries";
 import { STATUS_LABEL, TYPE_LABEL, daysUntil, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { loadJobLd, jobJsonLd } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/jobs/$slug")({
-  head: ({ params }) => {
+  loader: ({ params }) => loadJobLd(params.slug).catch(() => null),
+  head: ({ params, loaderData }) => {
     const pretty = params.slug.replace(/-demo$/, "").replace(/-/g, " ");
     return {
       meta: [
@@ -28,6 +30,14 @@ export const Route = createFileRoute("/jobs/$slug")({
         { property: "og:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
         { name: "twitter:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
       ],
+      scripts: loaderData
+        ? [
+            {
+              type: "application/ld+json",
+              children: JSON.stringify(jobJsonLd(loaderData)),
+            },
+          ]
+        : [],
     };
   },
   component: OpportunityDetail,
