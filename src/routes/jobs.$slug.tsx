@@ -77,7 +77,11 @@ function OpportunityDetail() {
           description="This call may have been closed and archived, or merged with a duplicate."
         />
         <div className="mx-auto w-full max-w-7xl px-6 py-8">
-          <Link to="/jobs" className="text-sm text-primary hover:underline">
+          <Link
+            to="/jobs"
+            search={{ sector: "academic" }}
+            className="text-sm text-primary hover:underline"
+          >
             ← Back to the jobs radar
           </Link>
         </div>
