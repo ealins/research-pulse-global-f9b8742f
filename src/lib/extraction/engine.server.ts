@@ -2,7 +2,7 @@
 // cleaned content -> content-hash cache -> callNemotron -> schema validation ->
 // business-rule validation -> recorded run. Nothing else may call the model.
 import { cleanPageText } from "../content-clean.server";
-import { LLM_INPUT_CHARS, LLM_MAX_TOKENS, LLM_EXTRACTION_ENABLED, type LlmOperation } from "../llm-config.server";
+import { LLM_INPUT_CHARS, LLM_MAX_TOKENS, LLM_EXTRACTION_ENABLED, LLM_SHRINK_RETRY_FACTOR, type LlmOperation } from "../llm-config.server";
 import { callNemotron, isNvidiaConfigured } from "../nvidia.server";
 import { findCachedResult, logCacheHit, recordValidatedResult } from "./validate.server";
 import type { ValidationOutcome } from "./shared.server";
