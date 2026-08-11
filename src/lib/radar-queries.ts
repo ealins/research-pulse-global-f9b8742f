@@ -1,0 +1,197 @@
+import { supabase } from "@/integrations/supabase/client";
+import { queryOptions } from "@tanstack/react-query";
+
+export type OpportunityRow = {
+  id: string;
+  title: string;
+  slug: string;
+  city: string | null;
+  country: string | null;
+  opportunity_type: string;
+  description: string | null;
+  requirements: string | null;
+  funding_type: string | null;
+  salary_text: string | null;
+  start_date: string | null;
+  application_deadline: string | null;
+  application_url: string | null;
+  official_source_url: string | null;
+  supervisor_name: string | null;
+  status: string;
+  confidence: string;
+  verification_status: string;
+  last_checked_at: string | null;
+  is_demo: boolean;
+  institutions: { name: string; slug: string; abbreviation: string | null } | null;
+  opportunity_topics: { research_topics: { name: string; slug: string } | null }[];
+};
+
+export const opportunitiesQuery = queryOptions({
+  queryKey: ["opportunities"],
+  queryFn: async (): Promise<OpportunityRow[]> => {
+    const { data, error } = await supabase
+      .from("opportunities")
+      .select(
+        `id, title, slug, city, country, opportunity_type, description, requirements,
+         funding_type, salary_text, start_date, application_deadline, application_url,
+         official_source_url, supervisor_name, status, confidence, verification_status,
+         last_checked_at, is_demo,
+         institutions ( name, slug, abbreviation ),
+         opportunity_topics ( research_topics ( name, slug ) )`,
+      )
+      .order("application_deadline", { ascending: true, nullsFirst: false })
+      .limit(200);
+    if (error) throw error;
+    return (data ?? []) as unknown as OpportunityRow[];
+  },
+});
+
+export const pulseQuery = queryOptions({
+  queryKey: ["pulse-events"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("pulse_events")
+      .select(
+        "id, category, title, summary, event_date, importance, link_url, source_url, verification_status, confidence, is_demo, country",
+      )
+      .order("importance", { ascending: false })
+      .order("event_date", { ascending: false })
+      .limit(60);
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const countsQuery = queryOptions({
+  queryKey: ["entity-counts"],
+  queryFn: async () => {
+    const tables = [
+      "institutions",
+      "researchers",
+      "opportunities",
+      "publications",
+      "projects",
+      "events",
+    ] as const;
+    const entries = await Promise.all(
+      tables.map(async (t) => {
+        const { count, error } = await supabase.from(t).select("id", {
+          count: "exact",
+          head: true,
+        });
+        if (error) throw error;
+        return [t, count ?? 0] as const;
+      }),
+    );
+    return Object.fromEntries(entries) as Record<(typeof tables)[number], number>;
+  },
+});
+
+export const openJobCountQuery = queryOptions({
+  queryKey: ["open-job-count"],
+  queryFn: async () => {
+    const { count, error } = await supabase
+      .from("opportunities")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["open", "closing_soon", "rolling"]);
+    if (error) throw error;
+    return count ?? 0;
+  },
+});
+
+export const institutionsQuery = queryOptions({
+  queryKey: ["institutions"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("institutions")
+      .select(
+        `id, name, slug, abbreviation, city, country, institution_type, official_url,
+         research_url, description, verification_status, is_demo,
+         institution_topics ( weight, research_topics ( name, slug ) )`,
+      )
+      .order("name");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const researchersQuery = queryOptions({
+  queryKey: ["researchers"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("researchers")
+      .select(
+        `id, full_name, slug, academic_title, current_position, official_profile_url,
+         research_summary, verification_status, is_demo,
+         institutions ( name, slug, country ),
+         researcher_topics ( research_topics ( name, slug ) )`,
+      )
+      .order("full_name");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const trendsQuery = queryOptions({
+  queryKey: ["topic-momentum"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("topic_momentum")
+      .select(
+        `id, pubs_last_12m, pubs_prev_12m, pubs_last_36m, active_projects,
+         open_opportunities, institutions_active, growth_ratio, trend_signal, computed_at,
+         research_topics ( name, slug, category )`,
+      )
+      .order("trend_signal", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const eventsQuery = queryOptions({
+  queryKey: ["events"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("events")
+      .select(
+        `id, title, slug, organization, location, country, recurrence, summary, website,
+         start_date, abstract_deadline, paper_deadline, verification_status, is_demo,
+         event_topics ( research_topics ( name, slug ) )`,
+      )
+      .order("title");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const STATUS_LABEL: Record<string, string> = {
+  open: "Open",
+  closing_soon: "Closing soon",
+  rolling: "Rolling call",
+  possibly_open: "Possibly open",
+  closed: "Closed",
+  archived: "Archived",
+};
+
+export const TYPE_LABEL: Record<string, string> = {
+  phd: "PhD",
+  doctoral_researcher: "Doctoral researcher",
+  research_assistant: "Research assistant",
+  postdoc: "Postdoc",
+  other: "Other",
+};
+
+export function daysUntil(date: string | null): number | null {
+  if (!date) return null;
+  const diff = new Date(date + "T00:00:00Z").getTime() - Date.now();
+  return Math.ceil(diff / 86_400_000);
+}
+
+export function formatDate(date: string | null): string {
+  if (!date) return "Not stated";
+  return new Date(date).toLocaleDateString(undefined, {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
