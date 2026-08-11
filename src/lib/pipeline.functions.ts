@@ -233,3 +233,50 @@ export const requeueDeadTasks = createServerFn({ method: "POST" })
     if (error) throw error;
     return { requeued: count ?? 0 };
   });
+
+export type SchedulerJob = {
+  jobname: string;
+  schedule: string;
+  active: boolean;
+  last_run_at: string | null;
+  last_status: string | null;
+  last_message: string | null;
+  runs_24h: number;
+};
+
+export type SchedulerHealth = {
+  jobs: SchedulerJob[];
+  recent_ticks: {
+    id: string;
+    trigger: string;
+    started_at: string;
+    duration_ms: number | null;
+    tasks_processed: number;
+    tasks_ok: number;
+    tasks_failed: number;
+    nvidia_calls: number;
+    nvidia_cached: number;
+    error_message: string | null;
+  }[];
+};
+
+/** Proof that autonomous processing is running: cron jobs + recorded ticks. */
+export const getSchedulerHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<SchedulerHealth> => {
+    const { data: isAdmin } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    if (isAdmin !== true) throw new Error("Forbidden: admin role required");
+
+    const { data: jobs } = await context.supabase.rpc("scheduler_status");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: ticks } = await supabaseAdmin
+      .from("pipeline_runs")
+      .select("id, trigger, started_at, duration_ms, tasks_processed, tasks_ok, tasks_failed, nvidia_calls, nvidia_cached, error_message")
+      .order("started_at", { ascending: false })
+      .limit(10);
+
+    return {
+      jobs: (Array.isArray(jobs) ? jobs : []) as SchedulerJob[],
+      recent_ticks: (ticks ?? []) as SchedulerHealth["recent_ticks"],
+    };
+  });

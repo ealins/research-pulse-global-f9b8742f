@@ -1151,6 +1151,69 @@ export type Database = {
         }
         Relationships: []
       }
+      pipeline_runs: {
+        Row: {
+          created_at: string
+          details: Json
+          duration_ms: number | null
+          error_message: string | null
+          errors: number
+          fetch_enqueued: number
+          finished_at: string | null
+          id: string
+          nvidia_cached: number
+          nvidia_calls: number
+          records_created: number
+          records_updated: number
+          started_at: string
+          tasks_dead: number
+          tasks_failed: number
+          tasks_ok: number
+          tasks_processed: number
+          trigger: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json
+          duration_ms?: number | null
+          error_message?: string | null
+          errors?: number
+          fetch_enqueued?: number
+          finished_at?: string | null
+          id?: string
+          nvidia_cached?: number
+          nvidia_calls?: number
+          records_created?: number
+          records_updated?: number
+          started_at?: string
+          tasks_dead?: number
+          tasks_failed?: number
+          tasks_ok?: number
+          tasks_processed?: number
+          trigger?: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json
+          duration_ms?: number | null
+          error_message?: string | null
+          errors?: number
+          fetch_enqueued?: number
+          finished_at?: string | null
+          id?: string
+          nvidia_cached?: number
+          nvidia_calls?: number
+          records_created?: number
+          records_updated?: number
+          started_at?: string
+          tasks_dead?: number
+          tasks_failed?: number
+          tasks_ok?: number
+          tasks_processed?: number
+          trigger?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -2528,6 +2591,7 @@ export type Database = {
       }
       is_admin: { Args: never; Returns: boolean }
       refresh_topic_momentum: { Args: never; Returns: number }
+      scheduler_status: { Args: never; Returns: Json }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }

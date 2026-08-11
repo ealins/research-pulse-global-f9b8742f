@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-type Body = { action?: "enqueue-discovery" | "drain"; limit?: number };
+type Body = { action?: "enqueue-discovery" | "drain"; limit?: number; trigger?: string };
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
@@ -83,8 +83,55 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           });
         }
 
-        const result = await runQueueBatch(limit);
-        return json({ action: "drain", ...result });
+        // Every autonomous tick is recorded so /admin/pipeline-health can prove
+        // that scheduled processing is really running.
+        const startedAt = new Date();
+        const { data: run } = await supabaseAdmin
+          .from("pipeline_runs")
+          .insert({ trigger: body.trigger ?? "cron", started_at: startedAt.toISOString() } as never)
+          .select("id")
+          .maybeSingle();
+
+        try {
+          const result = await runQueueBatch(limit);
+          const { data: llm } = await supabaseAdmin
+            .from("llm_processing_runs")
+            .select("cached")
+            .gte("created_at", startedAt.toISOString());
+          const calls = llm ?? [];
+          if (run?.id) {
+            await supabaseAdmin
+              .from("pipeline_runs")
+              .update({
+                finished_at: new Date().toISOString(),
+                duration_ms: Date.now() - startedAt.getTime(),
+                tasks_processed: result.processed,
+                tasks_ok: result.ok,
+                tasks_failed: result.failed,
+                tasks_dead: result.dead,
+                nvidia_calls: calls.length,
+                nvidia_cached: calls.filter((c) => c.cached).length,
+                errors: result.failed + result.dead,
+                details: { sample: result.details.slice(0, 20) } as never,
+              })
+              .eq("id", run.id);
+          }
+          return json({ action: "drain", run_id: run?.id ?? null, ...result });
+        } catch (e) {
+          const message = e instanceof Error ? e.message : String(e);
+          if (run?.id) {
+            await supabaseAdmin
+              .from("pipeline_runs")
+              .update({
+                finished_at: new Date().toISOString(),
+                duration_ms: Date.now() - startedAt.getTime(),
+                errors: 1,
+                error_message: message.slice(0, 1000),
+              })
+              .eq("id", run.id);
+          }
+          return json({ error: message }, 500);
+        }
       },
     },
   },

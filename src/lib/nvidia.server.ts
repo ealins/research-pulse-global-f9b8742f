@@ -37,6 +37,8 @@ export type NemotronResult = {
   errorCode: string | null;
   errorMessage: string | null;
   runId: string | null;
+  finishReason?: string | null;
+  outputTokens?: number | null;
 };
 
 /* ---------------- concurrency gate ---------------- */
@@ -125,6 +127,8 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
     let content: string | null = null;
     let errorCode: string | null = null;
     let errorMessage: string | null = null;
+    let finishReason: string | null = null;
+    let outputTokens: number | null = null;
 
     try {
       const controller = new AbortController();
@@ -157,12 +161,21 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       } else {
         try {
           const parsed = JSON.parse(bodyText) as {
-            choices?: { message?: { content?: string } }[];
+            choices?: { message?: { content?: string }; finish_reason?: string }[];
+            usage?: { completion_tokens?: number };
           };
           content = parsed.choices?.[0]?.message?.content ?? null;
+          finishReason = parsed.choices?.[0]?.finish_reason ?? null;
+          outputTokens = parsed.usage?.completion_tokens ?? null;
           if (!content) {
-            errorCode = "EMPTY_COMPLETION";
-            errorMessage = bodyText.slice(0, 400);
+            errorCode = finishReason === "length" ? "OUTPUT_TRUNCATED" : "EMPTY_COMPLETION";
+            errorMessage = `finish_reason=${finishReason ?? "unknown"} completion_tokens=${outputTokens ?? "?"} ${bodyText.slice(0, 300)}`;
+          } else if (finishReason === "length" && !content.trimEnd().endsWith("}")) {
+            // Truncated mid-JSON: treat as a failure rather than feeding a
+            // half object into validation.
+            errorCode = "OUTPUT_TRUNCATED";
+            errorMessage = `finish_reason=length completion_tokens=${outputTokens ?? "?"}`;
+            content = null;
           }
         } catch {
           errorCode = "UNPARSEABLE_RESPONSE";
@@ -203,6 +216,8 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       errorCode,
       errorMessage,
       runId,
+      finishReason,
+      outputTokens,
     };
 
     if (ok) return lastResult;
