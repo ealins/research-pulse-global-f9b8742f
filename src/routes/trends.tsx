@@ -13,7 +13,7 @@ export const Route = createFileRoute("/trends")({
       {
         name: "description",
         content:
-          "Topic momentum in photogrammetry, remote sensing and geoinformatics, computed from tracked publications, projects and open positions — not editorial opinion.",
+          "Topic momentum in photogrammetry, remote sensing and geoinformatics, computed from tracked papers, projects and open positions.",
       },
       { property: "og:title", content: "Research Trends — GeoAcademic Radar" },
       {

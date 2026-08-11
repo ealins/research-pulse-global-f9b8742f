@@ -13,7 +13,7 @@ export const Route = createFileRoute("/methodology")({
       {
         name: "description",
         content:
-          "How GeoAcademic Radar collects, verifies and scores academic records: source registry, verification statuses, deduplication rules and the exact momentum formula.",
+          "How we collect, verify and score academic records: source registry, verification statuses, dedupe rules and the momentum formula.",
       },
       { property: "og:title", content: "Methodology & provenance — GeoAcademic Radar" },
       {

@@ -14,7 +14,7 @@ export const Route = createFileRoute("/topics/")({
       {
         name: "description",
         content:
-          "The controlled vocabulary behind the platform: photogrammetry, remote sensing and geoinformatics topics with definitions, grouped by category and linked to activity.",
+          "Photogrammetry, remote sensing and geoinformatics topics with definitions, grouped by category and linked to live activity.",
       },
       { property: "og:title", content: "Topic taxonomy — GeoAcademic Radar" },
       {

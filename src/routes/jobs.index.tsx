@@ -32,7 +32,7 @@ export const Route = createFileRoute("/jobs/")({
       {
         name: "description",
         content:
-          "Academic vacancies (PhD, postdoc, research staff) and industry roles at geospatial employers in photogrammetry, remote sensing and geoinformatics, each with deadline and official source link.",
+          "PhD, postdoc and industry vacancies in photogrammetry, remote sensing and geoinformatics, each with a deadline and official link.",
       },
       { property: "og:title", content: "Academic & industry jobs — GeoAcademic Radar" },
       {

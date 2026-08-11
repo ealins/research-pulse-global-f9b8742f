@@ -16,7 +16,7 @@ export const Route = createFileRoute("/institutions/")({
       {
         name: "description",
         content:
-          "Universities, institutes and labs in photogrammetry, remote sensing and geoinformatics, ranked by live academic pulse: open calls, active projects, recent papers and people.",
+          "Universities, institutes and labs in photogrammetry, remote sensing and geoinformatics, ranked by live academic pulse.",
       },
       { property: "og:title", content: "Institutions ranked by academic pulse" },
       {
