@@ -62,7 +62,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16.5rem_1fr]">
-      <aside className="border-b border-sidebar-border bg-sidebar/80 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
+      <aside className="border-b border-sidebar-border bg-sidebar/80 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
         <div className="flex items-center gap-3 px-5 py-5">
           <span className="relative flex h-2.5 w-2.5 items-center justify-center text-primary">
             <span className="live-dot absolute inset-0 rounded-full" />
