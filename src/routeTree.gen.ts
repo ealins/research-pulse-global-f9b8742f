@@ -76,9 +76,9 @@ const InstitutionsIndexRoute = InstitutionsIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstitutionsSlugRoute = InstitutionsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => InstitutionsRoute,
+  id: '/institutions/$slug',
+  path: '/institutions/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const JobsIndexRoute = JobsIndexRouteImport.update({
   id: '/jobs/',
@@ -86,9 +86,9 @@ const JobsIndexRoute = JobsIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const JobsSlugRoute = JobsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => JobsRoute,
+  id: '/jobs/$slug',
+  path: '/jobs/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   id: '/projects/',
@@ -96,9 +96,9 @@ const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsSlugRoute = ProjectsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => ProjectsRoute,
+  id: '/projects/$slug',
+  path: '/projects/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const PublicationsIndexRoute = PublicationsIndexRouteImport.update({
   id: '/publications/',
@@ -106,9 +106,9 @@ const PublicationsIndexRoute = PublicationsIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const PublicationsIdRoute = PublicationsIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => PublicationsRoute,
+  id: '/publications/$id',
+  path: '/publications/$id',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ResearchersIndexRoute = ResearchersIndexRouteImport.update({
   id: '/researchers/',
@@ -116,9 +116,9 @@ const ResearchersIndexRoute = ResearchersIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const ResearchersSlugRoute = ResearchersSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => ResearchersRoute,
+  id: '/researchers/$slug',
+  path: '/researchers/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const TopicsIndexRoute = TopicsIndexRouteImport.update({
   id: '/topics/',
@@ -126,9 +126,9 @@ const TopicsIndexRoute = TopicsIndexRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const TopicsSlugRoute = TopicsSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => TopicsRoute,
+  id: '/topics/$slug',
+  path: '/topics/$slug',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -276,6 +276,12 @@ export interface RootRouteChildren {
   MethodologyRoute: typeof MethodologyRoute
   ProgrammesRoute: typeof ProgrammesRoute
   TrendsRoute: typeof TrendsRoute
+  InstitutionsSlugRoute: typeof InstitutionsSlugRoute
+  JobsSlugRoute: typeof JobsSlugRoute
+  ProjectsSlugRoute: typeof ProjectsSlugRoute
+  PublicationsIdRoute: typeof PublicationsIdRoute
+  ResearchersSlugRoute: typeof ResearchersSlugRoute
+  TopicsSlugRoute: typeof TopicsSlugRoute
   InstitutionsIndexRoute: typeof InstitutionsIndexRoute
   JobsIndexRoute: typeof JobsIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
@@ -351,10 +357,10 @@ declare module '@tanstack/react-router' {
     }
     '/institutions/$slug': {
       id: '/institutions/$slug'
-      path: '/$slug'
+      path: '/institutions/$slug'
       fullPath: '/institutions/$slug'
       preLoaderRoute: typeof InstitutionsSlugRouteImport
-      parentRoute: typeof InstitutionsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/jobs/': {
       id: '/jobs/'
@@ -365,10 +371,10 @@ declare module '@tanstack/react-router' {
     }
     '/jobs/$slug': {
       id: '/jobs/$slug'
-      path: '/$slug'
+      path: '/jobs/$slug'
       fullPath: '/jobs/$slug'
       preLoaderRoute: typeof JobsSlugRouteImport
-      parentRoute: typeof JobsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/projects/': {
       id: '/projects/'
@@ -379,10 +385,10 @@ declare module '@tanstack/react-router' {
     }
     '/projects/$slug': {
       id: '/projects/$slug'
-      path: '/$slug'
+      path: '/projects/$slug'
       fullPath: '/projects/$slug'
       preLoaderRoute: typeof ProjectsSlugRouteImport
-      parentRoute: typeof ProjectsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/publications/': {
       id: '/publications/'
@@ -393,10 +399,10 @@ declare module '@tanstack/react-router' {
     }
     '/publications/$id': {
       id: '/publications/$id'
-      path: '/$id'
+      path: '/publications/$id'
       fullPath: '/publications/$id'
       preLoaderRoute: typeof PublicationsIdRouteImport
-      parentRoute: typeof PublicationsRoute
+      parentRoute: typeof rootRouteImport
     }
     '/researchers/': {
       id: '/researchers/'
@@ -407,10 +413,10 @@ declare module '@tanstack/react-router' {
     }
     '/researchers/$slug': {
       id: '/researchers/$slug'
-      path: '/$slug'
+      path: '/researchers/$slug'
       fullPath: '/researchers/$slug'
       preLoaderRoute: typeof ResearchersSlugRouteImport
-      parentRoute: typeof ResearchersRoute
+      parentRoute: typeof rootRouteImport
     }
     '/topics/': {
       id: '/topics/'
@@ -421,10 +427,10 @@ declare module '@tanstack/react-router' {
     }
     '/topics/$slug': {
       id: '/topics/$slug'
-      path: '/$slug'
+      path: '/topics/$slug'
       fullPath: '/topics/$slug'
       preLoaderRoute: typeof TopicsSlugRouteImport
-      parentRoute: typeof TopicsRoute
+      parentRoute: typeof rootRouteImport
     }
   }
 }
@@ -438,6 +444,12 @@ const rootRouteChildren: RootRouteChildren = {
   MethodologyRoute: MethodologyRoute,
   ProgrammesRoute: ProgrammesRoute,
   TrendsRoute: TrendsRoute,
+  InstitutionsSlugRoute: InstitutionsSlugRoute,
+  JobsSlugRoute: JobsSlugRoute,
+  ProjectsSlugRoute: ProjectsSlugRoute,
+  PublicationsIdRoute: PublicationsIdRoute,
+  ResearchersSlugRoute: ResearchersSlugRoute,
+  TopicsSlugRoute: TopicsSlugRoute,
   InstitutionsIndexRoute: InstitutionsIndexRoute,
   JobsIndexRoute: JobsIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
@@ -448,13 +460,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
