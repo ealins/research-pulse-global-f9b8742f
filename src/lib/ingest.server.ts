@@ -37,14 +37,18 @@ function pathOf(url: string): string {
 export function classifyUrlAndText(url: string, title: string, text: string): Classification {
   // Match on path + title only: the host (e.g. ifp.uni-stuttgart.de) would
   // otherwise tag every page of an institute with the same category.
-  const haystack = `${pathOf(url)} ${title}`.toLowerCase();
+  const path = pathOf(url);
+  const heading = title.toLowerCase();
   const body = text.toLowerCase().slice(0, 6000);
   let best: Classification = { classification: "UNKNOWN", confidence: 0 };
   for (const rule of CATEGORY_RULES) {
     let score = 0;
     for (const w of rule.words) {
-      if (haystack.includes(w)) score += 0.45;
-      if (body.includes(w.replace(/-/g, " "))) score += 0.12;
+      // The URL path is the strongest signal; institute names in titles would
+      // otherwise label every page of an institute as a department page.
+      if (path.includes(w)) score += 0.5;
+      if (heading.includes(w)) score += 0.15;
+      if (body.includes(w.replace(/-/g, " "))) score += 0.08;
     }
     if (score > best.confidence) best = { classification: rule.kind, confidence: Math.min(0.95, score) };
   }
@@ -190,7 +194,7 @@ export type DiscoveryResult = {
  * Discovers academically relevant sources for one institution, scoped to the
  * institute host/path only — never the whole university domain.
  */
-export async function discoverInstitutionSources(institutionId: string, maxSources = 60): Promise<DiscoveryResult> {
+export async function discoverInstitutionSources(institutionId: string, maxSources = 150): Promise<DiscoveryResult> {
   const { data: inst, error } = await supabaseAdmin
     .from("institutions")
     .select("id, name, slug, official_url, research_url, careers_url")
@@ -235,7 +239,16 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
 
   result.discovered = candidates.size;
 
-  for (const [url, meta] of Array.from(candidates.entries()).slice(0, maxSources)) {
+  const CATEGORY_ORDER = ["vacancies", "people", "projects", "publications", "events", "programmes", "courses", "research_groups"];
+  const ranked = Array.from(candidates.entries()).sort((a, b) => {
+    const rank = (u: string) => {
+      const idx = CATEGORY_ORDER.indexOf(categoryForUrl(u) ?? "");
+      return idx === -1 ? CATEGORY_ORDER.length : idx;
+    };
+    return rank(a[0]) - rank(b[0]);
+  });
+
+  for (const [url, meta] of ranked.slice(0, maxSources)) {
     const category = categoryForUrl(url) ?? "research";
     const sourceType =
       category === "vacancies" ? "careers_page" : category === "research_groups" ? "research_group" : "institution";
