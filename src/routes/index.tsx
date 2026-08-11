@@ -1,10 +1,41 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, queryOptions } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
 import { countsQuery, pulseQuery } from "@/lib/radar-queries";
+import { PulseHub, type Cluster } from "@/components/PulseHub";
+import type { GlobeArc, GlobePoint } from "@/components/Globe";
+import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const hubGlobeQuery = queryOptions({
+  queryKey: ["hub-globe"],
+  queryFn: async () => {
+    const [institutions, opportunities, edges] = await Promise.all([
+      supabase.from("institutions").select("id, name, slug, country, latitude, longitude"),
+      supabase
+        .from("opportunities")
+        .select("institution_id")
+        .in("status", ["open", "closing_soon", "rolling", "possibly_open"]),
+      supabase
+        .from("collaboration_edges")
+        .select("source_entity_id, target_entity_id, weight")
+        .order("weight", { ascending: false })
+        .limit(80),
+    ]);
+    if (institutions.error) throw institutions.error;
+    if (opportunities.error) throw opportunities.error;
+    if (edges.error) throw edges.error;
+    return {
+      institutions: institutions.data ?? [],
+      opportunities: opportunities.data ?? [],
+      edges: edges.data ?? [],
+    };
+  },
+});
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
