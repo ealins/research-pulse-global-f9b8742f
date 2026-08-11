@@ -6,7 +6,7 @@ import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/
 import { eventsQuery, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/events")({
+export const Route = createFileRoute("/events/")({
   head: () => ({
     meta: [
       { title: "Conferences & Events — GeoAcademic Radar" },
