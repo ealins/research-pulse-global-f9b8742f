@@ -636,9 +636,18 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     .eq("official_source_url", raw.final_url ?? "")
     .maybeSingle();
 
+  // Two postings can share a title (e.g. the same role advertised per language),
+  // so keep slugs unique by appending a stable suffix from the source URL.
+  let uniqueSlug = slug;
+  const { data: slugOwner } = await supabaseAdmin.from("opportunities").select("id").eq("slug", slug).maybeSingle();
+  if (slugOwner && slugOwner.id !== existing?.id) {
+    const suffix = (await sha256(raw.final_url ?? raw.id)).slice(0, 6);
+    uniqueSlug = `${slug.slice(0, 70)}-${suffix}`;
+  }
+
   const payload = {
     title: title.slice(0, 300),
-    slug,
+    slug: uniqueSlug,
     normalized_title: title.toLowerCase().slice(0, 300),
     institution_id: raw.institution_id,
     opportunity_type: (isPhd ? "phd" : "other") as never,
