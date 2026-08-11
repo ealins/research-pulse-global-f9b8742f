@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 
@@ -6,7 +6,7 @@ import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/
 import { formatDate, projectsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/projects")({
+export const Route = createFileRoute("/projects/")({
   head: () => ({
     meta: [
       { title: "Research Projects — GeoAcademic Radar" },
@@ -78,12 +78,24 @@ function ProjectsPage() {
                     </span>
                   ) : null}
                 </div>
-                <h2 className="mt-2.5 text-base font-semibold leading-snug text-foreground">
+                <Link
+                  to="/projects/$slug"
+                  params={{ slug: p.slug }}
+                  className="mt-2.5 block text-base font-semibold leading-snug text-foreground hover:text-primary"
+                >
                   {p.name}
-                </h2>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {p.institutions?.name ?? "Lead institution not stated"}
-                </p>
+                </Link>
+                {p.institutions?.slug ? (
+                  <Link
+                    to="/institutions/$slug"
+                    params={{ slug: p.institutions.slug }}
+                    className="mt-1 block text-xs text-muted-foreground hover:text-primary"
+                  >
+                    {p.institutions.name}
+                  </Link>
+                ) : (
+                  <p className="mt-1 text-xs text-muted-foreground">Lead institution not stated</p>
+                )}
                 {p.summary ? (
                   <p className="mt-2.5 text-sm leading-relaxed text-foreground/80">{p.summary}</p>
                 ) : null}

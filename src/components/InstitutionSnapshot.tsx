@@ -152,6 +152,67 @@ export function InstitutionSnapshot({
               </section>
             ) : null}
 
+            {(data?.projects?.length ?? 0) > 0 || (data?.publications?.length ?? 0) > 0 ? (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {(data?.projects?.length ?? 0) > 0 ? (
+                  <section>
+                    <h3 className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Projects
+                    </h3>
+                    <ul className="mt-2 space-y-1.5">
+                      {(data!.projects as any[]).slice(0, 5).map((pr) => (
+                        <li key={pr.id}>
+                          <Link
+                            to="/projects/$slug"
+                            params={{ slug: pr.slug }}
+                            onClick={() => onOpenChange(false)}
+                            className="panel panel-hover block p-2.5"
+                          >
+                            <p className="truncate text-xs font-medium text-foreground">
+                              {pr.acronym ? `${pr.acronym} — ` : ""}
+                              {pr.name}
+                            </p>
+                            <p className="mt-0.5 text-[0.66rem] text-muted-foreground">
+                              {[pr.status?.replace(/_/g, " "), pr.funding_organization]
+                                .filter(Boolean)
+                                .join(" · ")}
+                            </p>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+                {(data?.publications?.length ?? 0) > 0 ? (
+                  <section>
+                    <h3 className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Recent publications
+                    </h3>
+                    <ul className="mt-2 space-y-1.5">
+                      {(data!.publications as any[]).slice(0, 5).map((pb) => (
+                        <li key={pb.id}>
+                          <Link
+                            to="/publications/$id"
+                            params={{ id: pb.id }}
+                            onClick={() => onOpenChange(false)}
+                            className="panel panel-hover block p-2.5"
+                          >
+                            <p className="line-clamp-2 text-xs font-medium leading-snug text-foreground">
+                              {pb.title}
+                            </p>
+                            <p className="mono-num mt-0.5 text-[0.66rem] text-muted-foreground">
+                              {[pb.venue, pb.year].filter(Boolean).join(" · ")}
+                              {pb.citation_count != null ? ` · ${pb.citation_count} cit.` : ""}
+                            </p>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ) : null}
+              </div>
+            ) : null}
+
             {liveCalls.length ? (
               <section>
                 <h3 className="font-display text-[0.7rem] font-semibold uppercase tracking-[0.18em] text-muted-foreground">

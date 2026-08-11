@@ -6,7 +6,7 @@ import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/
 import { researchersQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/researchers")({
+export const Route = createFileRoute("/researchers/")({
   head: () => ({
     meta: [
       { title: "Researchers — GeoAcademic Radar" },

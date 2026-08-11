@@ -243,11 +243,15 @@ function InstitutionDetail() {
         <Section title="Funded projects" icon={FlaskConical} count={data.projects.length}>
           <ul className="space-y-2">
             {data.projects.map((p: any) => (
-              <li key={p.id} className="panel p-3">
-                <p className="text-sm text-foreground">
+              <li key={p.id} className="panel panel-hover p-3">
+                <Link
+                  to="/projects/$slug"
+                  params={{ slug: p.slug }}
+                  className="block text-sm text-foreground hover:text-primary"
+                >
                   {p.acronym ? `${p.acronym} — ` : ""}
                   {p.name}
-                </p>
+                </Link>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {p.status} · {formatDate(p.start_date)} → {formatDate(p.end_date)}
                   {p.funding_organization ? ` · ${p.funding_organization}` : ""}
@@ -273,8 +277,14 @@ function InstitutionDetail() {
         <Section title="Recent publications" icon={ScrollText} count={data.publications.length}>
           <ul className="space-y-2">
             {data.publications.map((p: any) => (
-              <li key={p.id} className="panel p-3">
-                <p className="text-sm leading-snug text-foreground">{p.title}</p>
+              <li key={p.id} className="panel panel-hover p-3">
+                <Link
+                  to="/publications/$id"
+                  params={{ id: p.id }}
+                  className="block text-sm leading-snug text-foreground hover:text-primary"
+                >
+                  {p.title}
+                </Link>
                 <p className="mono-num mt-1 text-[0.68rem] text-muted-foreground">
                   {[p.venue, p.year].filter(Boolean).join(" · ")}
                   {p.citation_count != null ? ` · ${p.citation_count} citations` : ""}

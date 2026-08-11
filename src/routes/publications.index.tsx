@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Quote, Unlock } from "lucide-react";
 
@@ -6,7 +6,7 @@ import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/
 import { publicationsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/publications")({
+export const Route = createFileRoute("/publications/")({
   head: () => ({
     meta: [
       { title: "Publications — GeoAcademic Radar" },
@@ -67,9 +67,13 @@ function PublicationsPage() {
                     </span>
                   ) : null}
                 </div>
-                <h2 className="mt-2 text-[0.95rem] font-semibold leading-snug text-foreground">
+                <Link
+                  to="/publications/$id"
+                  params={{ id: p.id }}
+                  className="mt-2 block text-[0.95rem] font-semibold leading-snug text-foreground hover:text-primary"
+                >
                   {p.title}
-                </h2>
+                </Link>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {p.authors_text ?? "Authors not stated"}
                 </p>
