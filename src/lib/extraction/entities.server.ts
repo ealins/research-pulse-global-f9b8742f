@@ -288,7 +288,7 @@ export function extractProgramme(input: ExtractionInput): Promise<ExtractionOutc
 export const RESEARCHER_SYSTEM_PROMPT = `${ROLE}
 
 ${COMMON_RULES}
-6. NEVER infer an e-mail address, an ORCID, a department or a supervisor relationship. Return null unless the text states it literally.
+7. NEVER infer an e-mail address, an ORCID, a department or a supervisor relationship. Return null unless the text states it literally.
 
 Return exactly this shape:
 {
