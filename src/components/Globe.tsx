@@ -14,7 +14,7 @@ export type GlobePoint = {
 
 export type GlobeArc = { from: string; to: string; weight: number };
 
-const TILT = (-16 * Math.PI) / 180;
+const TILT = (18 * Math.PI) / 180;
 
 type Vec = { x: number; y: number; z: number };
 
