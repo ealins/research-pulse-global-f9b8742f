@@ -36,6 +36,7 @@ import { Route as ResearchersIndexRouteImport } from './routes/researchers.index
 import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
 import { Route as TopicsIndexRouteImport } from './routes/topics.index'
 import { Route as TopicsSlugRouteImport } from './routes/topics.$slug'
+import { Route as ApiPublicHooksIngestBatchRouteImport } from './routes/api/public/hooks/ingest-batch'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -172,6 +173,12 @@ const TopicsSlugRoute = TopicsSlugRouteImport.update({
   path: '/topics/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicHooksIngestBatchRoute =
+  ApiPublicHooksIngestBatchRouteImport.update({
+    id: '/api/public/hooks/ingest-batch',
+    path: '/api/public/hooks/ingest-batch',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -201,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
   '/topics/': typeof TopicsIndexRoute
+  '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -230,6 +238,7 @@ export interface FileRoutesByTo {
   '/publications': typeof PublicationsIndexRoute
   '/researchers': typeof ResearchersIndexRoute
   '/topics': typeof TopicsIndexRoute
+  '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -260,6 +269,7 @@ export interface FileRoutesById {
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
   '/topics/': typeof TopicsIndexRoute
+  '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/publications/'
     | '/researchers/'
     | '/topics/'
+    | '/api/public/hooks/ingest-batch'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -320,6 +331,7 @@ export interface FileRouteTypes {
     | '/publications'
     | '/researchers'
     | '/topics'
+    | '/api/public/hooks/ingest-batch'
   id:
     | '__root__'
     | '/'
@@ -349,6 +361,7 @@ export interface FileRouteTypes {
     | '/publications/'
     | '/researchers/'
     | '/topics/'
+    | '/api/public/hooks/ingest-batch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -379,6 +392,7 @@ export interface RootRouteChildren {
   PublicationsIndexRoute: typeof PublicationsIndexRoute
   ResearchersIndexRoute: typeof ResearchersIndexRoute
   TopicsIndexRoute: typeof TopicsIndexRoute
+  ApiPublicHooksIngestBatchRoute: typeof ApiPublicHooksIngestBatchRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -572,6 +586,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TopicsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/hooks/ingest-batch': {
+      id: '/api/public/hooks/ingest-batch'
+      path: '/api/public/hooks/ingest-batch'
+      fullPath: '/api/public/hooks/ingest-batch'
+      preLoaderRoute: typeof ApiPublicHooksIngestBatchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -603,6 +624,7 @@ const rootRouteChildren: RootRouteChildren = {
   PublicationsIndexRoute: PublicationsIndexRoute,
   ResearchersIndexRoute: ResearchersIndexRoute,
   TopicsIndexRoute: TopicsIndexRoute,
+  ApiPublicHooksIngestBatchRoute: ApiPublicHooksIngestBatchRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
