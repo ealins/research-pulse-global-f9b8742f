@@ -43,6 +43,7 @@ export const opportunitiesQuery = queryOptions({
          institutions ( name, slug, abbreviation ),
          opportunity_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("application_deadline", { ascending: true, nullsFirst: false })
       .limit(200);
     if (error) throw error;
@@ -58,6 +59,7 @@ export const pulseQuery = queryOptions({
       .select(
         "id, category, title, summary, event_date, importance, link_url, source_url, verification_status, confidence, is_demo, country",
       )
+      .order("is_demo", { ascending: true })
       .order("importance", { ascending: false })
       .order("event_date", { ascending: false })
       .limit(60);
@@ -113,6 +115,7 @@ export const institutionsQuery = queryOptions({
          research_url, description, verification_status, is_demo,
          institution_topics ( weight, research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("name");
     if (error) throw error;
     return data ?? [];
@@ -130,6 +133,7 @@ export const researchersQuery = queryOptions({
          institutions ( name, slug, country ),
          researcher_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("full_name");
     if (error) throw error;
     return data ?? [];
@@ -163,6 +167,7 @@ export const eventsQuery = queryOptions({
          verification_status, is_demo,
          event_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
     return data ?? [];
@@ -181,6 +186,7 @@ export const publicationsQuery = queryOptions({
          institutions!publications_institution_id_fkey ( name, slug ),
          publication_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("year", { ascending: false, nullsFirst: false })
       .order("citation_count", { ascending: false, nullsFirst: false })
       .limit(200);
@@ -201,6 +207,7 @@ export const projectsQuery = queryOptions({
          institutions!projects_institution_id_fkey ( name, slug, country ),
          project_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
     return data ?? [];
@@ -218,6 +225,7 @@ export const coursesQuery = queryOptions({
          institutions ( name, slug, country ),
          course_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
     return data ?? [];
@@ -250,6 +258,7 @@ export const topicsQuery = queryOptions({
       .from("research_topics")
       .select("id, name, slug, category, description")
       .eq("active", true)
+      .order("is_demo", { ascending: true })
       .order("name");
     if (error) throw error;
     return data ?? [];

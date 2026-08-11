@@ -242,6 +242,7 @@ export function countryDetailQuery(slug: string) {
              verification_status, is_demo, institutions ( name, slug )`,
           )
           .or(`institution_id.in.(${ids.join(",")}),country.eq.${country}`)
+          .order("is_demo", { ascending: true })
           .order("application_deadline", { ascending: true, nullsFirst: false })
           .limit(60),
         supabase
@@ -251,11 +252,13 @@ export function countryDetailQuery(slug: string) {
              institutions ( name, slug )`,
           )
           .in("institution_id", ids)
+          .order("is_demo", { ascending: true })
           .order("title"),
         supabase
           .from("events")
           .select("id, title, slug, start_date, location, organization, website")
           .eq("country", country)
+          .order("is_demo", { ascending: true })
           .order("start_date"),
         supabase
           .from("researchers")
@@ -266,6 +269,7 @@ export function countryDetailQuery(slug: string) {
           .from("projects")
           .select("id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug )")
           .in("institution_id", ids)
+          .order("is_demo", { ascending: true })
           .order("start_date", { ascending: false, nullsFirst: false })
           .limit(30),
         supabase
@@ -323,6 +327,7 @@ export const programmeCatalogueQuery = queryOptions({
          institutions ( name, slug, country, city, continent ),
          course_topics ( research_topics ( name, slug ) )`,
       )
+      .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
     return (data ?? []).map((c) => ({
@@ -361,6 +366,7 @@ export function programmeDetailQuery(slug: string) {
               .select("id, title, slug, opportunity_type, status, application_deadline")
               .eq("institution_id", instId)
               .in("status", OPEN_STATUSES)
+              .order("is_demo", { ascending: true })
               .order("application_deadline", { ascending: true, nullsFirst: false })
               .limit(8)
           : Promise.resolve({ data: [], error: null }),

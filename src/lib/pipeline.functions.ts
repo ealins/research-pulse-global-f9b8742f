@@ -358,3 +358,134 @@ export const updateScheduleConfig = createServerFn({ method: "POST" })
     const { saveSchedule } = await import("./schedule.server");
     return await saveSchedule(data as never, context.userId);
   });
+
+export type RealDataMigration = {
+  raw_pages: number;
+  raw_processed: number;
+  raw_pending: number;
+  candidates: { label: string; classification: string; candidates: number; created_real: number; demo_remaining: number }[];
+  publications: { provider_backed: number; demo_remaining: number };
+  institutions: { total: number; source_backed: number; demo_remaining: number; with_openalex_identity: number };
+  queue: { normalize_open: number; promote_open: number; publications_open: number };
+  model: { calls: number; cache_hits: number; validation_rejects: number };
+  manual_review: number;
+};
+
+/** REAL DATA MIGRATION progress — every number is a live database count. */
+export const getRealDataMigration = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<RealDataMigration> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    type Q = { select: (c: string, o?: unknown) => Q; eq: (c: string, v: unknown) => Q; in: (c: string, v: unknown[]) => Q; not: (c: string, o: string, v: unknown) => Q };
+    const run = async (build: (q: Q) => Q, table: string): Promise<number> => {
+      const q = build((supabaseAdmin.from(table as never) as unknown as Q).select("id", { count: "exact", head: true }));
+      const { count } = (await (q as unknown as Promise<{ count: number | null }>)) as { count: number | null };
+      return count ?? 0;
+    };
+
+    const rawByClass = async (classification: string) =>
+      run((q) => q.eq("classification", classification), "raw_records");
+    const realRows = async (table: string) => run((q) => q.eq("is_demo", false), table);
+    const demoRows = async (table: string) => run((q) => q.eq("is_demo", true), table);
+
+    const [
+      raw_pages,
+      raw_processed,
+      raw_pending,
+      candProject,
+      candResearcher,
+      candEvent,
+      candProgramme,
+      candCourse,
+      candVacancy,
+      realProjects,
+      demoProjects,
+      realResearchers,
+      demoResearchers,
+      realEvents,
+      demoEvents,
+      realCourses,
+      demoCourses,
+      realOpps,
+      demoOpps,
+      pubsProvider,
+      pubsDemo,
+      instTotal,
+      instReal,
+      instDemo,
+      instIdentity,
+      normalizeOpen,
+      promoteOpen,
+      publicationsOpen,
+      modelCalls,
+      modelCached,
+      validationRejects,
+      reviewDupes,
+      reviewNeeds,
+    ] = await Promise.all([
+      run((q) => q, "raw_records"),
+      run((q) => q.eq("normalization_status", "NORMALIZED"), "raw_records"),
+      run((q) => q.eq("normalization_status", "PENDING"), "raw_records"),
+      rawByClass("PROJECT"),
+      rawByClass("RESEARCHER"),
+      rawByClass("EVENT"),
+      rawByClass("PROGRAMME"),
+      rawByClass("COURSE"),
+      rawByClass("VACANCY"),
+      realRows("projects"),
+      demoRows("projects"),
+      realRows("researchers"),
+      demoRows("researchers"),
+      realRows("events"),
+      demoRows("events"),
+      realRows("courses"),
+      demoRows("courses"),
+      realRows("opportunities"),
+      demoRows("opportunities"),
+      run((q) => q.not("external_id", "is", null).eq("is_demo", false), "publications"),
+      demoRows("publications"),
+      run((q) => q, "institutions"),
+      realRows("institutions"),
+      demoRows("institutions"),
+      run((q) => q.not("openalex_id", "is", null), "institutions"),
+      run((q) => q.eq("task_type", "NORMALIZE").in("status", ["QUEUED", "RETRY", "PROCESSING"]), "ingestion_tasks"),
+      run((q) => q.eq("task_type", "PROMOTE_INSTITUTION").in("status", ["QUEUED", "RETRY", "PROCESSING"]), "ingestion_tasks"),
+      run((q) => q.eq("task_type", "IMPORT_PUBLICATIONS").in("status", ["QUEUED", "RETRY", "PROCESSING"]), "ingestion_tasks"),
+      run((q) => q, "llm_processing_runs"),
+      run((q) => q.eq("cached", true), "llm_processing_runs"),
+      run((q) => q.eq("status", "VALIDATION_FAILED"), "llm_processing_runs"),
+      run((q) => q.eq("resolved", false), "duplicate_candidates"),
+      run((q) => q.eq("verification_status", "needs_review"), "opportunities"),
+    ]);
+
+    return {
+      raw_pages,
+      raw_processed,
+      raw_pending,
+      candidates: [
+        { label: "Research projects", classification: "PROJECT", candidates: candProject, created_real: realProjects, demo_remaining: demoProjects },
+        { label: "Researcher profiles", classification: "RESEARCHER", candidates: candResearcher, created_real: realResearchers, demo_remaining: demoResearchers },
+        { label: "Academic events", classification: "EVENT", candidates: candEvent, created_real: realEvents, demo_remaining: demoEvents },
+        { label: "Programmes / courses", classification: "PROGRAMME+COURSE", candidates: candProgramme + candCourse, created_real: realCourses, demo_remaining: demoCourses },
+        { label: "Positions / vacancies", classification: "VACANCY", candidates: candVacancy, created_real: realOpps, demo_remaining: demoOpps },
+      ],
+      publications: { provider_backed: pubsProvider, demo_remaining: pubsDemo },
+      institutions: { total: instTotal, source_backed: instReal, demo_remaining: instDemo, with_openalex_identity: instIdentity },
+      queue: { normalize_open: normalizeOpen, promote_open: promoteOpen, publications_open: publicationsOpen },
+      model: { calls: modelCalls, cache_hits: modelCached, validation_rejects: validationRejects },
+      manual_review: reviewDupes + reviewNeeds,
+    };
+  });
+
+/** Enqueues the one-time backfill of already-stored pages + provider imports. */
+export const startRealDataBackfill = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    await assertAdmin(context as never);
+    const { enqueueRawBackfill, enqueueProviderBackfill } = await import("./backfill.server");
+    const raw = await enqueueRawBackfill(400);
+    const providers = await enqueueProviderBackfill(120);
+    return { raw, providers };
+  });

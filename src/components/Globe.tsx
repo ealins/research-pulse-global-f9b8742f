@@ -16,6 +16,13 @@ export type GlobeArc = { from: string; to: string; weight: number };
 
 const TILT = (18 * Math.PI) / 180;
 
+/** Zoom is a multiplier on the sphere radius. Limits keep the globe usable. */
+const MIN_ZOOM = 0.6;
+const MAX_ZOOM = 2.6;
+const DEFAULT_ZOOM = 1;
+const DEFAULT_ROTATION = -24;
+const clampZoom = (z: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, z));
+
 type Vec = { x: number; y: number; z: number };
 
 function toVec(lat: number, lon: number, rot: number): Vec {
@@ -58,7 +65,12 @@ export function Globe({
     null,
   );
 
-  const rot = useRef(-24);
+  const zoom = useRef(1);
+  const zoomTarget = useRef(1);
+  const [zoomLabel, setZoomLabel] = useState(1);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ dist: number; zoom: number } | null>(null);
+  const rot = useRef(DEFAULT_ROTATION);
   const vel = useRef(0.006); // deg per ms — the idle glide
   const drag = useRef<{ x: number; last: number; time: number; moved: boolean } | null>(null);
   const hitmap = useRef<{ id: string; name: string; x: number; y: number; r: number; live: boolean }[]>(
@@ -124,7 +136,9 @@ export function Globe({
 
       const cx = w / 2;
       const cy = h / 2;
-      const R = Math.max(12, Math.min(w, h) * 0.42);
+      // Smooth interpolation toward the zoom target; purely local state.
+      zoom.current += (zoomTarget.current - zoom.current) * (1 - Math.exp(-dt / 120));
+      const R = Math.max(12, Math.min(w, h) * 0.42 * zoom.current);
       const rotation = rot.current;
       const { pts: P, arcs: A } = dataRef.current;
 
@@ -277,7 +291,9 @@ export function Globe({
         const depth = 0.45 + 0.55 * v.z;
         const active = sel.current === p.id;
         const color = p.live ? theme.growth : theme.primary;
-        const r = (active ? 4.6 : 3.2) * depth;
+        // Markers grow far slower than the sphere so they stay readable.
+        const markerScale = Math.min(1.6, Math.sqrt(zoom.current));
+        const r = (active ? 4.6 : 3.2) * depth * markerScale;
 
         ctx.globalAlpha = 0.5 * depth;
         ctx.strokeStyle = color;
@@ -365,6 +381,33 @@ export function Globe({
     };
   }, [spinning, height]);
 
+  // Native non-passive wheel listener: React's onWheel is passive, so
+  // preventDefault() there is ignored and the page would scroll instead.
+  useEffect(() => {
+    const el = canvasRef.current;
+    if (!el) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const dy = e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 100 : 1);
+      zoomTarget.current = clampZoom(zoomTarget.current * Math.exp(-dy * 0.0015));
+      setZoomLabel(zoomTarget.current);
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, []);
+
+  const nudgeZoom = (factor: number) => {
+    zoomTarget.current = clampZoom(zoomTarget.current * factor);
+    setZoomLabel(zoomTarget.current);
+  };
+
+  const resetView = () => {
+    zoomTarget.current = DEFAULT_ZOOM;
+    rot.current = DEFAULT_ROTATION;
+    vel.current = 0.006;
+    setZoomLabel(DEFAULT_ZOOM);
+  };
+
   const pick = (e: React.PointerEvent | React.MouseEvent) => {
     const rect = canvasRef.current?.getBoundingClientRect();
     if (!rect) return null;
@@ -388,10 +431,26 @@ export function Globe({
         ref={canvasRef}
         className="block w-full touch-none select-none"
         onPointerDown={(e) => {
+          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (pointers.current.size === 2) {
+            const [a, b] = [...pointers.current.values()];
+            pinch.current = { dist: Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1, zoom: zoomTarget.current };
+            drag.current = null;
+            return;
+          }
           drag.current = { x: e.clientX, last: e.clientX, time: performance.now(), moved: false };
           (e.target as Element).setPointerCapture?.(e.pointerId);
         }}
         onPointerMove={(e) => {
+          if (pointers.current.has(e.pointerId)) pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          // Two-finger pinch: scale from the gesture start distance.
+          if (pinch.current && pointers.current.size >= 2) {
+            const [a, b] = [...pointers.current.values()];
+            const dist = Math.hypot(a!.x - b!.x, a!.y - b!.y) || 1;
+            zoomTarget.current = clampZoom(pinch.current.zoom * (dist / pinch.current.dist));
+            setZoomLabel(zoomTarget.current);
+            return;
+          }
           const d = drag.current;
           if (d) {
             const now = performance.now();
@@ -408,6 +467,8 @@ export function Globe({
           setHover(hit ? { name: hit.name, x: hit.x, y: hit.y, live: hit.live } : null);
         }}
         onPointerUp={(e) => {
+          pointers.current.delete(e.pointerId);
+          if (pointers.current.size < 2) pinch.current = null;
           const d = drag.current;
           drag.current = null;
           if (d && !d.moved) {
@@ -415,12 +476,44 @@ export function Globe({
             onSelect?.(hit && hit.id !== selectedId ? hit.id : null);
           }
         }}
-        onPointerLeave={() => {
+        onPointerLeave={(e) => {
+          pointers.current.delete(e.pointerId);
+          if (pointers.current.size < 2) pinch.current = null;
           drag.current = null;
           setHover(null);
         }}
         style={{ cursor: hover ? "pointer" : "grab" }}
       />
+
+      <div className="absolute right-2 top-2 z-10 flex flex-col gap-1">
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => nudgeZoom(1.25)}
+          disabled={zoomLabel >= MAX_ZOOM - 0.001}
+          className="panel flex h-8 w-8 items-center justify-center rounded-md text-sm text-muted-foreground hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:outline-none disabled:opacity-40"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => nudgeZoom(1 / 1.25)}
+          disabled={zoomLabel <= MIN_ZOOM + 0.001}
+          className="panel flex h-8 w-8 items-center justify-center rounded-md text-sm text-muted-foreground hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:outline-none disabled:opacity-40"
+        >
+          −
+        </button>
+        <button
+          type="button"
+          aria-label="Reset globe view"
+          title="Reset globe view"
+          onClick={resetView}
+          className="panel flex h-8 w-8 items-center justify-center rounded-md text-[0.6rem] uppercase text-muted-foreground hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/60 focus-visible:outline-none"
+        >
+          rst
+        </button>
+      </div>
 
       {hover ? (
         <div
@@ -446,7 +539,7 @@ export function Globe({
           <span className="flex items-center gap-1.5">
             <span className="h-2 w-2 rounded-full bg-primary" /> no live call
           </span>
-          <span>drag to spin · click a pin</span>
+          <span>drag to spin · scroll or pinch to zoom · click a pin</span>
         </div>
       )}
     </div>

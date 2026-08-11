@@ -12,6 +12,7 @@ import { getPipelineHealth, runDiscovery, runQueue, requeueDeadTasks } from "@/l
 import { NvidiaEnginePanel } from "@/components/admin/NvidiaEnginePanel";
 import { SchedulerPanel } from "@/components/admin/SchedulerPanel";
 import { OperatingModePanel } from "@/components/admin/OperatingModePanel";
+import { RealDataMigrationPanel } from "@/components/admin/RealDataMigrationPanel";
 
 
 export const Route = createFileRoute("/admin/pipeline-health")({
@@ -221,6 +222,8 @@ function PipelineHealthPage() {
             </section>
 
             <NvidiaEnginePanel />
+
+            <RealDataMigrationPanel />
 
             <OperatingModePanel />
 

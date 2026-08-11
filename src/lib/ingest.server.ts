@@ -292,7 +292,7 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
 /* ------------------------------------------------------------------ */
 
 export async function enqueue(
-  taskType: "DISCOVER" | "FETCH" | "CLASSIFY" | "EXTRACT" | "NORMALIZE" | "VERIFY",
+  taskType: "DISCOVER" | "FETCH" | "CLASSIFY" | "EXTRACT" | "NORMALIZE" | "VERIFY" | "PROMOTE_INSTITUTION" | "IMPORT_PUBLICATIONS",
   opts: { source_id?: string | undefined; institution_id?: string | undefined; payload?: Record<string, unknown> | undefined },
 ): Promise<void> {
   if (opts.source_id) {
@@ -314,14 +314,17 @@ export async function enqueue(
 }
 
 /** Runs a small batch of queued work. Exponential backoff, DEAD after max attempts. */
-export async function runQueueBatch(limit = 8): Promise<{ processed: number; ok: number; failed: number; dead: number; details: string[] }> {
-  const { data: tasks, error } = await supabaseAdmin
+export async function runQueueBatch(
+  limit = 8,
+  taskTypes?: string[],
+): Promise<{ processed: number; ok: number; failed: number; dead: number; details: string[] }> {
+  let query = supabaseAdmin
     .from("ingestion_tasks")
     .select("*")
     .in("status", ["QUEUED", "RETRY"])
-    .lte("run_after", new Date().toISOString())
-    .order("run_after")
-    .limit(limit);
+    .lte("run_after", new Date().toISOString());
+  if (taskTypes && taskTypes.length > 0) query = query.in("task_type", taskTypes);
+  const { data: tasks, error } = await query.order("run_after").limit(limit);
   if (error) throw error;
 
   const out = { processed: 0, ok: 0, failed: 0, dead: 0, details: [] as string[] };
@@ -342,6 +345,20 @@ export async function runQueueBatch(limit = 8): Promise<{ processed: number; ok:
       } else if (task.task_type === "NORMALIZE" && task.source_id) {
         const r = await normalizeSource(task.source_id);
         detail = `NORMALIZE ${r.status}${r.reason ? `: ${r.reason}` : ""}`;
+      } else if (task.task_type === "PROMOTE_INSTITUTION" && task.institution_id) {
+        const { promoteInstitution } = await import("./openalex.server");
+        const r = await promoteInstitution(task.institution_id);
+        detail = `PROMOTE ${r.institution}: ${r.matched ? `matched ${r.openalex_id}${r.promoted ? " (promoted)" : ""}` : `no match (${r.reason})`}`;
+      } else if (task.task_type === "IMPORT_PUBLICATIONS" && task.institution_id) {
+        const { importInstitutionPublications, promoteInstitution } = await import("./openalex.server");
+        const { data: inst } = await supabaseAdmin
+          .from("institutions")
+          .select("openalex_id")
+          .eq("id", task.institution_id)
+          .maybeSingle();
+        if (!inst?.openalex_id) await promoteInstitution(task.institution_id);
+        const r = await importInstitutionPublications(task.institution_id);
+        detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen`;
       } else {
         throw new Error(`Unsupported task ${task.task_type} (missing source/institution)`);
       }
