@@ -49,8 +49,13 @@ export type PipelineHealth = {
   classification_breakdown: { classification: string; count: number }[];
 };
 
-export const getPipelineHealth = createServerFn({ method: "GET" }).handler(async (): Promise<PipelineHealth> => {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+/** Internal operational data: admin session required, enforced server-side. */
+export const getPipelineHealth = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<PipelineHealth> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
 
   type AnyQuery = {
     select: (c: string, o: unknown) => AnyQuery;
