@@ -10,7 +10,7 @@ export const LLM_EXTRACTION_ENABLED = true;
 /** Hard cap on characters sent to the model per request. */
 export const LLM_MAX_INPUT_CHARS = 12_000;
 export const LLM_DEFAULT_TEMPERATURE = 0.1;
-export const LLM_DEFAULT_MAX_TOKENS = 1200;
+export const LLM_DEFAULT_MAX_TOKENS = 2000;
 
 export type LlmOperation =
   | "CONNECTION_TEST"

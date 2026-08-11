@@ -88,7 +88,7 @@ ${cleaned.text}
     rawRecordId: input.rawRecordId ?? null,
     contentHash: input.contentHash ?? null,
     contentReduced: cleaned.contentReduced,
-    maxTokens: 1400,
+    maxTokens: 3000,
   });
 
   return { call, cleanedChars: cleaned.sentChars, originalChars: cleaned.originalChars };
