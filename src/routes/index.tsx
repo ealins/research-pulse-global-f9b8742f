@@ -1,10 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, queryOptions } from "@tanstack/react-query";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
 import { countsQuery, pulseQuery } from "@/lib/radar-queries";
+import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
 import { PulseHub, type Cluster } from "@/components/PulseHub";
 import type { GlobeArc, GlobePoint } from "@/components/Globe";
 import { supabase } from "@/integrations/supabase/client";
@@ -75,6 +76,7 @@ function AcademicPulse() {
   const { data: events, isLoading, error } = useQuery(pulseQuery);
   const { data: counts } = useQuery(countsQuery);
   const { data: globe, isLoading: globeLoading } = useQuery(hubGlobeQuery);
+  const [selectedPoint, setSelectedPoint] = useState<string | null>(null);
 
   const points: GlobePoint[] = useMemo(() => {
     if (!globe) return [];
@@ -173,6 +175,8 @@ function AcademicPulse() {
               points={points}
               arcs={globeArcs}
               loading={globeLoading}
+              selectedId={selectedPoint}
+              onSelectPoint={setSelectedPoint}
             />
           </div>
         </section>
@@ -265,6 +269,14 @@ function AcademicPulse() {
           ) : null}
         </section>
       </div>
+
+      <InstitutionSnapshot
+        slug={points.find((p) => p.id === selectedPoint)?.slug ?? null}
+        open={Boolean(selectedPoint)}
+        onOpenChange={(o) => {
+          if (!o) setSelectedPoint(null);
+        }}
+      />
     </AppShell>
   );
 }

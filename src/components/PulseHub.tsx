@@ -74,11 +74,15 @@ export function PulseHub({
   points,
   arcs,
   loading,
+  selectedId,
+  onSelectPoint,
 }: {
   clusters: Cluster[];
   points: GlobePoint[];
   arcs: GlobeArc[];
   loading?: boolean;
+  selectedId?: string | null | undefined;
+  onSelectPoint?: ((id: string | null) => void) | undefined;
 }) {
   const [hover, setHover] = useState<string | null>(null);
 
@@ -115,7 +119,13 @@ export function PulseHub({
             {loading ? (
               <div className="aspect-square w-full animate-pulse rounded-full bg-muted/40" />
             ) : (
-              <Globe points={points} arcs={arcs} compact />
+              <Globe
+                points={points}
+                arcs={arcs}
+                compact
+                selectedId={selectedId}
+                onSelect={onSelectPoint}
+              />
             )}
           </div>
         </div>
