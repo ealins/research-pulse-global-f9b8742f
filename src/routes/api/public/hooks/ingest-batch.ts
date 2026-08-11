@@ -88,14 +88,62 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           });
         }
 
+        // Time-based source refresh: turns elapsed intervals into fetch work.
+        // Only sources whose own cadence is due are queued.
+        if (action === "refresh-due") {
+          const { enqueueDueRefreshes } = await import("@/lib/schedule.server");
+          const result = await enqueueDueRefreshes(Math.min(200, Math.max(1, body.limit ?? 40)));
+          return json({ action, ...result });
+        }
+
+        // Deterministic deadline maintenance — pure date arithmetic, no model call.
+        if (action === "deadline-sweep") {
+          const { sweepOpportunityDeadlines } = await import("@/lib/schedule.server");
+          const result = await sweepOpportunityDeadlines();
+          return json({ action, ...result });
+        }
+
+        // Queue processing: waking up is cheap, working is not. Check first.
+        const { loadSchedule, readQueueState } = await import("@/lib/schedule.server");
+        const schedule = await loadSchedule();
+        const queueState = await readQueueState(schedule);
+
+        if (queueState.due_tasks === 0) {
+          // Nothing to do: no fetch, no extraction, no NVIDIA call.
+          return json({ action: "drain", skipped: true, reason: "queue empty", ...queueState });
+        }
+
+        // In steady state the processor only works every steady_interval_minutes
+        // even though the scheduler wakes on the backlog cadence.
+        if (queueState.mode === "STEADY_STATE") {
+          const cutoff = new Date(Date.now() - queueState.interval_minutes * 60_000).toISOString();
+          const { data: recent } = await supabaseAdmin
+            .from("pipeline_runs")
+            .select("id")
+            .gt("started_at", cutoff)
+            .gt("tasks_processed", 0)
+            .limit(1)
+            .maybeSingle();
+          if (recent) {
+            return json({ action: "drain", skipped: true, reason: "steady-state interval not elapsed", ...queueState });
+          }
+        }
+
+        const batch = Math.min(50, Math.max(1, body.limit ?? queueState.batch_size));
+
         // Every autonomous tick is recorded so /admin/pipeline-health can prove
         // that scheduled processing is really running.
         const startedAt = new Date();
         const { data: run } = await supabaseAdmin
           .from("pipeline_runs")
-          .insert({ trigger: body.trigger ?? "cron", started_at: startedAt.toISOString() } as never)
+          .insert({
+            trigger: body.trigger ?? "cron",
+            started_at: startedAt.toISOString(),
+            details: { mode: queueState.mode, batch_size: batch, due_tasks: queueState.due_tasks } as never,
+          } as never)
           .select("id")
           .maybeSingle();
+
 
         try {
           const result = await runQueueBatch(limit);
