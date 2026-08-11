@@ -13,7 +13,7 @@ import {
 } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/jobs")({
+export const Route = createFileRoute("/jobs/")({
   head: () => ({
     meta: [
       { title: "Jobs & PhD Radar — GeoAcademic Radar" },

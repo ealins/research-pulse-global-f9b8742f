@@ -7,7 +7,7 @@ import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { topicsQuery, trendsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export const Route = createFileRoute("/topics")({
+export const Route = createFileRoute("/topics/")({
   head: () => ({
     meta: [
       { title: "Topic taxonomy — GeoAcademic Radar" },
