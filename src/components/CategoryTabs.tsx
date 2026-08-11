@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { EmptyState } from "@/components/EmptyState";
 
 export type CategoryTab = { key: string; label: string; count?: number };
 

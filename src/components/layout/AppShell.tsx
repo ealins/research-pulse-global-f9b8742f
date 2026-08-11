@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { EmptyState } from "@/components/EmptyState";
 import type { ReactNode } from "react";
 import {
   Activity,

@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
+import { EmptyState } from "@/components/EmptyState";
 import { countsQuery, pulseQuery } from "@/lib/radar-queries";
 import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
 import { PulseHub, type Cluster } from "@/components/PulseHub";
