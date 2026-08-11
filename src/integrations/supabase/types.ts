@@ -14,6 +14,81 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          details: Json | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          details?: Json | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      collaboration_edges: {
+        Row: {
+          created_at: string
+          edge_type: string
+          evidence_url: string
+          id: string
+          is_demo: boolean
+          source_entity_id: string
+          source_entity_type: string
+          target_entity_id: string
+          target_entity_type: string
+          updated_at: string
+          verification_status: Database["public"]["Enums"]["verification_status"]
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          edge_type: string
+          evidence_url: string
+          id?: string
+          is_demo?: boolean
+          source_entity_id: string
+          source_entity_type: string
+          target_entity_id: string
+          target_entity_type: string
+          updated_at?: string
+          verification_status?: Database["public"]["Enums"]["verification_status"]
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          edge_type?: string
+          evidence_url?: string
+          id?: string
+          is_demo?: boolean
+          source_entity_id?: string
+          source_entity_type?: string
+          target_entity_id?: string
+          target_entity_type?: string
+          updated_at?: string
+          verification_status?: Database["public"]["Enums"]["verification_status"]
+          weight?: number
+        }
+        Relationships: []
+      }
       course_researchers: {
         Row: {
           course_id: string
@@ -192,6 +267,120 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      duplicate_candidates: {
+        Row: {
+          created_at: string
+          duplicate_id: string
+          entity_type: string
+          id: string
+          match_reason: string | null
+          primary_id: string
+          resolution: string | null
+          resolved: boolean
+          resolved_at: string | null
+          resolved_by: string | null
+          score: number | null
+        }
+        Insert: {
+          created_at?: string
+          duplicate_id: string
+          entity_type: string
+          id?: string
+          match_reason?: string | null
+          primary_id: string
+          resolution?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          score?: number | null
+        }
+        Update: {
+          created_at?: string
+          duplicate_id?: string
+          entity_type?: string
+          id?: string
+          match_reason?: string | null
+          primary_id?: string
+          resolution?: string | null
+          resolved?: boolean
+          resolved_at?: string | null
+          resolved_by?: string | null
+          score?: number | null
+        }
+        Relationships: []
+      }
+      entity_history: {
+        Row: {
+          change_reason: string | null
+          changed_at: string
+          changed_by: string | null
+          entity_id: string
+          entity_type: string
+          field: string
+          id: string
+          new_value: string | null
+          old_value: string | null
+          source_url: string | null
+        }
+        Insert: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          entity_id: string
+          entity_type: string
+          field: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source_url?: string | null
+        }
+        Update: {
+          change_reason?: string | null
+          changed_at?: string
+          changed_by?: string | null
+          entity_id?: string
+          entity_type?: string
+          field?: string
+          id?: string
+          new_value?: string | null
+          old_value?: string | null
+          source_url?: string | null
+        }
+        Relationships: []
+      }
+      entity_metrics: {
+        Row: {
+          entity_id: string
+          entity_type: string
+          id: string
+          metric: string
+          metric_source: string
+          retrieved_at: string
+          value: number | null
+          value_text: string | null
+        }
+        Insert: {
+          entity_id: string
+          entity_type: string
+          id?: string
+          metric: string
+          metric_source: string
+          retrieved_at?: string
+          value?: number | null
+          value_text?: string | null
+        }
+        Update: {
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          metric?: string
+          metric_source?: string
+          retrieved_at?: string
+          value?: number | null
+          value_text?: string | null
+        }
+        Relationships: []
       }
       event_institutions: {
         Row: {
@@ -1051,6 +1240,229 @@ export type Database = {
           },
         ]
       }
+      pulse_event_topics: {
+        Row: {
+          pulse_event_id: string
+          topic_id: string
+        }
+        Insert: {
+          pulse_event_id: string
+          topic_id: string
+        }
+        Update: {
+          pulse_event_id?: string
+          topic_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_event_topics_pulse_event_id_fkey"
+            columns: ["pulse_event_id"]
+            isOneToOne: false
+            referencedRelation: "pulse_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulse_event_topics_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "research_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pulse_events: {
+        Row: {
+          category: Database["public"]["Enums"]["pulse_category"]
+          confidence: Database["public"]["Enums"]["confidence_level"]
+          country: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          event_date: string
+          id: string
+          importance: number
+          institution_id: string | null
+          is_demo: boolean
+          link_url: string | null
+          researcher_id: string | null
+          source_url: string | null
+          summary: string | null
+          title: string
+          updated_at: string
+          verification_status: Database["public"]["Enums"]["verification_status"]
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["pulse_category"]
+          confidence?: Database["public"]["Enums"]["confidence_level"]
+          country?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_date?: string
+          id?: string
+          importance?: number
+          institution_id?: string | null
+          is_demo?: boolean
+          link_url?: string | null
+          researcher_id?: string | null
+          source_url?: string | null
+          summary?: string | null
+          title: string
+          updated_at?: string
+          verification_status?: Database["public"]["Enums"]["verification_status"]
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["pulse_category"]
+          confidence?: Database["public"]["Enums"]["confidence_level"]
+          country?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          event_date?: string
+          id?: string
+          importance?: number
+          institution_id?: string | null
+          is_demo?: boolean
+          link_url?: string | null
+          researcher_id?: string | null
+          source_url?: string | null
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          verification_status?: Database["public"]["Enums"]["verification_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pulse_events_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pulse_events_researcher_id_fkey"
+            columns: ["researcher_id"]
+            isOneToOne: false
+            referencedRelation: "researchers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      raw_records: {
+        Row: {
+          adapter_key: string
+          canonical_entity_id: string | null
+          canonical_entity_type: string | null
+          external_id: string | null
+          fetched_at: string
+          id: string
+          payload: Json
+          processed_at: string | null
+          processing_error: string | null
+          source_id: string | null
+        }
+        Insert: {
+          adapter_key: string
+          canonical_entity_id?: string | null
+          canonical_entity_type?: string | null
+          external_id?: string | null
+          fetched_at?: string
+          id?: string
+          payload: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          source_id?: string | null
+        }
+        Update: {
+          adapter_key?: string
+          canonical_entity_id?: string | null
+          canonical_entity_type?: string | null
+          external_id?: string | null
+          fetched_at?: string
+          id?: string
+          payload?: Json
+          processed_at?: string | null
+          processing_error?: string | null
+          source_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "raw_records_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      record_sources: {
+        Row: {
+          claim: string | null
+          confidence: Database["public"]["Enums"]["confidence_level"]
+          created_at: string
+          discovered_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          is_primary: boolean
+          last_checked_at: string | null
+          last_verified_at: string | null
+          original_title: string | null
+          source_id: string | null
+          source_organization: string | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          source_url: string
+          updated_at: string
+          verification_status: Database["public"]["Enums"]["verification_status"]
+        }
+        Insert: {
+          claim?: string | null
+          confidence?: Database["public"]["Enums"]["confidence_level"]
+          created_at?: string
+          discovered_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          is_primary?: boolean
+          last_checked_at?: string | null
+          last_verified_at?: string | null
+          original_title?: string | null
+          source_id?: string | null
+          source_organization?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"]
+          source_url: string
+          updated_at?: string
+          verification_status?: Database["public"]["Enums"]["verification_status"]
+        }
+        Update: {
+          claim?: string | null
+          confidence?: Database["public"]["Enums"]["confidence_level"]
+          created_at?: string
+          discovered_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          is_primary?: boolean
+          last_checked_at?: string | null
+          last_verified_at?: string | null
+          original_title?: string | null
+          source_id?: string | null
+          source_organization?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"]
+          source_url?: string
+          updated_at?: string
+          verification_status?: Database["public"]["Enums"]["verification_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_sources_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       research_groups: {
         Row: {
           created_at: string
@@ -1351,6 +1763,177 @@ export type Database = {
             columns: ["research_group_id"]
             isOneToOne: false
             referencedRelation: "research_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sources: {
+        Row: {
+          active: boolean
+          adapter_key: string | null
+          created_at: string
+          id: string
+          institution_id: string | null
+          last_error: string | null
+          last_failure_at: string | null
+          last_success_at: string | null
+          name: string
+          notes: string | null
+          organization: string | null
+          refresh_frequency_hours: number
+          source_type: Database["public"]["Enums"]["source_type"]
+          trust_level: number
+          updated_at: string
+          url: string
+        }
+        Insert: {
+          active?: boolean
+          adapter_key?: string | null
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          name: string
+          notes?: string | null
+          organization?: string | null
+          refresh_frequency_hours?: number
+          source_type?: Database["public"]["Enums"]["source_type"]
+          trust_level?: number
+          updated_at?: string
+          url: string
+        }
+        Update: {
+          active?: boolean
+          adapter_key?: string | null
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          last_error?: string | null
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          name?: string
+          notes?: string | null
+          organization?: string | null
+          refresh_frequency_hours?: number
+          source_type?: Database["public"]["Enums"]["source_type"]
+          trust_level?: number
+          updated_at?: string
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sources_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sync_runs: {
+        Row: {
+          adapter_key: string
+          duplicates_detected: number
+          error_message: string | null
+          errors: number
+          finished_at: string | null
+          id: string
+          records_changed: number
+          records_closed: number
+          records_discovered: number
+          response_time_ms: number | null
+          source_id: string | null
+          started_at: string
+          success: boolean | null
+        }
+        Insert: {
+          adapter_key: string
+          duplicates_detected?: number
+          error_message?: string | null
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          records_changed?: number
+          records_closed?: number
+          records_discovered?: number
+          response_time_ms?: number | null
+          source_id?: string | null
+          started_at?: string
+          success?: boolean | null
+        }
+        Update: {
+          adapter_key?: string
+          duplicates_detected?: number
+          error_message?: string | null
+          errors?: number
+          finished_at?: string | null
+          id?: string
+          records_changed?: number
+          records_closed?: number
+          records_discovered?: number
+          response_time_ms?: number | null
+          source_id?: string | null
+          started_at?: string
+          success?: boolean | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sync_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      topic_momentum: {
+        Row: {
+          active_projects: number
+          computed_at: string
+          growth_ratio: number | null
+          id: string
+          institutions_active: number
+          open_opportunities: number
+          pubs_last_12m: number
+          pubs_last_36m: number
+          pubs_prev_12m: number
+          topic_id: string
+          trend_signal: number | null
+        }
+        Insert: {
+          active_projects?: number
+          computed_at?: string
+          growth_ratio?: number | null
+          id?: string
+          institutions_active?: number
+          open_opportunities?: number
+          pubs_last_12m?: number
+          pubs_last_36m?: number
+          pubs_prev_12m?: number
+          topic_id: string
+          trend_signal?: number | null
+        }
+        Update: {
+          active_projects?: number
+          computed_at?: string
+          growth_ratio?: number | null
+          id?: string
+          institutions_active?: number
+          open_opportunities?: number
+          pubs_last_12m?: number
+          pubs_last_36m?: number
+          pubs_prev_12m?: number
+          topic_id?: string
+          trend_signal?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "topic_momentum_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: true
+            referencedRelation: "research_topics"
             referencedColumns: ["id"]
           },
         ]
