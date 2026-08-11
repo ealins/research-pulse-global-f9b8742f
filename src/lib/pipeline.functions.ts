@@ -489,3 +489,25 @@ export const startRealDataBackfill = createServerFn({ method: "POST" })
     const providers = await enqueueProviderBackfill(120);
     return { raw, providers };
   });
+
+/** Whether the current signed-in user holds the admin role. Never returns tokens. */
+export const getAdminStatus = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ isAdmin: boolean; adminExists: boolean }> => {
+    const { data } = await context.supabase.rpc("has_role", { _user_id: context.userId, _role: "admin" });
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { count } = await supabaseAdmin
+      .from("user_roles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "admin");
+    return { isAdmin: data === true, adminExists: (count ?? 0) > 0 };
+  });
+
+/** One-time bootstrap: the first signed-in account may claim the admin role. */
+export const claimAdminRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<{ isAdmin: boolean }> => {
+    const { data, error } = await context.supabase.rpc("claim_admin_if_unclaimed");
+    if (error) throw new Error(error.message);
+    return { isAdmin: data === true };
+  });

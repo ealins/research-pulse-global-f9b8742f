@@ -10,14 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AtlasRouteImport } from './routes/atlas'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TopRouteImport } from './routes/top'
 import { Route as TrendsRouteImport } from './routes/trends'
-import { Route as AdminPipelineHealthRouteImport } from './routes/admin.pipeline-health'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
 import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
@@ -36,6 +37,7 @@ import { Route as ResearchersIndexRouteImport } from './routes/researchers.index
 import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
 import { Route as TopicsIndexRouteImport } from './routes/topics.index'
 import { Route as TopicsSlugRouteImport } from './routes/topics.$slug'
+import { Route as AuthenticatedAdminPipelineHealthRouteImport } from './routes/_authenticated/admin.pipeline-health'
 import { Route as ApiPublicHooksIngestBatchRouteImport } from './routes/api/public/hooks/ingest-batch'
 
 const IndexRoute = IndexRouteImport.update({
@@ -43,9 +45,18 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AtlasRoute = AtlasRouteImport.update({
   id: '/atlas',
   path: '/atlas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CollaborationRoute = CollaborationRouteImport.update({
@@ -76,11 +87,6 @@ const TopRoute = TopRouteImport.update({
 const TrendsRoute = TrendsRouteImport.update({
   id: '/trends',
   path: '/trends',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AdminPipelineHealthRoute = AdminPipelineHealthRouteImport.update({
-  id: '/admin/pipeline-health',
-  path: '/admin/pipeline-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CountriesIndexRoute = CountriesIndexRouteImport.update({
@@ -173,6 +179,12 @@ const TopicsSlugRoute = TopicsSlugRouteImport.update({
   path: '/topics/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedAdminPipelineHealthRoute =
+  AuthenticatedAdminPipelineHealthRouteImport.update({
+    id: '/admin/pipeline-health',
+    path: '/admin/pipeline-health',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const ApiPublicHooksIngestBatchRoute =
   ApiPublicHooksIngestBatchRouteImport.update({
     id: '/api/public/hooks/ingest-batch',
@@ -183,13 +195,13 @@ const ApiPublicHooksIngestBatchRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
+  '/auth': typeof AuthRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
-  '/admin/pipeline-health': typeof AdminPipelineHealthRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -208,18 +220,19 @@ export interface FileRoutesByFullPath {
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
   '/topics/': typeof TopicsIndexRoute
+  '/admin/pipeline-health': typeof AuthenticatedAdminPipelineHealthRoute
   '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
+  '/auth': typeof AuthRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
-  '/admin/pipeline-health': typeof AdminPipelineHealthRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -238,19 +251,21 @@ export interface FileRoutesByTo {
   '/publications': typeof PublicationsIndexRoute
   '/researchers': typeof ResearchersIndexRoute
   '/topics': typeof TopicsIndexRoute
+  '/admin/pipeline-health': typeof AuthenticatedAdminPipelineHealthRoute
   '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/atlas': typeof AtlasRoute
+  '/auth': typeof AuthRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
-  '/admin/pipeline-health': typeof AdminPipelineHealthRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -269,6 +284,7 @@ export interface FileRoutesById {
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
   '/topics/': typeof TopicsIndexRoute
+  '/_authenticated/admin/pipeline-health': typeof AuthenticatedAdminPipelineHealthRoute
   '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRouteTypes {
@@ -276,13 +292,13 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/atlas'
+    | '/auth'
     | '/collaboration'
     | '/matcher'
     | '/methodology'
     | '/sitemap.xml'
     | '/top'
     | '/trends'
-    | '/admin/pipeline-health'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -301,18 +317,19 @@ export interface FileRouteTypes {
     | '/publications/'
     | '/researchers/'
     | '/topics/'
+    | '/admin/pipeline-health'
     | '/api/public/hooks/ingest-batch'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/atlas'
+    | '/auth'
     | '/collaboration'
     | '/matcher'
     | '/methodology'
     | '/sitemap.xml'
     | '/top'
     | '/trends'
-    | '/admin/pipeline-health'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -331,18 +348,20 @@ export interface FileRouteTypes {
     | '/publications'
     | '/researchers'
     | '/topics'
+    | '/admin/pipeline-health'
     | '/api/public/hooks/ingest-batch'
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/atlas'
+    | '/auth'
     | '/collaboration'
     | '/matcher'
     | '/methodology'
     | '/sitemap.xml'
     | '/top'
     | '/trends'
-    | '/admin/pipeline-health'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -361,19 +380,21 @@ export interface FileRouteTypes {
     | '/publications/'
     | '/researchers/'
     | '/topics/'
+    | '/_authenticated/admin/pipeline-health'
     | '/api/public/hooks/ingest-batch'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AtlasRoute: typeof AtlasRoute
+  AuthRoute: typeof AuthRoute
   CollaborationRoute: typeof CollaborationRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TopRoute: typeof TopRoute
   TrendsRoute: typeof TrendsRoute
-  AdminPipelineHealthRoute: typeof AdminPipelineHealthRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
   EventsSlugRoute: typeof EventsSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
@@ -404,11 +425,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/atlas': {
       id: '/atlas'
       path: '/atlas'
       fullPath: '/atlas'
       preLoaderRoute: typeof AtlasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/collaboration': {
@@ -451,13 +486,6 @@ declare module '@tanstack/react-router' {
       path: '/trends'
       fullPath: '/trends'
       preLoaderRoute: typeof TrendsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/admin/pipeline-health': {
-      id: '/admin/pipeline-health'
-      path: '/admin/pipeline-health'
-      fullPath: '/admin/pipeline-health'
-      preLoaderRoute: typeof AdminPipelineHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/countries/': {
@@ -586,6 +614,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TopicsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/admin/pipeline-health': {
+      id: '/_authenticated/admin/pipeline-health'
+      path: '/admin/pipeline-health'
+      fullPath: '/admin/pipeline-health'
+      preLoaderRoute: typeof AuthenticatedAdminPipelineHealthRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/api/public/hooks/ingest-batch': {
       id: '/api/public/hooks/ingest-batch'
       path: '/api/public/hooks/ingest-batch'
@@ -596,16 +631,28 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminPipelineHealthRoute: typeof AuthenticatedAdminPipelineHealthRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminPipelineHealthRoute: AuthenticatedAdminPipelineHealthRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AtlasRoute: AtlasRoute,
+  AuthRoute: AuthRoute,
   CollaborationRoute: CollaborationRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TopRoute: TopRoute,
   TrendsRoute: TrendsRoute,
-  AdminPipelineHealthRoute: AdminPipelineHealthRoute,
   CountriesSlugRoute: CountriesSlugRoute,
   EventsSlugRoute: EventsSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,
@@ -629,13 +676,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

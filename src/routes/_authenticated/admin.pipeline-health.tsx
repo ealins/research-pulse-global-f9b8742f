@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { Activity, AlertTriangle, ArrowRight, Database, Download, RefreshCw, ShieldAlert } from "lucide-react";
@@ -8,14 +8,22 @@ import { toast } from "sonner";
 import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getPipelineHealth, runDiscovery, runQueue, requeueDeadTasks } from "@/lib/pipeline.functions";
+import {
+  claimAdminRole,
+  getAdminStatus,
+  getPipelineHealth,
+  runDiscovery,
+  runQueue,
+  requeueDeadTasks,
+} from "@/lib/pipeline.functions";
+
 import { NvidiaEnginePanel } from "@/components/admin/NvidiaEnginePanel";
 import { SchedulerPanel } from "@/components/admin/SchedulerPanel";
 import { OperatingModePanel } from "@/components/admin/OperatingModePanel";
 import { RealDataMigrationPanel } from "@/components/admin/RealDataMigrationPanel";
 
 
-export const Route = createFileRoute("/admin/pipeline-health")({
+export const Route = createFileRoute("/_authenticated/admin/pipeline-health")({
   head: () => ({
     meta: [
       { title: "Pipeline health — GeoAcademic Radar" },
@@ -34,7 +42,7 @@ export const Route = createFileRoute("/admin/pipeline-health")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: PipelineHealthPage,
+  component: AdminGate,
 });
 
 const STAGES = [
@@ -56,7 +64,53 @@ function Stat({ label, value, tone }: { label: string; value: number; tone?: "go
   );
 }
 
-function PipelineHealthPage() {
+function AdminGate() {
+  const status = useServerFn(getAdminStatus);
+  const claim = useServerFn(claimAdminRole);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["admin-status"], queryFn: () => status(), retry: false });
+  const claimMutation = useMutation({
+    mutationFn: () => claim(),
+    onSuccess: async (res) => {
+      if (res.isAdmin) {
+        toast.success("Admin role granted");
+        await qc.invalidateQueries();
+      } else {
+        toast.error("Admin access required", { description: "An administrator already exists for this workspace." });
+      }
+    },
+    onError: (e) => toast.error("Could not grant admin", { description: e instanceof Error ? e.message : String(e) }),
+  });
+
+  if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (data?.isAdmin) return <PipelineHealthPanels />;
+
+  return (
+    <AppShell>
+      <PageHeader
+        eyebrow="Operations"
+        title="Admin access required"
+        description="You are signed in, but this diagnostic is restricted to accounts holding the admin role."
+      />
+      <div className="mx-auto w-full max-w-2xl px-6 py-10">
+        <div className="rounded-xl border border-border/60 bg-card/40 p-5 text-sm text-muted-foreground">
+          {data?.adminExists ? (
+            <p>Ask an existing administrator to grant your account the admin role.</p>
+          ) : (
+            <>
+              <p>No administrator exists yet. As the first signed-in account you can claim the role once.</p>
+              <Button className="mt-4" disabled={claimMutation.isPending} onClick={() => claimMutation.mutate()}>
+                {claimMutation.isPending ? "Granting…" : "Claim admin role"}
+              </Button>
+            </>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
+function PipelineHealthPanels() {
   const health = useServerFn(getPipelineHealth);
   const discover = useServerFn(runDiscovery);
   const queue = useServerFn(runQueue);
@@ -68,6 +122,7 @@ function PipelineHealthPage() {
     queryFn: () => health(),
     refetchInterval: 20_000,
   });
+
 
   const act = async (name: string, fn: () => Promise<unknown>) => {
     setBusy(name);
