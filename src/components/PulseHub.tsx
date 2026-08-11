@@ -45,7 +45,7 @@ const TONE = {
 
 const SIZE = 620;
 const C = SIZE / 2;
-const RINGS = [246, 246, 246];
+const RING = 246;
 
 /** Sector angles in degrees, 0 = top, clockwise. */
 const SECTORS: Record<string, [number, number]> = {
@@ -56,7 +56,10 @@ const SECTORS: Record<string, [number, number]> = {
 
 function polar(r: number, deg: number) {
   const rad = ((deg - 90) * Math.PI) / 180;
-  return { x: C + r * Math.cos(rad), y: C + r * Math.sin(rad) };
+  return {
+    x: Number((C + r * Math.cos(rad)).toFixed(2)),
+    y: Number((C + r * Math.sin(rad)).toFixed(2)),
+  };
 }
 
 function arcPath(r: number, from: number, to: number) {
@@ -81,9 +84,9 @@ export function PulseHub({
 
   const laidOut = useMemo(
     () =>
-      clusters.map((cluster, ci) => {
+      clusters.map((cluster) => {
         const [start, end] = SECTORS[cluster.tone] ?? [-60, 60];
-        const ring = RINGS[ci % RINGS.length]!;
+        const ring = RING;
         const span = end - start;
         const n = Math.max(cluster.spokes.length, 1);
         const gap = 3;
@@ -122,13 +125,13 @@ export function PulseHub({
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           className="pointer-events-none absolute inset-0 h-full w-full"
         >
-          {RINGS.map((r) => (
+          {[RING - 34, RING, RING + 26].map((r) => (
             <circle
               key={r}
               cx={C}
               cy={C}
               r={r}
-              className="fill-none stroke-border/45"
+              className="fill-none stroke-border/40"
               strokeWidth="0.7"
               strokeDasharray="2 6"
             />
