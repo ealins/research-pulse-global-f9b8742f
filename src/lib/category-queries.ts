@@ -1,7 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
-export const OPEN_STATUSES = ["open", "closing_soon", "rolling", "possibly_open"];
+export const OPEN_STATUSES = [
+  "open",
+  "closing_soon",
+  "rolling",
+  "possibly_open",
+] as const satisfies readonly ("open" | "closing_soon" | "rolling" | "possibly_open")[];
 
 export function countrySlug(country: string): string {
   return country
