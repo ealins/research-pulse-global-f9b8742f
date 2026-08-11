@@ -220,7 +220,10 @@ function PipelineHealthPage() {
 
             <NvidiaEnginePanel />
 
+            <OperatingModePanel />
+
             <SchedulerPanel />
+
 
 
 
