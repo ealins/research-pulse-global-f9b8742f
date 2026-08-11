@@ -7,9 +7,11 @@ import { EvidenceDrawer, staleness } from "@/components/EvidenceDrawer";
 import { institutionDetailQuery } from "@/lib/detail-queries";
 import { STATUS_LABEL, TYPE_LABEL, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { loadInstitutionLd, institutionJsonLd } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/institutions/$slug")({
-  head: ({ params }) => {
+  loader: ({ params }) => loadInstitutionLd(params.slug).catch(() => null),
+  head: ({ params, loaderData }) => {
     const pretty = params.slug.replace(/-/g, " ");
     return {
       meta: [
@@ -28,6 +30,14 @@ export const Route = createFileRoute("/institutions/$slug")({
         { property: "og:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
         { name: "twitter:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
       ],
+      scripts: loaderData
+        ? [
+            {
+              type: "application/ld+json",
+              children: JSON.stringify(institutionJsonLd(loaderData)),
+            },
+          ]
+        : [],
     };
   },
   component: InstitutionDetail,

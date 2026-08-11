@@ -7,9 +7,11 @@ import { EvidenceDrawer, staleness } from "@/components/EvidenceDrawer";
 import { publicationDetailQuery } from "@/lib/detail-queries";
 import { formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { loadPublicationLd, publicationJsonLd } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/publications/$id")({
-  head: ({ params }) => {
+  loader: ({ params }) => loadPublicationLd(params.id).catch(() => null),
+  head: ({ params, loaderData }) => {
     const ref = params.id.slice(0, 8);
     return {
       meta: [
@@ -28,6 +30,14 @@ export const Route = createFileRoute("/publications/$id")({
         { property: "og:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
         { name: "twitter:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
       ],
+      scripts: loaderData
+        ? [
+            {
+              type: "application/ld+json",
+              children: JSON.stringify(publicationJsonLd(loaderData)),
+            },
+          ]
+        : [],
     };
   },
   component: PublicationDetail,

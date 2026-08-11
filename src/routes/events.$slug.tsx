@@ -7,9 +7,11 @@ import { eventDetailQuery, KIND_LABEL, SECTOR_LABEL } from "@/lib/relevance-quer
 import { countrySlug } from "@/lib/category-queries";
 import { daysUntil, formatDate, STATUS_LABEL } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { loadEventLd, eventJsonLd } from "@/lib/jsonld";
 
 export const Route = createFileRoute("/events/$slug")({
-  head: ({ params }) => {
+  loader: ({ params }) => loadEventLd(params.slug).catch(() => null),
+  head: ({ params, loaderData }) => {
     const pretty = params.slug.replace(/-demo$/, "").replace(/-/g, " ");
     return {
       meta: [
@@ -28,6 +30,14 @@ export const Route = createFileRoute("/events/$slug")({
         { property: "og:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
         { name: "twitter:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
       ],
+      scripts: loaderData
+        ? [
+            {
+              type: "application/ld+json",
+              children: JSON.stringify(eventJsonLd(loaderData)),
+            },
+          ]
+        : [],
     };
   },
   component: EventDetail,
