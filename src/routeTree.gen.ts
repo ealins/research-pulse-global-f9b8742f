@@ -14,6 +14,7 @@ import { Route as AtlasRouteImport } from './routes/atlas'
 import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as TopRouteImport } from './routes/top'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
 import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
@@ -57,6 +58,11 @@ const MatcherRoute = MatcherRouteImport.update({
 const MethodologyRoute = MethodologyRouteImport.update({
   id: '/methodology',
   path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TopRoute = TopRouteImport.update({
+  id: '/top',
+  path: '/top',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrendsRoute = TrendsRouteImport.update({
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
@@ -187,6 +194,7 @@ export interface FileRoutesByTo {
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
@@ -214,6 +222,7 @@ export interface FileRoutesById {
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
@@ -242,6 +251,7 @@ export interface FileRouteTypes {
     | '/collaboration'
     | '/matcher'
     | '/methodology'
+    | '/top'
     | '/trends'
     | '/countries/$slug'
     | '/events/$slug'
@@ -268,6 +278,7 @@ export interface FileRouteTypes {
     | '/collaboration'
     | '/matcher'
     | '/methodology'
+    | '/top'
     | '/trends'
     | '/countries/$slug'
     | '/events/$slug'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
     | '/collaboration'
     | '/matcher'
     | '/methodology'
+    | '/top'
     | '/trends'
     | '/countries/$slug'
     | '/events/$slug'
@@ -321,6 +333,7 @@ export interface RootRouteChildren {
   CollaborationRoute: typeof CollaborationRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
+  TopRoute: typeof TopRoute
   TrendsRoute: typeof TrendsRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
   EventsSlugRoute: typeof EventsSlugRoute
@@ -377,6 +390,13 @@ declare module '@tanstack/react-router' {
       path: '/methodology'
       fullPath: '/methodology'
       preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/top': {
+      id: '/top'
+      path: '/top'
+      fullPath: '/top'
+      preLoaderRoute: typeof TopRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trends': {
@@ -521,6 +541,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollaborationRoute: CollaborationRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
+  TopRoute: TopRoute,
   TrendsRoute: TrendsRoute,
   CountriesSlugRoute: CountriesSlugRoute,
   EventsSlugRoute: EventsSlugRoute,
