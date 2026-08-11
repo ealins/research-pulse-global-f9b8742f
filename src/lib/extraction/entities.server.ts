@@ -202,7 +202,7 @@ Return exactly this shape:
 }
 
 Dates must be ISO (YYYY-MM-DD) or null.
-Include "courses" only when the page explicitly lists modules or courses of THIS programme; include "professors" only when the page explicitly names teaching staff of THIS programme. Otherwise return empty arrays.
+Include "courses" only when the page explicitly lists modules or courses of THIS programme, at most 6 of them; include "professors" only when the page explicitly names teaching staff of THIS programme, at most 4 of them. Otherwise return empty arrays.
 Set "is_single_real_programme" to false for generic "Study at ..." landing pages, faculty overviews, admissions-office pages or programme lists, and give a short rejection_reason.`;
 
 export type ProgrammeExtraction = {
