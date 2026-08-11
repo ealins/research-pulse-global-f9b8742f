@@ -177,7 +177,16 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
 
         try {
-          const result = await runQueueBatch(batch);
+          // Semantic extraction must not be starved by crawl work: NORMALIZE
+          // goes first (capped, because each task may invoke the engine and
+          // take 10-25s), and collection work only runs when nothing is due.
+          const normalizeBatch = Math.min(2, batch);
+          let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
+          let result = await runQueueBatch(normalizeBatch, ["NORMALIZE"]);
+          if (result.processed === 0) {
+            taskGroup = "FETCH_DISCOVER";
+            result = await runQueueBatch(batch, ["FETCH", "DISCOVER"]);
+          }
           const { data: llm } = await supabaseAdmin
             .from("llm_processing_runs")
             .select("cached")
@@ -196,11 +205,17 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
                 nvidia_calls: calls.length,
                 nvidia_cached: calls.filter((c) => c.cached).length,
                 errors: result.failed + result.dead,
-                details: { mode: queueState.mode, batch_size: batch, sample: result.details.slice(0, 20) } as never,
+                details: {
+                  mode: queueState.mode,
+                  batch_size: taskGroup === "NORMALIZE" ? normalizeBatch : batch,
+                  task_group: taskGroup,
+                  sample: result.details.slice(0, 20),
+                } as never,
               })
               .eq("id", run.id);
           }
-          return json({ action: "drain", run_id: run?.id ?? null, mode: queueState.mode, ...result });
+          return json({ action: "drain", run_id: run?.id ?? null, mode: queueState.mode, task_group: taskGroup, ...result });
+
 
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
