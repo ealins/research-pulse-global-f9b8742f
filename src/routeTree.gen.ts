@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AtlasRouteImport } from './routes/atlas'
 import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as MatcherRouteImport } from './routes/matcher'
@@ -41,6 +42,10 @@ import { Route as ApiPublicHooksIngestBatchRouteImport } from './routes/api/publ
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AtlasRoute = AtlasRouteImport.update({
@@ -170,9 +175,9 @@ const TopicsSlugRoute = TopicsSlugRouteImport.update({
 } as any)
 const AuthenticatedAdminPipelineHealthRoute =
   AuthenticatedAdminPipelineHealthRouteImport.update({
-    id: '/_authenticated/admin/pipeline-health',
+    id: '/admin/pipeline-health',
     path: '/admin/pipeline-health',
-    getParentRoute: () => rootRouteImport,
+    getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const ApiPublicHooksIngestBatchRoute =
   ApiPublicHooksIngestBatchRouteImport.update({
@@ -244,6 +249,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/atlas': typeof AtlasRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
@@ -336,6 +342,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_authenticated'
     | '/atlas'
     | '/collaboration'
     | '/matcher'
@@ -367,6 +374,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AtlasRoute: typeof AtlasRoute
   CollaborationRoute: typeof CollaborationRoute
   MatcherRoute: typeof MatcherRoute
@@ -392,7 +400,6 @@ export interface RootRouteChildren {
   PublicationsIndexRoute: typeof PublicationsIndexRoute
   ResearchersIndexRoute: typeof ResearchersIndexRoute
   TopicsIndexRoute: typeof TopicsIndexRoute
-  AuthenticatedAdminPipelineHealthRoute: typeof AuthenticatedAdminPipelineHealthRoute
   ApiPublicHooksIngestBatchRoute: typeof ApiPublicHooksIngestBatchRoute
 }
 
@@ -403,6 +410,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/atlas': {
@@ -585,7 +599,7 @@ declare module '@tanstack/react-router' {
       path: '/admin/pipeline-health'
       fullPath: '/admin/pipeline-health'
       preLoaderRoute: typeof AuthenticatedAdminPipelineHealthRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/api/public/hooks/ingest-batch': {
       id: '/api/public/hooks/ingest-batch'
@@ -597,8 +611,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAdminPipelineHealthRoute: typeof AuthenticatedAdminPipelineHealthRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAdminPipelineHealthRoute: AuthenticatedAdminPipelineHealthRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AtlasRoute: AtlasRoute,
   CollaborationRoute: CollaborationRoute,
   MatcherRoute: MatcherRoute,
@@ -624,7 +650,6 @@ const rootRouteChildren: RootRouteChildren = {
   PublicationsIndexRoute: PublicationsIndexRoute,
   ResearchersIndexRoute: ResearchersIndexRoute,
   TopicsIndexRoute: TopicsIndexRoute,
-  AuthenticatedAdminPipelineHealthRoute: AuthenticatedAdminPipelineHealthRoute,
   ApiPublicHooksIngestBatchRoute: ApiPublicHooksIngestBatchRoute,
 }
 export const routeTree = rootRouteImport
