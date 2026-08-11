@@ -2226,6 +2226,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      global_search: {
+        Args: { max_results?: number; q: string }
+        Returns: {
+          entity_id: string
+          entity_type: string
+          score: number
+          slug: string
+          subtitle: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -2234,6 +2245,7 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      refresh_topic_momentum: { Args: never; Returns: number }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
     }
