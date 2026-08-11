@@ -164,6 +164,93 @@ export const eventsQuery = queryOptions({
   },
 });
 
+export const publicationsQuery = queryOptions({
+  queryKey: ["publications"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("publications")
+      .select(
+        `id, title, doi, venue, year, publication_date, authors_text, citation_count,
+         citation_source, is_open_access, abstract, landing_url, source,
+         verification_status, confidence, is_demo,
+         institutions ( name, slug ),
+         publication_topics ( research_topics ( name, slug ) )`,
+      )
+      .order("year", { ascending: false, nullsFirst: false })
+      .order("citation_count", { ascending: false, nullsFirst: false })
+      .limit(200);
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const projectsQuery = queryOptions({
+  queryKey: ["projects"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("projects")
+      .select(
+        `id, name, slug, acronym, status, start_date, end_date, funding_organization,
+         funding_amount, funding_currency, website, summary, verification_status,
+         confidence, is_demo,
+         institutions ( name, slug, country ),
+         project_topics ( research_topics ( name, slug ) )`,
+      )
+      .order("start_date", { ascending: false, nullsFirst: false });
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const coursesQuery = queryOptions({
+  queryKey: ["courses"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("courses")
+      .select(
+        `id, title, slug, degree_type, language, duration, website, summary,
+         verification_status, is_demo,
+         institutions ( name, slug, country ),
+         course_topics ( research_topics ( name, slug ) )`,
+      )
+      .order("title");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
+export const collaborationQuery = queryOptions({
+  queryKey: ["collaboration-edges"],
+  queryFn: async () => {
+    const [edges, institutions] = await Promise.all([
+      supabase
+        .from("collaboration_edges")
+        .select(
+          "id, source_entity_id, target_entity_id, edge_type, weight, evidence_url, verification_status, is_demo",
+        )
+        .order("weight", { ascending: false })
+        .limit(400),
+      supabase.from("institutions").select("id, name, slug, abbreviation, country"),
+    ]);
+    if (edges.error) throw edges.error;
+    if (institutions.error) throw institutions.error;
+    return { edges: edges.data ?? [], institutions: institutions.data ?? [] };
+  },
+});
+
+export const topicsQuery = queryOptions({
+  queryKey: ["research-topics"],
+  queryFn: async () => {
+    const { data, error } = await supabase
+      .from("research_topics")
+      .select("id, name, slug, category, description")
+      .eq("active", true)
+      .order("name");
+    if (error) throw error;
+    return data ?? [];
+  },
+});
+
 export const STATUS_LABEL: Record<string, string> = {
   open: "Open",
   closing_soon: "Closing soon",
