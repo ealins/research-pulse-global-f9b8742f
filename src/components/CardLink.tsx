@@ -12,8 +12,8 @@ export function CardLink({
   label,
 }: {
   to: string;
-  params?: Record<string, string>;
-  search?: Record<string, unknown>;
+  params?: Record<string, string> | undefined;
+  search?: Record<string, unknown> | undefined;
   label: string;
 }) {
   return (
