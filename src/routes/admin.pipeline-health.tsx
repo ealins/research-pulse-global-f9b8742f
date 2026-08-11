@@ -9,6 +9,7 @@ import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPipelineHealth, runDiscovery, runQueue, requeueDeadTasks } from "@/lib/pipeline.functions";
+import { NvidiaEnginePanel } from "@/components/admin/NvidiaEnginePanel";
 
 export const Route = createFileRoute("/admin/pipeline-health")({
   head: () => ({
@@ -215,6 +216,10 @@ function PipelineHealthPage() {
               </div>
               {busy ? <p className="mt-2 text-xs text-muted-foreground">Running {busy}…</p> : null}
             </section>
+
+            <NvidiaEnginePanel />
+
+
 
             <section className="grid gap-6 lg:grid-cols-2">
               <div>

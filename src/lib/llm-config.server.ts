@@ -1,0 +1,22 @@
+// Server-only configuration for the GeoAcademic Radar intelligence engine.
+export const AI_PROVIDER = "NVIDIA" as const;
+export const NVIDIA_SECRET_NAME = "Nvidia" as const;
+export const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+export const NVIDIA_MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+export const NVIDIA_MAX_CONCURRENCY = 2;
+export const NVIDIA_RETRY_LIMIT = 3;
+export const NVIDIA_TIMEOUT_MS = 90_000;
+export const LLM_EXTRACTION_ENABLED = true;
+/** Hard cap on characters sent to the model per request. */
+export const LLM_MAX_INPUT_CHARS = 12_000;
+export const LLM_DEFAULT_TEMPERATURE = 0.1;
+export const LLM_DEFAULT_MAX_TOKENS = 2000;
+
+export type LlmOperation =
+  | "CONNECTION_TEST"
+  | "VACANCY_EXTRACTION"
+  | "PROGRAMME_EXTRACTION"
+  | "PROJECT_EXTRACTION"
+  | "RESEARCHER_EXTRACTION"
+  | "EVENT_EXTRACTION"
+  | "RELEVANCE_CLASSIFICATION";

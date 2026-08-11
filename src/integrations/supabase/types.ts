@@ -833,6 +833,93 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_processing_runs: {
+        Row: {
+          attempt: number
+          cached: boolean
+          completed_at: string | null
+          content_hash: string | null
+          content_reduced: boolean
+          created_at: string
+          error_code: string | null
+          error_message: string | null
+          http_status: number | null
+          id: string
+          input_characters: number
+          latency_ms: number | null
+          model: string
+          operation: string
+          output_characters: number
+          provider: string
+          raw_page_id: string | null
+          result: Json | null
+          source_id: string | null
+          started_at: string
+          status: string
+        }
+        Insert: {
+          attempt?: number
+          cached?: boolean
+          completed_at?: string | null
+          content_hash?: string | null
+          content_reduced?: boolean
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          input_characters?: number
+          latency_ms?: number | null
+          model: string
+          operation: string
+          output_characters?: number
+          provider?: string
+          raw_page_id?: string | null
+          result?: Json | null
+          source_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          attempt?: number
+          cached?: boolean
+          completed_at?: string | null
+          content_hash?: string | null
+          content_reduced?: boolean
+          created_at?: string
+          error_code?: string | null
+          error_message?: string | null
+          http_status?: number | null
+          id?: string
+          input_characters?: number
+          latency_ms?: number | null
+          model?: string
+          operation?: string
+          output_characters?: number
+          provider?: string
+          raw_page_id?: string | null
+          result?: Json | null
+          source_id?: string | null
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_processing_runs_raw_page_id_fkey"
+            columns: ["raw_page_id"]
+            isOneToOne: false
+            referencedRelation: "raw_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "llm_processing_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       opportunities: {
         Row: {
           application_deadline: string | null
@@ -845,6 +932,10 @@ export type Database = {
           department_id: string | null
           description: string | null
           employer_name: string | null
+          extracted_by: string
+          extraction_confidence: number | null
+          extraction_model: string | null
+          extraction_timestamp: string | null
           first_discovered_at: string
           funding_type: string | null
           id: string
@@ -882,6 +973,10 @@ export type Database = {
           department_id?: string | null
           description?: string | null
           employer_name?: string | null
+          extracted_by?: string
+          extraction_confidence?: number | null
+          extraction_model?: string | null
+          extraction_timestamp?: string | null
           first_discovered_at?: string
           funding_type?: string | null
           id?: string
@@ -919,6 +1014,10 @@ export type Database = {
           department_id?: string | null
           description?: string | null
           employer_name?: string | null
+          extracted_by?: string
+          extraction_confidence?: number | null
+          extraction_model?: string | null
+          extraction_timestamp?: string | null
           first_discovered_at?: string
           funding_type?: string | null
           id?: string

@@ -624,7 +624,7 @@ export function looksLikeSinglePosting(url: string, title: string, text: string)
 export async function normalizeSource(sourceId: string): Promise<NormalizeResult> {
   const { data: raw } = await supabaseAdmin
     .from("raw_records")
-    .select("id, final_url, page_title, text_content, classification, institution_id, source_id")
+    .select("id, final_url, page_title, text_content, classification, institution_id, source_id, content_hash")
     .eq("source_id", sourceId)
     .order("fetched_at", { ascending: false })
     .limit(1)
@@ -661,12 +661,33 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     return { status: "SKIPPED", reason: `not a single vacancy posting: ${gate.reason}` };
   }
   const rolling = /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
-  const deadline = parseDeadline(text);
-  const status = deriveStatus(deadline, rolling);
+  const deterministicDeadline = parseDeadline(text);
   // Only the posting's own title decides the type: body text mentioning a
   // doctoral programme must not turn a staff role into a PhD position.
   const isPhd = /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
   const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
+
+  // Semantic enrichment runs AFTER the deterministic gate and can only add
+  // validated detail. If the model rejects the page as not a real single
+  // posting, we skip it — but it can never promote a page the gate refused.
+  const { enrichVacancy } = await import("./extraction/enrich.server");
+  const enriched = await enrichVacancy({
+    url: raw.final_url ?? "",
+    title,
+    text,
+    sourceId: raw.source_id,
+    rawRecordId: raw.id,
+    contentHash: raw.content_hash,
+  });
+  const ex = enriched.extraction;
+  if (ex && !ex.is_single_real_position) {
+    await mark("SKIPPED", `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`);
+    return { status: "SKIPPED", reason: `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}` };
+  }
+
+  const deadline = deterministicDeadline ?? ex?.application_deadline ?? null;
+  const status = deriveStatus(deadline, rolling);
+  const usedModel = Boolean(ex);
 
   const { data: existing } = await supabaseAdmin
     .from("opportunities")
@@ -688,10 +709,17 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     slug: uniqueSlug,
     normalized_title: title.toLowerCase().slice(0, 300),
     institution_id: raw.institution_id,
-    opportunity_type: (isPhd ? "phd" : "other") as never,
-    sector: "academic",
-    description: text.slice(0, 2000),
-    application_url: raw.final_url,
+    opportunity_type: ((ex?.opportunity_type ?? (isPhd ? "phd" : "other")) as string) as never,
+    sector: ex?.sector ?? "academic",
+    description: (ex?.summary ?? text).slice(0, 2000),
+    requirements: ex?.requirements ?? null,
+    funding_type: ex?.funding_type ?? null,
+    salary_text: ex?.salary_text ?? null,
+    supervisor_name: ex?.supervisor_name ?? null,
+    city: ex?.city ?? null,
+    country: ex?.country ?? null,
+    start_date: ex?.start_date ?? null,
+    application_url: ex?.application_url ?? raw.final_url,
     official_source_url: raw.final_url,
     status: status as never,
     confidence: (deadline ? "medium" : "low") as never,
@@ -699,7 +727,12 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     last_checked_at: new Date().toISOString(),
     application_deadline: deadline,
     is_demo: false,
+    extracted_by: usedModel ? "NVIDIA_NEMOTRON" : "DETERMINISTIC",
+    extraction_model: usedModel ? "nvidia/nemotron-3-ultra-550b-a55b" : null,
+    extraction_confidence: ex?.confidence ?? null,
+    extraction_timestamp: usedModel ? new Date().toISOString() : null,
   };
+
 
   let entityId = existing?.id;
   if (entityId) {
