@@ -5,6 +5,7 @@ import { Building2, Search } from "lucide-react";
 
 import { AppShell, PageHeader, StatTile } from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
+import { CardLink } from "@/components/CardLink";
 import { countrySlug, institutionPulseQuery } from "@/lib/category-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
@@ -132,7 +133,8 @@ function InstitutionsPage() {
         ) : (
           <ul className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {filtered.map((i, idx) => (
-              <li key={i.id} className="panel panel-hover rise-in flex flex-col p-5">
+              <li key={i.id} className="panel panel-hover rise-in relative flex flex-col p-5">
+                <CardLink to="/institutions/$slug" params={{ slug: i.slug }} label={`${i.name}: open institution profile`} />
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex min-w-0 items-start gap-2">
                     <span className="mono-num mt-0.5 text-[0.7rem] text-muted-foreground">{idx + 1}</span>
@@ -156,7 +158,7 @@ function InstitutionsPage() {
                     <Link
                       to="/countries/$slug"
                       params={{ slug: countrySlug(i.country) }}
-                      className="hover:text-primary"
+                      className="relative z-10 hover:text-primary"
                     >
                       {i.country}
                     </Link>
