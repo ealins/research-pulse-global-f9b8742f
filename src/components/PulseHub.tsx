@@ -81,8 +81,8 @@ export function PulseHub({
   points: GlobePoint[];
   arcs: GlobeArc[];
   loading?: boolean;
-  selectedId?: string | null;
-  onSelectPoint?: (id: string | null) => void;
+  selectedId?: string | null | undefined;
+  onSelectPoint?: ((id: string | null) => void) | undefined;
 }) {
   const [hover, setHover] = useState<string | null>(null);
 

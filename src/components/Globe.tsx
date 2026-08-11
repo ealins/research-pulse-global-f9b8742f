@@ -46,10 +46,10 @@ export function Globe({
 }: {
   points: GlobePoint[];
   arcs?: GlobeArc[];
-  selectedId?: string | null;
-  onSelect?: (id: string | null) => void;
-  compact?: boolean;
-  height?: number;
+  selectedId?: string | null | undefined;
+  onSelect?: ((id: string | null) => void) | undefined;
+  compact?: boolean | undefined;
+  height?: number | undefined;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
