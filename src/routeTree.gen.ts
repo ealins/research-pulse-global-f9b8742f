@@ -15,12 +15,15 @@ import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as MethodologyRouteImport } from './routes/methodology'
-import { Route as ProgrammesRouteImport } from './routes/programmes'
 import { Route as TrendsRouteImport } from './routes/trends'
+import { Route as CountriesIndexRouteImport } from './routes/countries.index'
+import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
 import { Route as InstitutionsIndexRouteImport } from './routes/institutions.index'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
 import { Route as JobsSlugRouteImport } from './routes/jobs.$slug'
+import { Route as ProgrammesIndexRouteImport } from './routes/programmes.index'
+import { Route as ProgrammesSlugRouteImport } from './routes/programmes.$slug'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ProjectsSlugRouteImport } from './routes/projects.$slug'
 import { Route as PublicationsIndexRouteImport } from './routes/publications.index'
@@ -60,14 +63,19 @@ const MethodologyRoute = MethodologyRouteImport.update({
   path: '/methodology',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ProgrammesRoute = ProgrammesRouteImport.update({
-  id: '/programmes',
-  path: '/programmes',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const TrendsRoute = TrendsRouteImport.update({
   id: '/trends',
   path: '/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesIndexRoute = CountriesIndexRouteImport.update({
+  id: '/countries/',
+  path: '/countries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesSlugRoute = CountriesSlugRouteImport.update({
+  id: '/countries/$slug',
+  path: '/countries/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstitutionsIndexRoute = InstitutionsIndexRouteImport.update({
@@ -88,6 +96,16 @@ const JobsIndexRoute = JobsIndexRouteImport.update({
 const JobsSlugRoute = JobsSlugRouteImport.update({
   id: '/jobs/$slug',
   path: '/jobs/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgrammesIndexRoute = ProgrammesIndexRouteImport.update({
+  id: '/programmes/',
+  path: '/programmes/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgrammesSlugRoute = ProgrammesSlugRouteImport.update({
+  id: '/programmes/$slug',
+  path: '/programmes/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
@@ -138,16 +156,19 @@ export interface FileRoutesByFullPath {
   '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
-  '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
+  '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/programmes/$slug': typeof ProgrammesSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
   '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
+  '/countries/': typeof CountriesIndexRoute
   '/institutions/': typeof InstitutionsIndexRoute
   '/jobs/': typeof JobsIndexRoute
+  '/programmes/': typeof ProgrammesIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
@@ -160,16 +181,19 @@ export interface FileRoutesByTo {
   '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
-  '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
+  '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/programmes/$slug': typeof ProgrammesSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
   '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
+  '/countries': typeof CountriesIndexRoute
   '/institutions': typeof InstitutionsIndexRoute
   '/jobs': typeof JobsIndexRoute
+  '/programmes': typeof ProgrammesIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/publications': typeof PublicationsIndexRoute
   '/researchers': typeof ResearchersIndexRoute
@@ -183,16 +207,19 @@ export interface FileRoutesById {
   '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
-  '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
+  '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/programmes/$slug': typeof ProgrammesSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
   '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
+  '/countries/': typeof CountriesIndexRoute
   '/institutions/': typeof InstitutionsIndexRoute
   '/jobs/': typeof JobsIndexRoute
+  '/programmes/': typeof ProgrammesIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
@@ -207,16 +234,19 @@ export interface FileRouteTypes {
     | '/events'
     | '/matcher'
     | '/methodology'
-    | '/programmes'
     | '/trends'
+    | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/programmes/$slug'
     | '/projects/$slug'
     | '/publications/$id'
     | '/researchers/$slug'
     | '/topics/$slug'
+    | '/countries/'
     | '/institutions/'
     | '/jobs/'
+    | '/programmes/'
     | '/projects/'
     | '/publications/'
     | '/researchers/'
@@ -229,16 +259,19 @@ export interface FileRouteTypes {
     | '/events'
     | '/matcher'
     | '/methodology'
-    | '/programmes'
     | '/trends'
+    | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/programmes/$slug'
     | '/projects/$slug'
     | '/publications/$id'
     | '/researchers/$slug'
     | '/topics/$slug'
+    | '/countries'
     | '/institutions'
     | '/jobs'
+    | '/programmes'
     | '/projects'
     | '/publications'
     | '/researchers'
@@ -251,16 +284,19 @@ export interface FileRouteTypes {
     | '/events'
     | '/matcher'
     | '/methodology'
-    | '/programmes'
     | '/trends'
+    | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/programmes/$slug'
     | '/projects/$slug'
     | '/publications/$id'
     | '/researchers/$slug'
     | '/topics/$slug'
+    | '/countries/'
     | '/institutions/'
     | '/jobs/'
+    | '/programmes/'
     | '/projects/'
     | '/publications/'
     | '/researchers/'
@@ -274,16 +310,19 @@ export interface RootRouteChildren {
   EventsRoute: typeof EventsRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
-  ProgrammesRoute: typeof ProgrammesRoute
   TrendsRoute: typeof TrendsRoute
+  CountriesSlugRoute: typeof CountriesSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
   JobsSlugRoute: typeof JobsSlugRoute
+  ProgrammesSlugRoute: typeof ProgrammesSlugRoute
   ProjectsSlugRoute: typeof ProjectsSlugRoute
   PublicationsIdRoute: typeof PublicationsIdRoute
   ResearchersSlugRoute: typeof ResearchersSlugRoute
   TopicsSlugRoute: typeof TopicsSlugRoute
+  CountriesIndexRoute: typeof CountriesIndexRoute
   InstitutionsIndexRoute: typeof InstitutionsIndexRoute
   JobsIndexRoute: typeof JobsIndexRoute
+  ProgrammesIndexRoute: typeof ProgrammesIndexRoute
   ProjectsIndexRoute: typeof ProjectsIndexRoute
   PublicationsIndexRoute: typeof PublicationsIndexRoute
   ResearchersIndexRoute: typeof ResearchersIndexRoute
@@ -334,18 +373,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MethodologyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/programmes': {
-      id: '/programmes'
-      path: '/programmes'
-      fullPath: '/programmes'
-      preLoaderRoute: typeof ProgrammesRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/trends': {
       id: '/trends'
       path: '/trends'
       fullPath: '/trends'
       preLoaderRoute: typeof TrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/': {
+      id: '/countries/'
+      path: '/countries'
+      fullPath: '/countries/'
+      preLoaderRoute: typeof CountriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/$slug': {
+      id: '/countries/$slug'
+      path: '/countries/$slug'
+      fullPath: '/countries/$slug'
+      preLoaderRoute: typeof CountriesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/institutions/': {
@@ -374,6 +420,20 @@ declare module '@tanstack/react-router' {
       path: '/jobs/$slug'
       fullPath: '/jobs/$slug'
       preLoaderRoute: typeof JobsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programmes/': {
+      id: '/programmes/'
+      path: '/programmes'
+      fullPath: '/programmes/'
+      preLoaderRoute: typeof ProgrammesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programmes/$slug': {
+      id: '/programmes/$slug'
+      path: '/programmes/$slug'
+      fullPath: '/programmes/$slug'
+      preLoaderRoute: typeof ProgrammesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/projects/': {
@@ -442,16 +502,19 @@ const rootRouteChildren: RootRouteChildren = {
   EventsRoute: EventsRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
-  ProgrammesRoute: ProgrammesRoute,
   TrendsRoute: TrendsRoute,
+  CountriesSlugRoute: CountriesSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,
   JobsSlugRoute: JobsSlugRoute,
+  ProgrammesSlugRoute: ProgrammesSlugRoute,
   ProjectsSlugRoute: ProjectsSlugRoute,
   PublicationsIdRoute: PublicationsIdRoute,
   ResearchersSlugRoute: ResearchersSlugRoute,
   TopicsSlugRoute: TopicsSlugRoute,
+  CountriesIndexRoute: CountriesIndexRoute,
   InstitutionsIndexRoute: InstitutionsIndexRoute,
   JobsIndexRoute: JobsIndexRoute,
+  ProgrammesIndexRoute: ProgrammesIndexRoute,
   ProjectsIndexRoute: ProjectsIndexRoute,
   PublicationsIndexRoute: PublicationsIndexRoute,
   ResearchersIndexRoute: ResearchersIndexRoute,
