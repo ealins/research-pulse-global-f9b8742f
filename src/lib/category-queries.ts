@@ -141,7 +141,7 @@ function scoreInstitutions(l: Awaited<ReturnType<typeof fetchLandscape>>): Insti
   return l.institutions
     .map((i) => {
       const openCalls = l.opportunities.filter(
-        (o) => o.institution_id === i.id && OPEN_STATUSES.includes(o.status),
+        (o) => o.institution_id === i.id && (OPEN_STATUSES as readonly string[]).includes(o.status),
       ).length;
       const programmes = l.courses.filter((c) => c.institution_id === i.id).length;
       const projects = l.projects.filter(
