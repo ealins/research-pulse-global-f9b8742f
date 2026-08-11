@@ -60,11 +60,13 @@ export function Globe({
   arcs = [],
   selectedId,
   onSelect,
+  compact = false,
 }: {
   points: GlobePoint[];
   arcs?: GlobeArc[];
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
+  compact?: boolean;
 }) {
   const [rotation, setRotation] = useState(-10);
   const [spinning, setSpinning] = useState(true);
@@ -98,7 +100,7 @@ export function Globe({
     <div className="relative">
       <svg
         viewBox="0 0 320 320"
-        className="w-full max-w-[420px] touch-none select-none"
+        className={`touch-none select-none ${compact ? "w-full" : "w-full max-w-[420px]"}`}
         onPointerDown={(e) => {
           drag.current = { x: e.clientX, start: rotation };
           setSpinning(false);
@@ -181,6 +183,7 @@ export function Globe({
           })}
       </svg>
 
+      {compact ? null : (
       <div className="mt-3 flex items-center justify-center gap-3 text-[0.65rem] text-muted-foreground">
         <button
           type="button"
@@ -196,6 +199,7 @@ export function Globe({
           <span className="h-2 w-2 rounded-full bg-signal" /> no live call
         </span>
       </div>
+      )}
     </div>
   );
 }
