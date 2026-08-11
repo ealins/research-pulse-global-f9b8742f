@@ -5,6 +5,7 @@ import { ExternalLink, Quote, Unlock } from "lucide-react";
 import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
 import { publicationsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardLink } from "@/components/CardLink";
 
 export const Route = createFileRoute("/publications/")({
   head: () => ({
@@ -52,7 +53,8 @@ function PublicationsPage() {
         ) : (
           <ul className="space-y-2.5">
             {data?.map((p) => (
-              <li key={p.id} className="panel panel-hover rise-in p-5">
+              <li key={p.id} className="panel panel-hover rise-in relative p-5">
+                <CardLink to="/publications/$id" params={{ id: p.id }} label={`${p.title}: open publication`} />
                 <div className="flex flex-wrap items-center gap-2 text-[0.65rem]">
                   <span className="mono-num rounded-md border border-border bg-muted/50 px-2 py-0.5 text-muted-foreground">
                     {p.year ?? "Year not stated"}
@@ -100,7 +102,7 @@ function PublicationsPage() {
                       href={`https://doi.org/${p.doi}`}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="mono-num inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                      className="mono-num relative z-10 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
                     >
                       doi:{p.doi} <ExternalLink className="h-3 w-3" />
                     </a>
@@ -109,7 +111,7 @@ function PublicationsPage() {
                       href={p.landing_url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                      className="relative z-10 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
                     >
                       Landing page <ExternalLink className="h-3 w-3" />
                     </a>
