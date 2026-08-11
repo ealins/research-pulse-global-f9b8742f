@@ -23,6 +23,7 @@ import { Route as InstitutionsIndexRouteImport } from './routes/institutions.ind
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
 import { Route as JobsSlugRouteImport } from './routes/jobs.$slug'
+import { Route as ProgrammesIndexRouteImport } from './routes/programmes.index'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ProjectsSlugRouteImport } from './routes/projects.$slug'
 import { Route as PublicationsIndexRouteImport } from './routes/publications.index'
@@ -102,6 +103,11 @@ const JobsSlugRoute = JobsSlugRouteImport.update({
   path: '/jobs/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgrammesIndexRoute = ProgrammesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => ProgrammesRoute,
+} as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   id: '/projects/',
   path: '/projects/',
@@ -150,7 +156,7 @@ export interface FileRoutesByFullPath {
   '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
-  '/programmes': typeof ProgrammesRoute
+  '/programmes': typeof ProgrammesRouteWithChildren
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -162,6 +168,7 @@ export interface FileRoutesByFullPath {
   '/countries/': typeof CountriesIndexRoute
   '/institutions/': typeof InstitutionsIndexRoute
   '/jobs/': typeof JobsIndexRoute
+  '/programmes/': typeof ProgrammesIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
@@ -174,7 +181,6 @@ export interface FileRoutesByTo {
   '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
-  '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -186,6 +192,7 @@ export interface FileRoutesByTo {
   '/countries': typeof CountriesIndexRoute
   '/institutions': typeof InstitutionsIndexRoute
   '/jobs': typeof JobsIndexRoute
+  '/programmes': typeof ProgrammesIndexRoute
   '/projects': typeof ProjectsIndexRoute
   '/publications': typeof PublicationsIndexRoute
   '/researchers': typeof ResearchersIndexRoute
@@ -199,7 +206,7 @@ export interface FileRoutesById {
   '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
-  '/programmes': typeof ProgrammesRoute
+  '/programmes': typeof ProgrammesRouteWithChildren
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -211,6 +218,7 @@ export interface FileRoutesById {
   '/countries/': typeof CountriesIndexRoute
   '/institutions/': typeof InstitutionsIndexRoute
   '/jobs/': typeof JobsIndexRoute
+  '/programmes/': typeof ProgrammesIndexRoute
   '/projects/': typeof ProjectsIndexRoute
   '/publications/': typeof PublicationsIndexRoute
   '/researchers/': typeof ResearchersIndexRoute
@@ -237,6 +245,7 @@ export interface FileRouteTypes {
     | '/countries/'
     | '/institutions/'
     | '/jobs/'
+    | '/programmes/'
     | '/projects/'
     | '/publications/'
     | '/researchers/'
@@ -249,7 +258,6 @@ export interface FileRouteTypes {
     | '/events'
     | '/matcher'
     | '/methodology'
-    | '/programmes'
     | '/trends'
     | '/countries/$slug'
     | '/institutions/$slug'
@@ -261,6 +269,7 @@ export interface FileRouteTypes {
     | '/countries'
     | '/institutions'
     | '/jobs'
+    | '/programmes'
     | '/projects'
     | '/publications'
     | '/researchers'
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/countries/'
     | '/institutions/'
     | '/jobs/'
+    | '/programmes/'
     | '/projects/'
     | '/publications/'
     | '/researchers/'
@@ -298,7 +308,7 @@ export interface RootRouteChildren {
   EventsRoute: typeof EventsRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
-  ProgrammesRoute: typeof ProgrammesRoute
+  ProgrammesRoute: typeof ProgrammesRouteWithChildren
   TrendsRoute: typeof TrendsRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
@@ -416,6 +426,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programmes/': {
+      id: '/programmes/'
+      path: '/'
+      fullPath: '/programmes/'
+      preLoaderRoute: typeof ProgrammesIndexRouteImport
+      parentRoute: typeof ProgrammesRoute
+    }
     '/projects/': {
       id: '/projects/'
       path: '/projects'
@@ -475,6 +492,18 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ProgrammesRouteChildren {
+  ProgrammesIndexRoute: typeof ProgrammesIndexRoute
+}
+
+const ProgrammesRouteChildren: ProgrammesRouteChildren = {
+  ProgrammesIndexRoute: ProgrammesIndexRoute,
+}
+
+const ProgrammesRouteWithChildren = ProgrammesRoute._addFileChildren(
+  ProgrammesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtlasRoute: AtlasRoute,
@@ -482,7 +511,7 @@ const rootRouteChildren: RootRouteChildren = {
   EventsRoute: EventsRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
-  ProgrammesRoute: ProgrammesRoute,
+  ProgrammesRoute: ProgrammesRouteWithChildren,
   TrendsRoute: TrendsRoute,
   CountriesSlugRoute: CountriesSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,
