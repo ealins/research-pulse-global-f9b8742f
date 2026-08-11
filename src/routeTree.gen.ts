@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AtlasRouteImport } from './routes/atlas'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as MethodologyRouteImport } from './routes/methodology'
@@ -51,6 +52,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const AtlasRoute = AtlasRouteImport.update({
   id: '/atlas',
   path: '/atlas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CollaborationRoute = CollaborationRouteImport.update({
@@ -189,6 +195,7 @@ const ApiPublicHooksIngestBatchRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
+  '/auth': typeof AuthRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
@@ -219,6 +226,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
+  '/auth': typeof AuthRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/atlas': typeof AtlasRoute
+  '/auth': typeof AuthRoute
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
@@ -283,6 +292,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/atlas'
+    | '/auth'
     | '/collaboration'
     | '/matcher'
     | '/methodology'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/atlas'
+    | '/auth'
     | '/collaboration'
     | '/matcher'
     | '/methodology'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/'
     | '/_authenticated'
     | '/atlas'
+    | '/auth'
     | '/collaboration'
     | '/matcher'
     | '/methodology'
@@ -376,6 +388,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AtlasRoute: typeof AtlasRoute
+  AuthRoute: typeof AuthRoute
   CollaborationRoute: typeof CollaborationRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/atlas'
       fullPath: '/atlas'
       preLoaderRoute: typeof AtlasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/collaboration': {
@@ -626,6 +646,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AtlasRoute: AtlasRoute,
+  AuthRoute: AuthRoute,
   CollaborationRoute: CollaborationRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
