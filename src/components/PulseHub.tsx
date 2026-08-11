@@ -139,7 +139,7 @@ export function PulseHub({
 
           {laidOut.map(({ cluster, ring, start, end, segments }) => {
             const tone = TONE[cluster.tone];
-            const head = polar(ring + 52, (start + end) / 2);
+            const head = polar(ring + 64, (start + end) / 2);
             return (
               <g key={cluster.key}>
                 <path
