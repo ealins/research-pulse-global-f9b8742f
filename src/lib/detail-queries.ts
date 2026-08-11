@@ -372,7 +372,7 @@ export function projectDetailQuery(slug: string) {
            confidence, last_verified_at, is_demo,
            institutions!projects_institution_id_fkey ( id, name, slug, country ),
            departments ( name, slug ),
-           organizations ( name, slug, org_type ),
+           organizations!projects_funder_id_fkey ( name, slug, org_type ),
            project_topics ( research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
