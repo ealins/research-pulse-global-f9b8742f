@@ -14,7 +14,7 @@ export const Route = createFileRoute("/collaboration")({
       {
         name: "description",
         content:
-          "How institutions in photogrammetry, remote sensing and geoinformatics connect through shared topics, projects and co-authored papers — each edge carries its evidence link.",
+          "How geospatial institutions connect through shared topics, projects and co-authored papers, with an evidence link per edge.",
       },
       { property: "og:title", content: "Collaboration Graph — GeoAcademic Radar" },
       {

@@ -9,24 +9,25 @@ import { formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/publications/$id")({
-  head: () => ({
-    meta: [
-      { title: "Publication record — GeoAcademic Radar" },
-      {
-        name: "description",
-        content:
-          "Publication record: DOI, venue, year, authors, affiliations, citation source and open-access status, with full provenance.",
-      },
-      { property: "og:title", content: "Publication record — GeoAcademic Radar" },
-      {
-        property: "og:description",
-        content:
-          "DOI, venue, authors and citation provenance for this photogrammetry, remote sensing or geoinformatics paper.",
-      },
-      { property: "og:type", content: "article" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: ({ params }) => {
+    const ref = params.id.slice(0, 8);
+    return {
+      meta: [
+        { title: `Publication ${ref} — GeoAcademic Radar` },
+        {
+          name: "description",
+          content: `Publication record ${ref}: DOI, venue, year, authors, affiliations, citations and open-access status.`,
+        },
+        { property: "og:title", content: `Publication record ${ref}` },
+        {
+          property: "og:description",
+          content: `DOI, venue, authors and citation provenance for geospatial publication record ${ref}.`,
+        },
+        { property: "og:type", content: "article" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+    };
+  },
   component: PublicationDetail,
 });
 

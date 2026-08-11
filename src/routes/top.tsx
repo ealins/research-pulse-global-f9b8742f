@@ -15,7 +15,7 @@ export const Route = createFileRoute("/top")({
       {
         name: "description",
         content:
-          "The most relevant things in photogrammetry, remote sensing and geoinformatics this week: top academic and industry positions, fastest-growing research areas, strongest master's programmes and nearest deadlines.",
+          "This week in geospatial research: top academic and industry roles, fastest-growing areas, strong programmes and nearest deadlines.",
       },
       { property: "og:title", content: "Top picks right now — GeoAcademic Radar" },
       {

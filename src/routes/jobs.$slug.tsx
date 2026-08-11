@@ -9,24 +9,25 @@ import { STATUS_LABEL, TYPE_LABEL, daysUntil, formatDate } from "@/lib/radar-que
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/jobs/$slug")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug.replace(/-/g, " ")} — Position — GeoAcademic Radar` },
-      {
-        name: "description",
-        content:
-          "Full detail for an academic position in photogrammetry, remote sensing or geoinformatics: requirements, funding, supervisor, deadline and the official application link.",
-      },
-      { property: "og:title", content: "Academic position — GeoAcademic Radar" },
-      {
-        property: "og:description",
-        content:
-          "Requirements, funding, supervisor and deadline for this geospatial research position, with the official source link.",
-      },
-      { property: "og:type", content: "article" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: ({ params }) => {
+    const pretty = params.slug.replace(/-demo$/, "").replace(/-/g, " ");
+    return {
+      meta: [
+        { title: `${pretty} — Position — GeoAcademic Radar` },
+        {
+          name: "description",
+          content: `${pretty}: requirements, funding, supervisor, deadline and the official application link.`,
+        },
+        { property: "og:title", content: `${pretty} — Position` },
+        {
+          property: "og:description",
+          content: `Requirements, funding, supervisor and deadline for ${pretty}, with the official source link.`,
+        },
+        { property: "og:type", content: "article" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+    };
+  },
   component: OpportunityDetail,
 });
 

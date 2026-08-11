@@ -29,7 +29,7 @@ export const Route = createFileRoute("/matcher")({
       {
         name: "description",
         content:
-          "Weight your interests once, then switch between academic fit (PhD, postdoc, research staff) and industry fit (engineering, data science, product) across tracked geospatial positions.",
+          "Weight your interests once, then compare academic fit and industry fit across tracked geospatial positions.",
       },
       { property: "og:title", content: "Matcher — academic & industry fit" },
       {

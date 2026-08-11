@@ -45,7 +45,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Live intelligence feed for photogrammetry, remote sensing and geoinformatics: PhD jobs, publications, projects and events, each with a source link and verification status.",
+          "Live feed for photogrammetry, remote sensing and geoinformatics: PhD jobs, papers, projects and events, each with a source link.",
       },
       { property: "og:title", content: "Academic Pulse — GeoAcademic Radar" },
       {
