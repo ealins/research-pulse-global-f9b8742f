@@ -5,6 +5,7 @@ import { Globe2, MapPin } from "lucide-react";
 
 import { AppShell, PageHeader, StatTile } from "@/components/layout/AppShell";
 import { Globe, type GlobeArc, type GlobePoint } from "@/components/Globe";
+import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -146,7 +147,16 @@ function AtlasPage() {
             {isLoading ? (
               <Skeleton className="h-[320px] w-[320px] rounded-full" />
             ) : (
-              <Globe points={points} arcs={arcs} selectedId={selected} onSelect={setSelected} />
+              <>
+                <Globe points={points} arcs={arcs} selectedId={selected} onSelect={setSelected} />
+                <InstitutionSnapshot
+                  slug={selectedInstitution?.slug ?? null}
+                  open={Boolean(selectedInstitution)}
+                  onOpenChange={(o) => {
+                    if (!o) setSelected(null);
+                  }}
+                />
+              </>
             )}
             {selectedInstitution ? (
               <div className="mt-4 w-full max-w-md rounded-md border border-primary/30 bg-primary/5 p-4">
