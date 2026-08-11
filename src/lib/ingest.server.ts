@@ -389,7 +389,7 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const started = Date.now();
   const { data: source, error } = await supabaseAdmin
     .from("sources")
-    .select("id, url, institution_id, adapter_key, category")
+    .select("id, url, institution_id, adapter_key, category, refresh_frequency_hours")
     .eq("id", sourceId)
     .maybeSingle();
   if (error) throw error;
@@ -491,6 +491,15 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
     rawId = inserted?.id ?? null;
   }
 
+  // Modest adaptive refresh: a page that comes back unchanged earns a longer
+  // interval (capped), a page that changed returns to its category cadence.
+  const { loadSchedule, refreshHoursFor } = await import("./schedule.server");
+  const schedule = await loadSchedule();
+  const baseHours = refreshHoursFor(schedule, source.category);
+  const nextHours = changed
+    ? baseHours
+    : Math.min(Math.round((source.refresh_frequency_hours ?? baseHours) * 1.5), baseHours * schedule.adaptive_backoff_max);
+
   await supabaseAdmin
     .from("sources")
     .update({
@@ -498,11 +507,14 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
       last_http_status: status,
       canonical_url: finalUrl,
       last_success_at: new Date().toISOString(),
+      refresh_frequency_hours: nextHours,
       last_error: null,
     })
     .eq("id", source.id);
   await recordRun(true, changed, null);
+  // Unchanged content stops here: no extraction, no model call, no canonical write.
   if (changed) await enqueue("NORMALIZE", { source_id: source.id, institution_id: source.institution_id ?? undefined });
+
 
   // A vacancy listing page is an index, not a record: register each individual
   // posting it links to as its own source so every position keeps its own URL.
