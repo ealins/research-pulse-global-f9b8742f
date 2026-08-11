@@ -45,13 +45,13 @@ const TONE = {
 
 const SIZE = 620;
 const C = SIZE / 2;
-const RINGS = [214, 253, 292];
+const RINGS = [246, 246, 246];
 
 /** Sector angles in degrees, 0 = top, clockwise. */
 const SECTORS: Record<string, [number, number]> = {
-  monitor: [-118, -10],
-  act: [12, 120],
-  knowledge: [142, 218],
+  monitor: [-128, -14],
+  act: [10, 124],
+  knowledge: [148, 232],
 };
 
 function polar(r: number, deg: number) {
@@ -107,12 +107,12 @@ export function PulseHub({
     <div className="relative">
       <div className="relative mx-auto aspect-square w-full max-w-[620px]">
         {/* Globe core */}
-        <div className="absolute left-1/2 top-1/2 w-[54%] -translate-x-1/2 -translate-y-1/2">
+        <div className="absolute left-1/2 top-1/2 w-[58%] -translate-x-1/2 -translate-y-1/2">
           <div className="mx-auto w-full text-primary">
             {loading ? (
               <div className="aspect-square w-full animate-pulse rounded-full bg-muted/40" />
             ) : (
-              <Globe points={points} arcs={arcs} />
+              <Globe points={points} arcs={arcs} compact />
             )}
           </div>
         </div>
