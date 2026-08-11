@@ -25,6 +25,7 @@ import { Route as TopicsRouteImport } from './routes/topics'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsSlugRouteImport } from './routes/jobs.$slug'
+import { Route as ProjectsSlugRouteImport } from './routes/projects.$slug'
 import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
 import { Route as TopicsSlugRouteImport } from './routes/topics.$slug'
 
@@ -108,6 +109,11 @@ const JobsSlugRoute = JobsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => JobsRoute,
 } as any)
+const ProjectsSlugRoute = ProjectsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => ProjectsRoute,
+} as any)
 const ResearchersSlugRoute = ResearchersSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -129,13 +135,14 @@ export interface FileRoutesByFullPath {
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
-  '/projects': typeof ProjectsRoute
+  '/projects': typeof ProjectsRouteWithChildren
   '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRouteWithChildren
   '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/projects/$slug': typeof ProjectsSlugRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
 }
@@ -149,13 +156,14 @@ export interface FileRoutesByTo {
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
-  '/projects': typeof ProjectsRoute
+  '/projects': typeof ProjectsRouteWithChildren
   '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRouteWithChildren
   '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/projects/$slug': typeof ProjectsSlugRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
 }
@@ -170,13 +178,14 @@ export interface FileRoutesById {
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
-  '/projects': typeof ProjectsRoute
+  '/projects': typeof ProjectsRouteWithChildren
   '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRouteWithChildren
   '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/projects/$slug': typeof ProjectsSlugRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
 }
@@ -199,6 +208,7 @@ export interface FileRouteTypes {
     | '/trends'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/projects/$slug'
     | '/researchers/$slug'
     | '/topics/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -219,6 +229,7 @@ export interface FileRouteTypes {
     | '/trends'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/projects/$slug'
     | '/researchers/$slug'
     | '/topics/$slug'
   id:
@@ -239,6 +250,7 @@ export interface FileRouteTypes {
     | '/trends'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/projects/$slug'
     | '/researchers/$slug'
     | '/topics/$slug'
   fileRoutesById: FileRoutesById
@@ -253,7 +265,7 @@ export interface RootRouteChildren {
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
   ProgrammesRoute: typeof ProgrammesRoute
-  ProjectsRoute: typeof ProjectsRoute
+  ProjectsRoute: typeof ProjectsRouteWithChildren
   PublicationsRoute: typeof PublicationsRoute
   ResearchersRoute: typeof ResearchersRouteWithChildren
   TopicsRoute: typeof TopicsRouteWithChildren
@@ -374,6 +386,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsSlugRouteImport
       parentRoute: typeof JobsRoute
     }
+    '/projects/$slug': {
+      id: '/projects/$slug'
+      path: '/$slug'
+      fullPath: '/projects/$slug'
+      preLoaderRoute: typeof ProjectsSlugRouteImport
+      parentRoute: typeof ProjectsRoute
+    }
     '/researchers/$slug': {
       id: '/researchers/$slug'
       path: '/$slug'
@@ -413,6 +432,18 @@ const JobsRouteChildren: JobsRouteChildren = {
 
 const JobsRouteWithChildren = JobsRoute._addFileChildren(JobsRouteChildren)
 
+interface ProjectsRouteChildren {
+  ProjectsSlugRoute: typeof ProjectsSlugRoute
+}
+
+const ProjectsRouteChildren: ProjectsRouteChildren = {
+  ProjectsSlugRoute: ProjectsSlugRoute,
+}
+
+const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
+  ProjectsRouteChildren,
+)
+
 interface ResearchersRouteChildren {
   ResearchersSlugRoute: typeof ResearchersSlugRoute
 }
@@ -446,7 +477,7 @@ const rootRouteChildren: RootRouteChildren = {
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
   ProgrammesRoute: ProgrammesRoute,
-  ProjectsRoute: ProjectsRoute,
+  ProjectsRoute: ProjectsRouteWithChildren,
   PublicationsRoute: PublicationsRoute,
   ResearchersRoute: ResearchersRouteWithChildren,
   TopicsRoute: TopicsRouteWithChildren,
@@ -455,13 +486,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
