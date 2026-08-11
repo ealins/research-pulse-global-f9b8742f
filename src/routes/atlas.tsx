@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { Globe2, MapPin } from "lucide-react";
 
+import { countrySlug } from "@/lib/category-queries";
 import { AppShell, PageHeader, StatTile } from "@/components/layout/AppShell";
 import { Globe, type GlobeArc, type GlobePoint } from "@/components/Globe";
 import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
@@ -194,9 +195,15 @@ function AtlasPage() {
               {byCountry.map(([country, row]) => {
                 const max = byCountry[0]?.[1].institutions || 1;
                 return (
-                  <li key={country} className="panel px-3 py-2">
+                  <li key={country} className="panel panel-hover px-3 py-2">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-foreground">{country}</span>
+                      <Link
+                        to="/countries/$slug"
+                        params={{ slug: countrySlug(country) }}
+                        className="text-foreground hover:text-primary"
+                      >
+                        {country}
+                      </Link>
                       <span className="mono-num text-muted-foreground">
                         {row.institutions} inst · {row.live} live
                       </span>
