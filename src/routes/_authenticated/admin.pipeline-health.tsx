@@ -42,7 +42,7 @@ export const Route = createFileRoute("/_authenticated/admin/pipeline-health")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  component: PipelineHealthPage,
+  component: AdminGate,
 });
 
 const STAGES = [
