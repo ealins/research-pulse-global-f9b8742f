@@ -10,9 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as InstitutionsRouteImport } from './routes/institutions'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as ProgrammesRouteImport } from './routes/programmes'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PublicationsRouteImport } from './routes/publications'
@@ -22,6 +24,11 @@ import { Route as TrendsRouteImport } from './routes/trends'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CollaborationRoute = CollaborationRouteImport.update({
+  id: '/collaboration',
+  path: '/collaboration',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EventsRoute = EventsRouteImport.update({
@@ -37,6 +44,11 @@ const InstitutionsRoute = InstitutionsRouteImport.update({
 const JobsRoute = JobsRouteImport.update({
   id: '/jobs',
   path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatcherRoute = MatcherRouteImport.update({
+  id: '/matcher',
+  path: '/matcher',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgrammesRoute = ProgrammesRouteImport.update({
@@ -67,9 +79,11 @@ const TrendsRoute = TrendsRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/collaboration': typeof CollaborationRoute
   '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/matcher': typeof MatcherRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
@@ -78,9 +92,11 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/collaboration': typeof CollaborationRoute
   '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/matcher': typeof MatcherRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
@@ -90,9 +106,11 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/collaboration': typeof CollaborationRoute
   '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/matcher': typeof MatcherRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
@@ -103,9 +121,11 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/collaboration'
     | '/events'
     | '/institutions'
     | '/jobs'
+    | '/matcher'
     | '/programmes'
     | '/projects'
     | '/publications'
@@ -114,9 +134,11 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/collaboration'
     | '/events'
     | '/institutions'
     | '/jobs'
+    | '/matcher'
     | '/programmes'
     | '/projects'
     | '/publications'
@@ -125,9 +147,11 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/collaboration'
     | '/events'
     | '/institutions'
     | '/jobs'
+    | '/matcher'
     | '/programmes'
     | '/projects'
     | '/publications'
@@ -137,9 +161,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CollaborationRoute: typeof CollaborationRoute
   EventsRoute: typeof EventsRoute
   InstitutionsRoute: typeof InstitutionsRoute
   JobsRoute: typeof JobsRoute
+  MatcherRoute: typeof MatcherRoute
   ProgrammesRoute: typeof ProgrammesRoute
   ProjectsRoute: typeof ProjectsRoute
   PublicationsRoute: typeof PublicationsRoute
@@ -154,6 +180,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/collaboration': {
+      id: '/collaboration'
+      path: '/collaboration'
+      fullPath: '/collaboration'
+      preLoaderRoute: typeof CollaborationRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/events': {
@@ -175,6 +208,13 @@ declare module '@tanstack/react-router' {
       path: '/jobs'
       fullPath: '/jobs'
       preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/matcher': {
+      id: '/matcher'
+      path: '/matcher'
+      fullPath: '/matcher'
+      preLoaderRoute: typeof MatcherRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/programmes': {
@@ -217,9 +257,11 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CollaborationRoute: CollaborationRoute,
   EventsRoute: EventsRoute,
   InstitutionsRoute: InstitutionsRoute,
   JobsRoute: JobsRoute,
+  MatcherRoute: MatcherRoute,
   ProgrammesRoute: ProgrammesRoute,
   ProjectsRoute: ProjectsRoute,
   PublicationsRoute: PublicationsRoute,
