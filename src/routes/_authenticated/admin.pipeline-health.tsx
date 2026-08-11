@@ -98,12 +98,16 @@ function AdminGate() {
             <p>Ask an existing administrator to grant your account the admin role.</p>
           ) : (
             <>
-              <p>No administrator exists yet. As the first signed-in account you can claim the role once.</p>
+              <p>
+                No administrator exists yet. The one-time bootstrap is reserved for the designated owner account
+                configured on the server; it is verified server-side and closes permanently once the first admin exists.
+              </p>
               <Button className="mt-4" disabled={claimMutation.isPending} onClick={() => claimMutation.mutate()}>
-                {claimMutation.isPending ? "Granting…" : "Claim admin role"}
+                {claimMutation.isPending ? "Checking…" : "Activate owner admin access"}
               </Button>
             </>
           )}
+
         </div>
       </div>
     </AppShell>
