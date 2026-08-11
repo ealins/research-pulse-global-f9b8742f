@@ -9,24 +9,25 @@ import { STATUS_LABEL, TYPE_LABEL, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/institutions/$slug")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug.replace(/-/g, " ")} — Institution profile — GeoAcademic Radar` },
-      {
-        name: "description",
-        content:
-          "Institution profile: departments, research groups, people, funded projects, publications, taught programmes and open positions in photogrammetry, remote sensing and geoinformatics.",
-      },
-      { property: "og:title", content: "Institution profile — GeoAcademic Radar" },
-      {
-        property: "og:description",
-        content:
-          "Departments, people, projects, publications and open positions for this geospatial research institution, each with source provenance.",
-      },
-      { property: "og:type", content: "profile" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: ({ params }) => {
+    const pretty = params.slug.replace(/-/g, " ");
+    return {
+      meta: [
+        { title: `${pretty} — Institution profile — GeoAcademic Radar` },
+        {
+          name: "description",
+          content: `${pretty}: departments, people, funded projects, publications, taught programmes and open geospatial positions.`,
+        },
+        { property: "og:title", content: `${pretty} — Institution profile` },
+        {
+          property: "og:description",
+          content: `Departments, people, projects, publications and open positions at ${pretty}, each with source provenance.`,
+        },
+        { property: "og:type", content: "profile" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+    };
+  },
   component: InstitutionDetail,
 });
 

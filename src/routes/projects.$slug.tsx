@@ -9,24 +9,25 @@ import { STATUS_LABEL, TYPE_LABEL, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/projects/$slug")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug.replace(/-/g, " ")} — Research project — GeoAcademic Radar` },
-      {
-        name: "description",
-        content:
-          "Funded research project detail: lead institution, partners, team, funder, timeline, topics and any positions attached to the grant.",
-      },
-      { property: "og:title", content: "Research project — GeoAcademic Radar" },
-      {
-        property: "og:description",
-        content:
-          "Funder, timeline, consortium partners and people behind this geospatial research project, with source provenance.",
-      },
-      { property: "og:type", content: "article" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: ({ params }) => {
+    const pretty = params.slug.replace(/-demo$/, "").replace(/-/g, " ");
+    return {
+      meta: [
+        { title: `${pretty} — Research project — GeoAcademic Radar` },
+        {
+          name: "description",
+          content: `${pretty}: lead institution, partners, team, funder, timeline, topics and attached positions.`,
+        },
+        { property: "og:title", content: `${pretty} — Research project` },
+        {
+          property: "og:description",
+          content: `Funder, timeline, partners and people behind ${pretty}, with source provenance.`,
+        },
+        { property: "og:type", content: "article" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+    };
+  },
   component: ProjectDetail,
 });
 

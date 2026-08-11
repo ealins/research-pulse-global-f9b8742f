@@ -8,24 +8,25 @@ import { STATUS_LABEL, TYPE_LABEL, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/topics/$slug")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug.replace(/-/g, " ")} — Topic dossier — GeoAcademic Radar` },
-      {
-        name: "description",
-        content:
-          "Topic dossier: definition, momentum, leading institutions, active researchers, projects, publications and open positions for this geospatial research area.",
-      },
-      { property: "og:title", content: "Topic dossier — GeoAcademic Radar" },
-      {
-        property: "og:description",
-        content:
-          "Who works on this topic, where, with what funding, and which positions are open right now.",
-      },
-      { property: "og:type", content: "article" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: ({ params }) => {
+    const pretty = params.slug.replace(/-/g, " ");
+    return {
+      meta: [
+        { title: `${pretty} — Topic dossier — GeoAcademic Radar` },
+        {
+          name: "description",
+          content: `${pretty}: momentum, leading institutions, active researchers, projects, papers and open positions.`,
+        },
+        { property: "og:title", content: `${pretty} — Topic dossier` },
+        {
+          property: "og:description",
+          content: `Who works on ${pretty}, where, with what funding, and which positions are open right now.`,
+        },
+        { property: "og:type", content: "article" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+    };
+  },
   component: TopicDetail,
 });
 

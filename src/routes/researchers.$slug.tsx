@@ -9,24 +9,25 @@ import { STATUS_LABEL, TYPE_LABEL, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/researchers/$slug")({
-  head: ({ params }) => ({
-    meta: [
-      { title: `${params.slug.replace(/-/g, " ")} — Researcher profile — GeoAcademic Radar` },
-      {
-        name: "description",
-        content:
-          "Researcher profile: position history, research topics, publications, funded projects, supervised positions and taught programmes, each traceable to an official source.",
-      },
-      { property: "og:title", content: "Researcher profile — GeoAcademic Radar" },
-      {
-        property: "og:description",
-        content:
-          "Position, topics, publications and supervision record for a photogrammetry, remote sensing and geoinformatics researcher.",
-      },
-      { property: "og:type", content: "profile" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-  }),
+  head: ({ params }) => {
+    const pretty = params.slug.replace(/-/g, " ");
+    return {
+      meta: [
+        { title: `${pretty} — Researcher profile — GeoAcademic Radar` },
+        {
+          name: "description",
+          content: `${pretty}: positions, research topics, publications, funded projects and supervised geospatial vacancies.`,
+        },
+        { property: "og:title", content: `${pretty} — Researcher profile` },
+        {
+          property: "og:description",
+          content: `Position, topics, publications and supervision record for ${pretty}, traceable to official sources.`,
+        },
+        { property: "og:type", content: "profile" },
+        { name: "twitter:card", content: "summary_large_image" },
+      ],
+    };
+  },
   component: ResearcherDetail,
 });
 
