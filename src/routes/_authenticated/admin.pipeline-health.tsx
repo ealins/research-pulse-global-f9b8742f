@@ -76,7 +76,10 @@ function AdminGate() {
         toast.success("Admin role granted");
         await qc.invalidateQueries();
       } else {
-        toast.error("Admin access required", { description: "An administrator already exists for this workspace." });
+        toast.error("Admin access required", {
+          description: "This account is not the designated owner, or the one-time bootstrap is already closed.",
+        });
+
       }
     },
     onError: (e) => toast.error("Could not grant admin", { description: e instanceof Error ? e.message : String(e) }),
