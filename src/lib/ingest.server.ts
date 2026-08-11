@@ -611,7 +611,11 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     await mark("FAILED", "missing institution");
     return { status: "FAILED", reason: "missing institution" };
   }
-  const title = (raw.page_title ?? "").replace(/\s*[|–-]\s*(University of Stuttgart|Universität Stuttgart).*$/i, "").trim();
+  const title = (raw.page_title ?? "")
+    // Strip site chrome that job portals append to <title>.
+    .replace(/\s*[|·–—-]\s*[^|·–—-]*(university|universit\u00e4t|hochschule|institut\w*|careers?|karriere)[^|·–—-]*$/gi, "")
+    .replace(/\s*(job\s*details?|stellendetails|stellenanzeige|job\s*description)\s*$/i, "")
+    .trim();
   if (!title) {
     await mark("FAILED", "missing title");
     return { status: "FAILED", reason: "missing title" };
@@ -621,7 +625,9 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   const rolling = /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
   const deadline = parseDeadline(text);
   const status = deriveStatus(deadline, rolling);
-  const isPhd = /(phd|doctoral|doktorand|promotion)/i.test(`${title} ${text.slice(0, 2000)}`);
+  // Only the posting's own title decides the type: body text mentioning a
+  // doctoral programme must not turn a staff role into a PhD position.
+  const isPhd = /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
   const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
 
   const { data: existing } = await supabaseAdmin
@@ -697,6 +703,35 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
         is_primary: true,
         last_checked_at: new Date().toISOString(),
       });
+    }
+  }
+
+  // Same posting published in several languages: flag, never silently merge.
+  if (entityId) {
+    const { data: twins } = await supabaseAdmin
+      .from("opportunities")
+      .select("id, normalized_title")
+      .eq("institution_id", raw.institution_id)
+      .neq("id", entityId)
+      .limit(50);
+    const twin = (twins ?? []).find((t) => t.normalized_title && payload.normalized_title.startsWith(t.normalized_title.slice(0, 25)));
+    if (twin) {
+      const { data: known } = await supabaseAdmin
+        .from("duplicate_candidates")
+        .select("id")
+        .eq("entity_type", "opportunity")
+        .eq("primary_id", twin.id)
+        .eq("duplicate_id", entityId)
+        .maybeSingle();
+      if (!known) {
+        await supabaseAdmin.from("duplicate_candidates").insert({
+          entity_type: "opportunity",
+          primary_id: twin.id,
+          duplicate_id: entityId,
+          match_reason: "Near-identical title at the same institution (likely language variant of one posting)",
+          score: 0.8,
+        });
+      }
     }
   }
 
