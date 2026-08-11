@@ -15,7 +15,7 @@ import { OperatingModePanel } from "@/components/admin/OperatingModePanel";
 import { RealDataMigrationPanel } from "@/components/admin/RealDataMigrationPanel";
 
 
-export const Route = createFileRoute("/admin/pipeline-health")({
+export const Route = createFileRoute("/_authenticated/admin/pipeline-health")({
   head: () => ({
     meta: [
       { title: "Pipeline health — GeoAcademic Radar" },
