@@ -5,19 +5,20 @@ import { Globe2 } from "lucide-react";
 
 import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
+import { CardLink } from "@/components/CardLink";
 import { countriesRollupQuery } from "@/lib/category-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/countries/")({
   head: () => ({
     meta: [
-      { title: "Countries — Academic capacity by nation | GeoAcademic Radar" },
+      { title: "Countries — Research capacity by nation | GeoAcademic Radar" },
       {
         name: "description",
         content:
           "Browse photogrammetry, remote sensing and geoinformatics research capacity country by country: institutions, live PhD calls, degree programmes and projects.",
       },
-      { property: "og:title", content: "Academic capacity by country — GeoAcademic Radar" },
+      { property: "og:title", content: "Research capacity by country — GeoAcademic Radar" },
       {
         property: "og:description",
         content:
@@ -69,7 +70,8 @@ function CountriesPage() {
         ) : (
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {rows.map((c) => (
-              <li key={c.slug} className="panel panel-hover rise-in p-5">
+              <li key={c.slug} className="panel panel-hover rise-in relative p-5">
+                <CardLink to="/countries/$slug" params={{ slug: c.slug }} label={`${c.country}: open country synopsis`} />
                 <div className="flex items-start justify-between gap-3">
                   <Link
                     to="/countries/$slug"

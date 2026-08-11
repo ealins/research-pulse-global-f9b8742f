@@ -8,6 +8,7 @@ import { CategoryTabs } from "@/components/CategoryTabs";
 import { eventsQuery, formatDate, daysUntil } from "@/lib/radar-queries";
 import { KIND_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardLink } from "@/components/CardLink";
 
 export const Route = createFileRoute("/events/")({
   head: () => ({
@@ -93,7 +94,8 @@ function EventsPage() {
         ) : (
           <ul className="mt-6 grid gap-3 md:grid-cols-2">
             {rows.map((e) => (
-              <li key={e.id} className="panel panel-hover rise-in flex flex-col p-5">
+              <li key={e.id} className="panel panel-hover rise-in relative flex flex-col p-5">
+                <CardLink to="/events/$slug" params={{ slug: e.slug }} label={`${e.title}: open event synopsis`} />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-primary/40 bg-primary/12 px-2.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-primary">
                     {KIND_LABEL[e.event_kind] ?? e.event_kind}
@@ -143,7 +145,7 @@ function EventsPage() {
                         href={e.website}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="inline-flex items-center gap-1 text-[0.7rem] font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
+                        className="relative z-10 inline-flex items-center gap-1 text-[0.7rem] font-medium text-muted-foreground underline-offset-4 hover:text-primary hover:underline"
                       >
                         Official page <ExternalLink className="h-3 w-3" />
                       </a>

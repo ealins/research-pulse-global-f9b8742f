@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
 import { researchersQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardLink } from "@/components/CardLink";
 
 export const Route = createFileRoute("/researchers/")({
   head: () => ({
@@ -51,7 +52,8 @@ function ResearchersPage() {
         ) : (
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {data?.map((r) => (
-              <li key={r.id} className="panel panel-hover rise-in flex flex-col p-5">
+              <li key={r.id} className="panel panel-hover rise-in relative flex flex-col p-5">
+                <CardLink to="/researchers/$slug" params={{ slug: r.slug }} label={`${r.full_name}: open researcher profile`} />
                 <p className="text-[0.65rem] uppercase tracking-[0.16em] text-primary">
                   {r.academic_title ?? "Title not stated"}
                 </p>
@@ -87,7 +89,7 @@ function ResearchersPage() {
                       href={r.official_profile_url}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="mt-3 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                      className="relative z-10 mt-3 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
                     >
                       Official profile <ExternalLink className="h-3 w-3" />
                     </a>

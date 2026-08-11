@@ -14,6 +14,7 @@ import {
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { SECTOR_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardLink } from "@/components/CardLink";
 
 type JobSector = "academic" | "industry" | "all";
 
@@ -219,7 +220,8 @@ function JobsPage() {
             {rows.map((o) => {
               const d = daysUntil(o.application_deadline);
               return (
-                <li key={o.id} className="panel panel-hover rise-in p-5">
+                <li key={o.id} className="panel panel-hover rise-in relative p-5">
+                  <CardLink to="/jobs/$slug" params={{ slug: o.slug }} label={`${o.title}: open position synopsis`} />
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full border px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider ${
@@ -300,7 +302,7 @@ function JobsPage() {
                         href={o.application_url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                        className="relative z-10 inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:opacity-90"
                       >
                         Apply via source <ExternalLink className="h-3.5 w-3.5" />
                       </a>
@@ -310,7 +312,7 @@ function JobsPage() {
                         href={o.official_source_url}
                         target="_blank"
                         rel="noreferrer noopener"
-                        className="inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
+                        className="relative z-10 inline-flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-accent"
                       >
                         Official source <ExternalLink className="h-3.5 w-3.5" />
                       </a>

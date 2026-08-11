@@ -13,6 +13,7 @@ import {
   countrySlug,
 } from "@/lib/category-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardLink } from "@/components/CardLink";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/programmes/")({
@@ -161,7 +162,8 @@ function ProgrammesPage() {
                 </h2>
                 <ul className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {list.map((c) => (
-                    <li key={c.id} className="panel panel-hover rise-in flex flex-col p-5">
+                    <li key={c.id} className="panel panel-hover rise-in relative flex flex-col p-5">
+                      <CardLink to="/programmes/$slug" params={{ slug: c.slug }} label={`${c.title}: open programme synopsis`} />
                       <div className="flex items-start justify-between gap-3">
                         <Link
                           to="/programmes/$slug"
@@ -179,7 +181,7 @@ function ProgrammesPage() {
                           <Link
                             to="/institutions/$slug"
                             params={{ slug: c.institutions.slug }}
-                            className="hover:text-primary"
+                            className="relative z-10 hover:text-primary"
                           >
                             {c.institutions.name}
                           </Link>
@@ -190,7 +192,7 @@ function ProgrammesPage() {
                         <Link
                           to="/countries/$slug"
                           params={{ slug: countrySlug(c.country) }}
-                          className="hover:text-primary"
+                          className="relative z-10 hover:text-primary"
                         >
                           {c.country}
                         </Link>

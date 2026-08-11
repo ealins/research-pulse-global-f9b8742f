@@ -5,6 +5,7 @@ import { ExternalLink } from "lucide-react";
 import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
 import { formatDate, projectsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CardLink } from "@/components/CardLink";
 
 export const Route = createFileRoute("/projects/")({
   head: () => ({
@@ -65,7 +66,8 @@ function ProjectsPage() {
         ) : (
           <ul className="grid gap-3 lg:grid-cols-2">
             {data?.map((p) => (
-              <li key={p.id} className="panel panel-hover rise-in flex flex-col p-5">
+              <li key={p.id} className="panel panel-hover rise-in relative flex flex-col p-5">
+                <CardLink to="/projects/$slug" params={{ slug: p.slug }} label={`${p.name}: open project synopsis`} />
                 <div className="flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-wider">
                   <span
                     className={`rounded-full border px-2.5 py-0.5 ${
@@ -91,7 +93,7 @@ function ProjectsPage() {
                   <Link
                     to="/institutions/$slug"
                     params={{ slug: p.institutions.slug }}
-                    className="mt-1 block text-xs text-muted-foreground hover:text-primary"
+                    className="relative z-10 mt-1 block w-fit text-xs text-muted-foreground hover:text-primary"
                   >
                     {p.institutions.name}
                   </Link>
@@ -123,7 +125,7 @@ function ProjectsPage() {
                       href={p.website}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="mt-3 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                      className="relative z-10 mt-3 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
                     >
                       Project page <ExternalLink className="h-3 w-3" />
                     </a>

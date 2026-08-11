@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { CardLink } from "@/components/CardLink";
 import { EmptyState } from "@/components/EmptyState";
 import type { ReactNode } from "react";
 import {
@@ -28,7 +29,7 @@ const NAV_GROUPS = [
   {
     label: "Monitor",
     items: [
-      { to: "/", label: "Academic Pulse", icon: Activity },
+      { to: "/", label: "Research Pulse", icon: Activity },
       { to: "/top", label: "Top picks", icon: Sparkles },
       { to: "/atlas", label: "World Monitor", icon: Globe2 },
       { to: "/countries", label: "Countries", icon: MapPinned },
@@ -168,11 +169,17 @@ export function StatTile({
   value,
   hint,
   tone = "default",
+  to,
+  params,
+  search,
 }: {
   label: string;
   value: string | number;
   hint?: string;
   tone?: "default" | "signal" | "deadline" | "growth";
+  to?: string;
+  params?: Record<string, string>;
+  search?: Record<string, unknown>;
 }) {
   const toneClass =
     tone === "signal"
@@ -184,7 +191,8 @@ export function StatTile({
           : "text-primary";
   const empty = isEmptyStat(value);
   return (
-    <div className="panel panel-hover rise-in p-4">
+    <div className="panel panel-hover rise-in relative p-4">
+      {to ? <CardLink to={to} params={params} search={search} label={`${label}: open`} /> : null}
       <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>

@@ -133,7 +133,7 @@ export function PulseHub({
         {/* Rings and spokes */}
         <svg
           viewBox={`0 0 ${SIZE} ${SIZE}`}
-          className="pointer-events-none absolute inset-0 h-full w-full"
+          className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
         >
           {[RING - 40, RING, RING + 34].map((r) => (
             <circle

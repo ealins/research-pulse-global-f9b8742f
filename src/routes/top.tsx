@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Briefcase, CalendarDays, GraduationCap, TrendingUp } from "lucide-react";
 
+import { CardLink } from "@/components/CardLink";
 import { AppShell, PageHeader, StatTile } from "@/components/layout/AppShell";
 import { KIND_LABEL, topPicksQuery } from "@/lib/relevance-queries";
 import { countriesRollupQuery, degreeLabel } from "@/lib/category-queries";
@@ -124,7 +125,8 @@ function TopPage() {
             {academic.map((j) => {
               const d = daysUntil(j.application_deadline);
               return (
-                <li key={j.id} className="panel panel-hover p-4">
+                <li key={j.id} className="panel panel-hover relative p-4">
+                  <CardLink to="/jobs/$slug" params={{ slug: j.slug }} label={`${j.title}: open position`} />
                   <Link
                     to="/jobs/$slug"
                     params={{ slug: j.slug }}
@@ -162,7 +164,8 @@ function TopPage() {
         >
           <ul className="grid gap-2 lg:grid-cols-2">
             {industry.map((j) => (
-              <li key={j.id} className="panel panel-hover p-4">
+              <li key={j.id} className="panel panel-hover relative p-4">
+                <CardLink to="/jobs/$slug" params={{ slug: j.slug }} label={`${j.title}: open position`} />
                 <Link
                   to="/jobs/$slug"
                   params={{ slug: j.slug }}
@@ -198,7 +201,8 @@ function TopPage() {
           <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {areas.map((a, i) =>
               a.research_topics ? (
-                <li key={a.research_topics.slug} className="panel panel-hover p-4">
+                <li key={a.research_topics.slug} className="panel panel-hover relative p-4">
+                  <CardLink to="/topics/$slug" params={{ slug: a.research_topics.slug }} label={`${a.research_topics.name}: open topic`} />
                   <div className="flex items-start justify-between gap-2">
                     <Link
                       to="/topics/$slug"
@@ -237,7 +241,8 @@ function TopPage() {
         >
           <ul className="grid gap-2 lg:grid-cols-2">
             {courses.map((c) => (
-              <li key={c.id} className="panel panel-hover p-4">
+              <li key={c.id} className="panel panel-hover relative p-4">
+                <CardLink to="/programmes/$slug" params={{ slug: c.slug }} label={`${c.title}: open programme`} />
                 <Link
                   to="/programmes/$slug"
                   params={{ slug: c.slug }}
@@ -273,7 +278,8 @@ function TopPage() {
         >
           <ul className="grid gap-2 lg:grid-cols-3">
             {events.map((e) => (
-              <li key={e.id} className="panel panel-hover p-4">
+              <li key={e.id} className="panel panel-hover relative p-4">
+                <CardLink to="/events/$slug" params={{ slug: e.slug }} label={`${e.title}: open event`} />
                 <Link
                   to="/events/$slug"
                   params={{ slug: e.slug }}
@@ -295,7 +301,7 @@ function TopPage() {
 
         <Block
           icon={TrendingUp}
-          title="Top countries by academic pulse"
+          title="Top countries by research pulse"
           hint="Where the tracked activity actually concentrates."
           to={{
             label: "countries",
@@ -308,7 +314,8 @@ function TopPage() {
         >
           <ul className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {topCountries.map((c, i) => (
-              <li key={c.slug} className="panel panel-hover p-4">
+              <li key={c.slug} className="panel panel-hover relative p-4">
+                <CardLink to="/countries/$slug" params={{ slug: c.slug }} label={`${c.country}: open country`} />
                 <div className="flex items-start justify-between gap-2">
                   <Link
                     to="/countries/$slug"

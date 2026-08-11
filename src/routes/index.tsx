@@ -5,6 +5,7 @@ import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/EmptyState";
+import { CardExternalLink } from "@/components/CardLink";
 import { countsQuery, pulseQuery } from "@/lib/radar-queries";
 import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
 import { PulseHub, type Cluster } from "@/components/PulseHub";
@@ -42,17 +43,17 @@ const hubGlobeQuery = queryOptions({
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Academic Pulse — GeoAcademic Radar" },
+      { title: "Research Pulse — GeoAcademic Radar" },
       {
         name: "description",
         content:
-          "Live feed for photogrammetry, remote sensing and geoinformatics: PhD jobs, papers, projects and events, each with a source link.",
+          "Live feed for photogrammetry, remote sensing and geoinformatics: academic and industry roles, papers, projects and events, each with a source link.",
       },
-      { property: "og:title", content: "Academic Pulse — GeoAcademic Radar" },
+      { property: "og:title", content: "Research Pulse — GeoAcademic Radar" },
       {
         property: "og:description",
         content:
-          "Live academic intelligence for photogrammetry, remote sensing and geoinformatics, with provenance on every record.",
+          "Live research and industry intelligence for photogrammetry, remote sensing and geoinformatics, with provenance on every record.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -117,8 +118,8 @@ function AcademicPulse() {
         blurb: "Watch the field move: where capacity sits, what is rising, who works with whom.",
         spokes: [
           { to: "/atlas", label: "World Monitor", count: points.length },
-          { to: "/trends", label: "Trends" },
-          { to: "/collaboration", label: "Collaboration" },
+          { to: "/trends", label: "Research trends" },
+          { to: "/collaboration", label: "Collaboration graph" },
         ],
       },
       {
@@ -127,9 +128,9 @@ function AcademicPulse() {
         tone: "act",
         blurb: "Time-critical surfaces: open calls, matched positions and closing deadlines.",
         spokes: [
-          { to: "/jobs", label: "Jobs & PhDs", count: counts?.opportunities ?? "—" },
-          { to: "/matcher", label: "PhD Matcher" },
-          { to: "/events", label: "Deadlines", count: counts?.events ?? "—" },
+          { to: "/jobs", label: "Jobs", count: counts?.opportunities ?? "—" },
+          { to: "/matcher", label: "Matcher" },
+          { to: "/events", label: "Events & deadlines", count: counts?.events ?? "—" },
           { to: "/programmes", label: "Programmes" },
         ],
       },
@@ -153,9 +154,9 @@ function AcademicPulse() {
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Global academic intelligence"
-        title="Academic Pulse"
-        description="What moved in photogrammetry, remote sensing and geoinformatics: new positions, publications, projects and events. Every signal keeps its source link and verification status — nothing is inferred or invented."
+        eyebrow="Global research & industry intelligence"
+        title="Research Pulse"
+        description="What moved in photogrammetry, remote sensing and geoinformatics: new academic and industry positions, publications, projects and events. Every signal keeps its source link and verification status — nothing is inferred or invented."
         actions={
           <Link
             to="/jobs"
@@ -193,12 +194,28 @@ function AcademicPulse() {
         </section>
 
         <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-6">
-          <StatTile label="Institutions" value={counts?.institutions ?? "—"} />
-          <StatTile label="Researchers" value={counts?.researchers ?? "—"} tone="signal" />
-          <StatTile label="Positions" value={counts?.opportunities ?? "—"} tone="deadline" />
-          <StatTile label="Publications" value={counts?.publications ?? "—"} tone="growth" />
-          <StatTile label="Projects" value={counts?.projects ?? "—"} />
-          <StatTile label="Events" value={counts?.events ?? "—"} tone="signal" />
+          <StatTile label="Institutions" value={counts?.institutions ?? "—"} to="/institutions" />
+          <StatTile
+            label="Researchers"
+            value={counts?.researchers ?? "—"}
+            tone="signal"
+            to="/researchers"
+          />
+          <StatTile
+            label="Positions"
+            value={counts?.opportunities ?? "—"}
+            tone="deadline"
+            to="/jobs"
+            search={{ sector: "all" }}
+          />
+          <StatTile
+            label="Publications"
+            value={counts?.publications ?? "—"}
+            tone="growth"
+            to="/publications"
+          />
+          <StatTile label="Projects" value={counts?.projects ?? "—"} to="/projects" />
+          <StatTile label="Events" value={counts?.events ?? "—"} tone="signal" to="/events" />
         </section>
 
 
@@ -228,7 +245,8 @@ function AcademicPulse() {
                 const cat = CATEGORY[e.category] ?? CATEGORY["PEOPLE"]!;
                 const href = e.link_url ?? e.source_url;
                 return (
-                  <li key={e.id} className="panel panel-hover rise-in p-4">
+                  <li key={e.id} className="panel panel-hover rise-in relative p-4">
+                    {href ? <CardExternalLink href={href} label={`${e.title}: open source`} /> : null}
                     <div className="flex flex-wrap items-center gap-2">
                       <span
                         className={`rounded-full border px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider ${cat.tone}`}
@@ -263,7 +281,7 @@ function AcademicPulse() {
                           href={href}
                           target="_blank"
                           rel="noreferrer noopener"
-                          className="inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                          className="relative z-10 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
                         >
                           Source <ExternalLink className="h-3 w-3" />
                         </a>
