@@ -51,12 +51,25 @@ export async function runExtraction<T>(args: {
     return { used: true, cached: true, value: cached, errorCode: null, errorMessage: null };
   }
 
-  const cleaned = cleanPageText(args.input.text, {
-    maxChars: LLM_INPUT_CHARS[args.operation],
+  const budget = LLM_INPUT_CHARS[args.operation];
+
+  // First attempt at the operation's normal input budget; if the model runs out
+  // of time or truncates mid-JSON, retry once with roughly half the page text.
+  let call: Awaited<ReturnType<typeof callNemotron>> | null = null;
+  let cleaned = cleanPageText(args.input.text, {
+    maxChars: budget,
     prioritiseJobSections: args.operation === "VACANCY_EXTRACTION",
   });
 
-  const user = `PAGE URL: ${args.input.url}
+  for (let pass = 0; pass < 2; pass += 1) {
+    if (pass === 1) {
+      cleaned = cleanPageText(args.input.text, {
+        maxChars: Math.max(1500, Math.floor(budget * LLM_SHRINK_RETRY_FACTOR)),
+        prioritiseJobSections: args.operation === "VACANCY_EXTRACTION",
+      });
+    }
+
+    const user = `PAGE URL: ${args.input.url}
 PAGE TITLE: ${args.input.title}
 ${args.extraUser ? `\n${args.extraUser}\n` : ""}
 PAGE TEXT:
@@ -64,28 +77,34 @@ PAGE TEXT:
 ${cleaned.text}
 """`;
 
-  const call = await callNemotron({
-    system: args.system,
-    user,
-    operation: args.operation,
-    sourceId: args.input.sourceId ?? null,
-    rawRecordId: args.input.rawRecordId ?? null,
-    contentHash: args.input.contentHash ?? null,
-    contentReduced: cleaned.contentReduced,
-    maxTokens: LLM_MAX_TOKENS[args.operation],
-  });
+    call = await callNemotron({
+      system: args.system,
+      user,
+      operation: args.operation,
+      sourceId: args.input.sourceId ?? null,
+      rawRecordId: args.input.rawRecordId ?? null,
+      contentHash: args.input.contentHash ?? null,
+      contentReduced: cleaned.contentReduced,
+      maxTokens: LLM_MAX_TOKENS[args.operation],
+    });
 
-  if (!call.ok || !call.content) {
+    if (call.ok && call.content) break;
+    const shrinkable = call.errorCode === "TIMEOUT" || call.errorCode === "OUTPUT_TRUNCATED";
+    if (!shrinkable) break;
+  }
+
+  if (!call || !call.ok || !call.content) {
     return {
       used: true,
       cached: false,
       value: null,
-      errorCode: call.errorCode,
-      errorMessage: call.errorMessage,
-      finishReason: call.finishReason ?? null,
-      outputTokens: call.outputTokens ?? null,
+      errorCode: call?.errorCode ?? "NO_RESULT",
+      errorMessage: call?.errorMessage ?? null,
+      finishReason: call?.finishReason ?? null,
+      outputTokens: call?.outputTokens ?? null,
     };
   }
+
 
   const validated = args.validate(call.content, cleaned.text);
   if (!validated.ok) {
