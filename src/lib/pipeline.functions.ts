@@ -286,3 +286,75 @@ export const getSchedulerHealth = createServerFn({ method: "GET" })
       recent_ticks: (ticks ?? []) as SchedulerHealth["recent_ticks"],
     };
   });
+
+export type OperationsSummary = {
+  mode: "BACKLOG" | "STEADY_STATE";
+  due_tasks: number;
+  pending_tasks: number;
+  batch_size: number;
+  interval_minutes: number;
+  config: {
+    backlog_threshold: number;
+    backlog_batch_size: number;
+    steady_batch_size: number;
+    backlog_interval_minutes: number;
+    steady_interval_minutes: number;
+    refresh_hours: Record<string, number>;
+    discovery_days: number;
+    adaptive_backoff_max: number;
+  };
+  categories: { category: string; label: string; refresh_hours: number; sources: number; due_now: number }[];
+  efficiency: {
+    window_hours: number;
+    fetches: number;
+    fetches_unchanged: number;
+    deterministic_rejects: number;
+    normalized: number;
+    model_calls: number;
+    model_cached: number;
+    cache_hit_rate: number;
+    unchanged_rate: number;
+    ticks: number;
+    ticks_with_work: number;
+  };
+};
+
+/** Operating mode, per-category cadence and cost-avoidance metrics. Admin only. */
+export const getOperationsSummary = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }): Promise<OperationsSummary> => {
+    await assertAdmin(context as never);
+    const { loadSchedule, readQueueState, readEfficiencyMetrics, refreshHoursFor, CATEGORY_LABELS } = await import("./schedule.server");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+
+    const config = await loadSchedule();
+    const [state, efficiency, sources] = await Promise.all([
+      readQueueState(config),
+      readEfficiencyMetrics(24),
+      supabaseAdmin.from("sources").select("category, last_success_at, active, status").eq("active", true).limit(2000),
+    ]);
+
+    const now = Date.now();
+    const categories = CATEGORY_LABELS.map(({ category, label }) => {
+      const hours = refreshHoursFor(config, category);
+      const rows = (sources.data ?? []).filter((s) => (s.category ?? "default") === category);
+      const due = rows.filter((s) => {
+        if (s.status === "BLOCKED") return false;
+        if (!s.last_success_at) return true;
+        return now - new Date(s.last_success_at).getTime() >= hours * 3_600_000;
+      }).length;
+      return { category, label, refresh_hours: hours, sources: rows.length, due_now: due };
+    });
+
+    return { ...state, config, categories, efficiency };
+  });
+
+/** Lets an admin retune cadence without a code change. */
+export const updateScheduleConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: Partial<OperationsSummary["config"]>) => input)
+  .handler(async ({ data, context }) => {
+    await assertAdmin(context as never);
+    const { saveSchedule } = await import("./schedule.server");
+    return await saveSchedule(data as never, context.userId);
+  });

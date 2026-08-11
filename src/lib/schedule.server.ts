@@ -187,3 +187,52 @@ export async function sweepOpportunityDeadlines(): Promise<{ closed: number; clo
 
   return { closed: closed.count ?? 0, closing_soon: closingSoon.count ?? 0, reopened: reopened.count ?? 0 };
 }
+
+export type EfficiencyMetrics = {
+  window_hours: number;
+  fetches: number;
+  fetches_unchanged: number;
+  deterministic_rejects: number;
+  normalized: number;
+  model_calls: number;
+  model_cached: number;
+  cache_hit_rate: number;
+  unchanged_rate: number;
+  ticks: number;
+  ticks_with_work: number;
+};
+
+/** Rolling efficiency view: how much work the system avoided paying for. */
+export async function readEfficiencyMetrics(windowHours = 24): Promise<EfficiencyMetrics> {
+  const since = new Date(Date.now() - windowHours * 3_600_000).toISOString();
+  const head = { count: "exact" as const, head: true };
+
+  const [fetches, unchanged, rejects, normalized, llm, cached, ticks, working] = await Promise.all([
+    supabaseAdmin.from("sync_runs").select("id", head).gte("started_at", since).eq("success", true),
+    supabaseAdmin.from("sync_runs").select("id", head).gte("started_at", since).eq("success", true).eq("records_changed", 0),
+    supabaseAdmin.from("raw_records").select("id", head).gte("fetched_at", since).eq("normalization_status", "SKIPPED"),
+    supabaseAdmin.from("raw_records").select("id", head).gte("fetched_at", since).eq("normalization_status", "NORMALIZED"),
+    supabaseAdmin.from("llm_processing_runs").select("id", head).gte("created_at", since),
+    supabaseAdmin.from("llm_processing_runs").select("id", head).gte("created_at", since).eq("cached", true),
+    supabaseAdmin.from("pipeline_runs").select("id", head).gte("started_at", since),
+    supabaseAdmin.from("pipeline_runs").select("id", head).gte("started_at", since).gt("tasks_processed", 0),
+  ]);
+
+  const calls = llm.count ?? 0;
+  const hits = cached.count ?? 0;
+  const f = fetches.count ?? 0;
+  const u = unchanged.count ?? 0;
+  return {
+    window_hours: windowHours,
+    fetches: f,
+    fetches_unchanged: u,
+    deterministic_rejects: rejects.count ?? 0,
+    normalized: normalized.count ?? 0,
+    model_calls: calls,
+    model_cached: hits,
+    cache_hit_rate: calls === 0 ? 0 : Math.round((hits / calls) * 100),
+    unchanged_rate: f === 0 ? 0 : Math.round((u / f) * 100),
+    ticks: ticks.count ?? 0,
+    ticks_with_work: working.count ?? 0,
+  };
+}
