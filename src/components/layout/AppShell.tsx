@@ -1,0 +1,187 @@
+import { Link } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import {
+  Activity,
+  Briefcase,
+  Building2,
+  CalendarDays,
+  LineChart,
+  Users,
+} from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+
+import { openJobCountQuery } from "@/lib/radar-queries";
+
+const NAV = [
+  { to: "/", label: "Academic Pulse", icon: Activity },
+  { to: "/jobs", label: "Jobs & PhD radar", icon: Briefcase },
+  { to: "/institutions", label: "Institutions", icon: Building2 },
+  { to: "/researchers", label: "Researchers", icon: Users },
+  { to: "/trends", label: "Research trends", icon: LineChart },
+  { to: "/events", label: "Events", icon: CalendarDays },
+] as const;
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const { data: openJobs } = useQuery(openJobCountQuery);
+
+  return (
+    <div className="min-h-screen lg:grid lg:grid-cols-[16.5rem_1fr]">
+      <aside className="border-b border-sidebar-border bg-sidebar/80 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:border-b-0 lg:border-r">
+        <div className="flex items-center gap-3 px-5 py-5">
+          <span className="relative flex h-2.5 w-2.5 items-center justify-center text-primary">
+            <span className="live-dot absolute inset-0 rounded-full" />
+            <span className="relative h-2.5 w-2.5 rounded-full bg-primary" />
+          </span>
+          <div>
+            <p className="font-display text-sm font-semibold leading-none text-sidebar-foreground">
+              GeoAcademic Radar
+            </p>
+            <p className="mt-1 text-[0.65rem] uppercase tracking-[0.18em] text-muted-foreground">
+              Photogrammetry · RS · GI
+            </p>
+          </div>
+        </div>
+
+        <nav className="flex gap-1 overflow-x-auto px-3 pb-4 lg:flex-col lg:overflow-visible">
+          {NAV.map(({ to, label, icon: Icon }) => (
+            <Link
+              key={to}
+              to={to}
+              activeOptions={{ exact: to === "/" }}
+              className="group flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-primary"
+            >
+              <Icon className="h-4 w-4" />
+              <span className="whitespace-nowrap">{label}</span>
+              {to === "/jobs" && openJobs ? (
+                <span className="mono-num ml-auto hidden rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] text-primary lg:inline">
+                  {openJobs}
+                </span>
+              ) : null}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="hidden px-5 pb-6 lg:block">
+          <div className="panel signal-wash p-3">
+            <p className="text-[0.68rem] leading-relaxed text-muted-foreground">
+              Every record links back to an official source and carries a verification status.
+              Nothing here is inferred.
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <div className="min-w-0">{children}</div>
+    </div>
+  );
+}
+
+export function PageHeader({
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrow: string;
+  title: string;
+  description: string;
+  actions?: ReactNode;
+}) {
+  return (
+    <header className="grid-lines border-b border-border">
+      <div className="signal-wash">
+        <div className="mx-auto w-full max-w-7xl px-6 py-10">
+          <p className="text-[0.68rem] font-medium uppercase tracking-[0.24em] text-primary">
+            {eyebrow}
+          </p>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-semibold tracking-tight text-foreground md:text-4xl">
+                {title}
+              </h1>
+              <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
+                {description}
+              </p>
+            </div>
+            {actions}
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+export function StatTile({
+  label,
+  value,
+  hint,
+  tone = "default",
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  tone?: "default" | "signal" | "deadline" | "growth";
+}) {
+  const toneClass =
+    tone === "signal"
+      ? "text-signal"
+      : tone === "deadline"
+        ? "text-deadline"
+        : tone === "growth"
+          ? "text-growth"
+          : "text-primary";
+  return (
+    <div className="panel panel-hover rise-in p-4">
+      <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
+        {label}
+      </p>
+      <p className={`mono-num mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
+      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+    </div>
+  );
+}
+
+export function ProvenanceChips({
+  verification,
+  isDemo,
+  confidence,
+}: {
+  verification: string;
+  isDemo?: boolean;
+  confidence?: string;
+}) {
+  return (
+    <span className="flex flex-wrap items-center gap-1.5">
+      <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[0.62rem] uppercase tracking-wider text-muted-foreground">
+        {verification === "verified" ? "Verified" : "Not verified"}
+      </span>
+      {confidence ? (
+        <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[0.62rem] uppercase tracking-wider text-muted-foreground">
+          {confidence} confidence
+        </span>
+      ) : null}
+      {isDemo ? (
+        <span className="rounded-full border border-deadline/40 bg-deadline/10 px-2 py-0.5 text-[0.62rem] uppercase tracking-wider text-deadline">
+          Demo data
+        </span>
+      ) : null}
+    </span>
+  );
+}
+
+export function TopicPills({ topics }: { topics: (string | undefined)[] }) {
+  const list = topics.filter(Boolean).slice(0, 5) as string[];
+  if (list.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {list.map((t) => (
+        <span
+          key={t}
+          className="rounded-md border border-signal/30 bg-signal/10 px-2 py-0.5 text-[0.68rem] text-foreground/85"
+        >
+          {t}
+        </span>
+      ))}
+    </div>
+  );
+}
