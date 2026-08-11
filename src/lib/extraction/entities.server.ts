@@ -19,8 +19,10 @@ const COMMON_RULES = `RULES — these are absolute:
 1. Use ONLY the supplied page text. Never infer, complete or invent any fact.
 2. If a field is not explicitly stated in the text, return null (or an empty array). Never guess.
 3. Every evidence snippet must be copied verbatim from the supplied text.
-4. Reply with ONE JSON object and nothing else — no prose, no markdown fences.
-5. "confidence" is a number from 0 to 1.`;
+4. Reply with ONE JSON object and nothing else — no prose, no markdown fences, no reasoning before or after it. Start your reply with "{".
+5. "confidence" is a number from 0 to 1.
+6. Be terse so the object always completes: "summary" at most 400 characters, at most 2 evidence snippets of at most 200 characters each, and at most 6 items in any array.`;
+
 
 const ROLE = `You are the extraction engine of GeoAcademic Radar, a research intelligence platform for photogrammetry, remote sensing, geodesy, geoinformatics, GeoAI and Earth observation.`;
 
@@ -200,7 +202,7 @@ Return exactly this shape:
 }
 
 Dates must be ISO (YYYY-MM-DD) or null.
-Include "courses" only when the page explicitly lists modules or courses of THIS programme; include "professors" only when the page explicitly names teaching staff of THIS programme. Otherwise return empty arrays.
+Include "courses" only when the page explicitly lists modules or courses of THIS programme, at most 6 of them; include "professors" only when the page explicitly names teaching staff of THIS programme, at most 4 of them. Otherwise return empty arrays.
 Set "is_single_real_programme" to false for generic "Study at ..." landing pages, faculty overviews, admissions-office pages or programme lists, and give a short rejection_reason.`;
 
 export type ProgrammeExtraction = {
@@ -286,7 +288,7 @@ export function extractProgramme(input: ExtractionInput): Promise<ExtractionOutc
 export const RESEARCHER_SYSTEM_PROMPT = `${ROLE}
 
 ${COMMON_RULES}
-6. NEVER infer an e-mail address, an ORCID, a department or a supervisor relationship. Return null unless the text states it literally.
+7. NEVER infer an e-mail address, an ORCID, a department or a supervisor relationship. Return null unless the text states it literally.
 
 Return exactly this shape:
 {

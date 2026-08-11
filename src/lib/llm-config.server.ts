@@ -36,13 +36,24 @@ export const LLM_MAX_TOKENS: Record<LlmOperation, number> = {
   RELEVANCE_CLASSIFICATION: 700,
 };
 
-/** Input budget per operation — smaller pages cost less and classify better. */
+/**
+ * Input budget per operation. Deliberately smaller than the hard cap: long
+ * pages made the model reason for minutes and hit the 90s timeout, so each
+ * budget is sized to the amount of text the schema actually needs.
+ */
 export const LLM_INPUT_CHARS: Record<LlmOperation, number> = {
   CONNECTION_TEST: 500,
   VACANCY_EXTRACTION: LLM_MAX_INPUT_CHARS,
-  PROGRAMME_EXTRACTION: 10_000,
-  PROJECT_EXTRACTION: 10_000,
-  RESEARCHER_EXTRACTION: 9_000,
-  EVENT_EXTRACTION: 8_000,
-  RELEVANCE_CLASSIFICATION: 6_000,
+  PROGRAMME_EXTRACTION: 6_000,
+  PROJECT_EXTRACTION: 7_000,
+  RESEARCHER_EXTRACTION: 6_000,
+  EVENT_EXTRACTION: 5_000,
+  RELEVANCE_CLASSIFICATION: 4_000,
 };
+
+/**
+ * Shrink factor applied on a single retry after a TIMEOUT or a truncated
+ * completion — a smaller page means less reasoning and a completed object.
+ */
+export const LLM_SHRINK_RETRY_FACTOR = 0.5;
+
