@@ -173,7 +173,7 @@ export const publicationsQuery = queryOptions({
         `id, title, doi, venue, year, publication_date, authors_text, citation_count,
          citation_source, is_open_access, abstract, landing_url, source,
          verification_status, confidence, is_demo,
-         institutions ( name, slug ),
+         institutions!publications_institution_id_fkey ( name, slug ),
          publication_topics ( research_topics ( name, slug ) )`,
       )
       .order("year", { ascending: false, nullsFirst: false })
@@ -193,7 +193,7 @@ export const projectsQuery = queryOptions({
         `id, name, slug, acronym, status, start_date, end_date, funding_organization,
          funding_amount, funding_currency, website, summary, verification_status,
          confidence, is_demo,
-         institutions ( name, slug, country ),
+         institutions!projects_institution_id_fkey ( name, slug, country ),
          project_topics ( research_topics ( name, slug ) )`,
       )
       .order("start_date", { ascending: false, nullsFirst: false });
