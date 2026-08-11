@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   Activity,
   Briefcase,
+  Sparkles,
   Building2,
   CalendarDays,
   FlaskConical,
@@ -27,6 +28,7 @@ const NAV_GROUPS = [
     label: "Monitor",
     items: [
       { to: "/", label: "Academic Pulse", icon: Activity },
+      { to: "/top", label: "Top picks", icon: Sparkles },
       { to: "/atlas", label: "World Monitor", icon: Globe2 },
       { to: "/countries", label: "Countries", icon: MapPinned },
       { to: "/trends", label: "Research trends", icon: LineChart },
@@ -34,10 +36,10 @@ const NAV_GROUPS = [
     ],
   },
   {
-    label: "Act",
+    label: "Careers",
     items: [
-      { to: "/jobs", label: "Jobs & PhD radar", icon: Briefcase },
-      { to: "/matcher", label: "PhD Matcher", icon: Target },
+      { to: "/jobs", label: "Academic & industry jobs", icon: Briefcase },
+      { to: "/matcher", label: "Matcher", icon: Target },
       { to: "/events", label: "Events & deadlines", icon: CalendarDays },
       { to: "/programmes", label: "Programmes", icon: GraduationCap },
     ],
