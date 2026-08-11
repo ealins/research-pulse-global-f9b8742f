@@ -5,7 +5,12 @@ import {
   Briefcase,
   Building2,
   CalendarDays,
+  FlaskConical,
+  GraduationCap,
   LineChart,
+  Network,
+  ScrollText,
+  Target,
   Users,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -15,11 +20,17 @@ import { openJobCountQuery } from "@/lib/radar-queries";
 const NAV = [
   { to: "/", label: "Academic Pulse", icon: Activity },
   { to: "/jobs", label: "Jobs & PhD radar", icon: Briefcase },
+  { to: "/matcher", label: "PhD Matcher", icon: Target },
   { to: "/institutions", label: "Institutions", icon: Building2 },
   { to: "/researchers", label: "Researchers", icon: Users },
+  { to: "/projects", label: "Projects", icon: FlaskConical },
+  { to: "/publications", label: "Publications", icon: ScrollText },
+  { to: "/programmes", label: "Programmes", icon: GraduationCap },
   { to: "/trends", label: "Research trends", icon: LineChart },
+  { to: "/collaboration", label: "Collaboration graph", icon: Network },
   { to: "/events", label: "Events", icon: CalendarDays },
 ] as const;
+
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: openJobs } = useQuery(openJobCountQuery);
