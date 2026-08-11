@@ -10,12 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as EventsRouteImport } from './routes/events'
 import { Route as InstitutionsRouteImport } from './routes/institutions'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as ResearchersRouteImport } from './routes/researchers'
+import { Route as TrendsRouteImport } from './routes/trends'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsRoute = EventsRouteImport.update({
+  id: '/events',
+  path: '/events',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstitutionsRoute = InstitutionsRouteImport.update({
@@ -28,35 +36,65 @@ const JobsRoute = JobsRouteImport.update({
   path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResearchersRoute = ResearchersRouteImport.update({
+  id: '/researchers',
+  path: '/researchers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrendsRoute = TrendsRouteImport.update({
+  id: '/trends',
+  path: '/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/researchers': typeof ResearchersRoute
+  '/trends': typeof TrendsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/researchers': typeof ResearchersRoute
+  '/trends': typeof TrendsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/researchers': typeof ResearchersRoute
+  '/trends': typeof TrendsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/institutions' | '/jobs'
+  fullPaths:
+    '/' | '/events' | '/institutions' | '/jobs' | '/researchers' | '/trends'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/institutions' | '/jobs'
-  id: '__root__' | '/' | '/institutions' | '/jobs'
+  to: '/' | '/events' | '/institutions' | '/jobs' | '/researchers' | '/trends'
+  id:
+    | '__root__'
+    | '/'
+    | '/events'
+    | '/institutions'
+    | '/jobs'
+    | '/researchers'
+    | '/trends'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  EventsRoute: typeof EventsRoute
   InstitutionsRoute: typeof InstitutionsRoute
   JobsRoute: typeof JobsRoute
+  ResearchersRoute: typeof ResearchersRoute
+  TrendsRoute: typeof TrendsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,6 +104,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events': {
+      id: '/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof EventsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/institutions': {
@@ -82,13 +127,30 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/researchers': {
+      id: '/researchers'
+      path: '/researchers'
+      fullPath: '/researchers'
+      preLoaderRoute: typeof ResearchersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trends': {
+      id: '/trends'
+      path: '/trends'
+      fullPath: '/trends'
+      preLoaderRoute: typeof TrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  EventsRoute: EventsRoute,
   InstitutionsRoute: InstitutionsRoute,
   JobsRoute: JobsRoute,
+  ResearchersRoute: ResearchersRoute,
+  TrendsRoute: TrendsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
