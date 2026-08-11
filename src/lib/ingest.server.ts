@@ -504,7 +504,49 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   await recordRun(true, changed, null);
   if (changed) await enqueue("NORMALIZE", { source_id: source.id, institution_id: source.institution_id ?? undefined });
 
+  // A vacancy listing page is an index, not a record: register each individual
+  // posting it links to as its own source so every position keeps its own URL.
+  if (source.category === "vacancies") {
+    const host = new URL(finalUrl).host;
+    const postings = extractLinks(html, finalUrl).filter((l) => {
+      try {
+        const u = new URL(l.url);
+        return u.host === host && /\/(job|jobs|stelle|stellenangebot|position)\//i.test(u.pathname);
+      } catch {
+        return false;
+      }
+    });
+    const seen = new Set<string>();
+    for (const posting of postings.slice(0, 60)) {
+      if (seen.has(posting.url)) continue;
+      seen.add(posting.url);
+      const { data: dup } = await supabaseAdmin.from("sources").select("id").eq("url", posting.url).maybeSingle();
+      if (dup) continue;
+      const { data: child } = await supabaseAdmin
+        .from("sources")
+        .insert({
+          url: posting.url,
+          canonical_url: posting.url,
+          name: (posting.label || posting.url).slice(0, 200),
+          source_type: "careers_page" as never,
+          adapter_key: "html-vacancy",
+          institution_id: source.institution_id,
+          category: "vacancies",
+          priority: 1,
+          status: "PENDING",
+          discovered_from: finalUrl,
+          trust_level: 5,
+          active: true,
+          notes: "Individual posting linked from a vacancy listing page",
+        })
+        .select("id")
+        .maybeSingle();
+      if (child) await enqueue("FETCH", { source_id: child.id, institution_id: source.institution_id ?? undefined });
+    }
+  }
+
   return { url: source.url, final_url: finalUrl, http_status: status, changed, classification, raw_record_id: rawId };
+
 }
 
 /* ------------------------------------------------------------------ */
