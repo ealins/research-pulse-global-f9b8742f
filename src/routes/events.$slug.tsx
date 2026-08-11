@@ -3,8 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ExternalLink, MapPin } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
-import { eventDetailQuery, SECTOR_LABEL } from "@/lib/relevance-queries";
-import { KIND_LABEL } from "./events.index";
+import { eventDetailQuery, KIND_LABEL, SECTOR_LABEL } from "@/lib/relevance-queries";
 import { countrySlug } from "@/lib/category-queries";
 import { daysUntil, formatDate, STATUS_LABEL } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";

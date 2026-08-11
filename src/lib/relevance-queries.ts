@@ -3,6 +3,14 @@ import { supabase } from "@/integrations/supabase/client";
 
 export const LIVE_STATUSES = ["open", "closing_soon", "rolling", "possibly_open"] as const;
 
+export const KIND_LABEL: Record<string, string> = {
+  conference: "Conference",
+  workshop: "Workshop",
+  summer_school: "Summer school",
+  colloquium: "Colloquium",
+  trade_fair: "Trade fair",
+};
+
 export const SECTOR_LABEL: Record<string, string> = {
   academic: "Academic",
   industry: "Industry",

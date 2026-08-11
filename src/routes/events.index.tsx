@@ -6,6 +6,7 @@ import { ExternalLink, Repeat } from "lucide-react";
 import { AppShell, PageHeader, ProvenanceChips, StatTile, TopicPills } from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { eventsQuery, formatDate, daysUntil } from "@/lib/radar-queries";
+import { KIND_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/events/")({
@@ -29,14 +30,6 @@ export const Route = createFileRoute("/events/")({
   }),
   component: EventsPage,
 });
-
-export const KIND_LABEL: Record<string, string> = {
-  conference: "Conference",
-  workshop: "Workshop",
-  summer_school: "Summer school",
-  colloquium: "Colloquium",
-  trade_fair: "Trade fair",
-};
 
 function EventsPage() {
   const { data, isLoading, error } = useQuery(eventsQuery);
