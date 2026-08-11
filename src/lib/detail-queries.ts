@@ -357,3 +357,111 @@ export function citationFor(kind: string, title: string, url: string) {
   const retrieved = new Date().toISOString().slice(0, 10);
   return `${title}. ${kind} record, GeoAcademic Radar. Retrieved ${retrieved} from ${url}`;
 }
+
+/* ---------- project & publication detail ---------- */
+
+export function projectDetailQuery(slug: string) {
+  return queryOptions({
+    queryKey: ["project-detail", slug],
+    queryFn: async () => {
+      const { data: project, error } = await supabase
+        .from("projects")
+        .select(
+          `id, name, slug, acronym, status, start_date, end_date, funding_organization,
+           funding_amount, funding_currency, website, summary, verification_status,
+           confidence, last_verified_at, is_demo,
+           institutions!projects_institution_id_fkey ( id, name, slug, country ),
+           departments ( name, slug ),
+           organizations ( name, slug, org_type ),
+           project_topics ( research_topics ( name, slug ) )`,
+        )
+        .eq("slug", slug)
+        .maybeSingle();
+      if (error) throw error;
+      if (!project) return null;
+
+      const id = project.id;
+      const [people, partners, orgs, opportunities] = await Promise.all([
+        supabase
+          .from("project_researchers")
+          .select(
+            `role, researchers ( id, full_name, slug, current_position, institutions ( name, slug ) )`,
+          )
+          .eq("project_id", id),
+        supabase
+          .from("project_institutions")
+          .select(`role, institutions ( id, name, slug, country )`)
+          .eq("project_id", id),
+        supabase
+          .from("project_organizations")
+          .select(`role, organizations ( id, name, slug, org_type )`)
+          .eq("project_id", id),
+        supabase
+          .from("opportunities")
+          .select(
+            "id, title, slug, opportunity_type, status, application_deadline, application_url",
+          )
+          .eq("project_id", id),
+      ]);
+
+      return {
+        project,
+        people: (people.data ?? [])
+          .map((r: any) => ({ ...r.researchers, member_role: r.role }))
+          .filter((r: any) => r?.id),
+        partners: (partners.data ?? [])
+          .map((r: any) => ({ ...r.institutions, partner_role: r.role }))
+          .filter((r: any) => r?.id),
+        organizations: (orgs.data ?? [])
+          .map((r: any) => ({ ...r.organizations, partner_role: r.role }))
+          .filter((r: any) => r?.id),
+        opportunities: opportunities.data ?? [],
+      };
+    },
+  });
+}
+
+export function publicationDetailQuery(id: string) {
+  return queryOptions({
+    queryKey: ["publication-detail", id],
+    queryFn: async () => {
+      const { data: publication, error } = await supabase
+        .from("publications")
+        .select(
+          `id, doi, title, publication_date, year, venue, authors_text, citation_count,
+           citation_source, is_open_access, abstract, source, external_id, landing_url,
+           verification_status, confidence, last_verified_at, is_demo,
+           institutions!publications_institution_id_fkey ( id, name, slug, country ),
+           publication_topics ( research_topics ( name, slug ) )`,
+        )
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      if (!publication) return null;
+
+      const [authors, institutions] = await Promise.all([
+        supabase
+          .from("publication_researchers")
+          .select(
+            `author_position, researchers ( id, full_name, slug, current_position, institutions ( name, slug ) )`,
+          )
+          .eq("publication_id", publication.id)
+          .order("author_position", { ascending: true, nullsFirst: false }),
+        supabase
+          .from("publication_institutions")
+          .select(`institutions ( id, name, slug, country )`)
+          .eq("publication_id", publication.id),
+      ]);
+
+      return {
+        publication,
+        authors: (authors.data ?? [])
+          .map((r: any) => ({ ...r.researchers, author_position: r.author_position }))
+          .filter((r: any) => r?.id),
+        institutions: (institutions.data ?? [])
+          .map((r: any) => r.institutions)
+          .filter(Boolean),
+      };
+    },
+  });
+}
