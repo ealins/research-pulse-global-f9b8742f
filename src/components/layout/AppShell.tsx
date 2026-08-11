@@ -78,24 +78,39 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <nav className="flex gap-1 overflow-x-auto px-3 pb-4 lg:flex-col lg:overflow-visible">
-          {NAV.map(({ to, label, icon: Icon }) => (
-            <Link
-              key={to}
-              to={to}
-              activeOptions={{ exact: to === "/" }}
-              className="group flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-primary"
-            >
-              <Icon className="h-4 w-4" />
-              <span className="whitespace-nowrap">{label}</span>
-              {to === "/jobs" && openJobs ? (
-                <span className="mono-num ml-auto hidden rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] text-primary lg:inline">
-                  {openJobs}
-                </span>
-              ) : null}
-            </Link>
+
+        <div className="px-3 pb-3">
+          <CommandPalette />
+        </div>
+
+        <nav className="flex flex-col gap-4 px-3 pb-4">
+          {NAV_GROUPS.map((group) => (
+            <div key={group.label}>
+              <p className="px-3 pb-1.5 text-[0.6rem] font-medium uppercase tracking-[0.2em] text-muted-foreground/70">
+                {group.label}
+              </p>
+              <div className="flex gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+                {group.items.map(({ to, label, icon: Icon }) => (
+                  <Link
+                    key={to}
+                    to={to}
+                    activeOptions={{ exact: to === "/" }}
+                    className="group flex shrink-0 items-center gap-2.5 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[status=active]:bg-sidebar-accent data-[status=active]:text-sidebar-primary"
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span className="whitespace-nowrap">{label}</span>
+                    {to === "/jobs" && openJobs ? (
+                      <span className="mono-num ml-auto hidden rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] text-primary lg:inline">
+                        {openJobs}
+                      </span>
+                    ) : null}
+                  </Link>
+                ))}
+              </div>
+            </div>
           ))}
         </nav>
+
 
         <div className="hidden px-5 pb-6 lg:block">
           <div className="panel signal-wash p-3">
