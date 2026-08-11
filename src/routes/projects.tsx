@@ -67,7 +67,7 @@ function ProjectsPage() {
                 <div className="flex flex-wrap items-center gap-2 text-[0.65rem] uppercase tracking-wider">
                   <span
                     className={`rounded-full border px-2.5 py-0.5 ${
-                      STATUS_TONE[p.status] ?? STATUS_TONE.unknown
+                      STATUS_TONE[p.status] ?? STATUS_TONE["unknown"]
                     }`}
                   >
                     {p.status.replace(/_/g, " ")}

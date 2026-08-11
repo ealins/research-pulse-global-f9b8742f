@@ -13,6 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as EventsRouteImport } from './routes/events'
 import { Route as InstitutionsRouteImport } from './routes/institutions'
 import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as ProgrammesRouteImport } from './routes/programmes'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PublicationsRouteImport } from './routes/publications'
 import { Route as ResearchersRouteImport } from './routes/researchers'
 import { Route as TrendsRouteImport } from './routes/trends'
 
@@ -36,6 +39,21 @@ const JobsRoute = JobsRouteImport.update({
   path: '/jobs',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ProgrammesRoute = ProgrammesRouteImport.update({
+  id: '/programmes',
+  path: '/programmes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicationsRoute = PublicationsRouteImport.update({
+  id: '/publications',
+  path: '/publications',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResearchersRoute = ResearchersRouteImport.update({
   id: '/researchers',
   path: '/researchers',
@@ -52,6 +70,9 @@ export interface FileRoutesByFullPath {
   '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/programmes': typeof ProgrammesRoute
+  '/projects': typeof ProjectsRoute
+  '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRoute
   '/trends': typeof TrendsRoute
 }
@@ -60,6 +81,9 @@ export interface FileRoutesByTo {
   '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/programmes': typeof ProgrammesRoute
+  '/projects': typeof ProjectsRoute
+  '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRoute
   '/trends': typeof TrendsRoute
 }
@@ -69,21 +93,44 @@ export interface FileRoutesById {
   '/events': typeof EventsRoute
   '/institutions': typeof InstitutionsRoute
   '/jobs': typeof JobsRoute
+  '/programmes': typeof ProgrammesRoute
+  '/projects': typeof ProjectsRoute
+  '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRoute
   '/trends': typeof TrendsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
-    '/' | '/events' | '/institutions' | '/jobs' | '/researchers' | '/trends'
+    | '/'
+    | '/events'
+    | '/institutions'
+    | '/jobs'
+    | '/programmes'
+    | '/projects'
+    | '/publications'
+    | '/researchers'
+    | '/trends'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/events' | '/institutions' | '/jobs' | '/researchers' | '/trends'
+  to:
+    | '/'
+    | '/events'
+    | '/institutions'
+    | '/jobs'
+    | '/programmes'
+    | '/projects'
+    | '/publications'
+    | '/researchers'
+    | '/trends'
   id:
     | '__root__'
     | '/'
     | '/events'
     | '/institutions'
     | '/jobs'
+    | '/programmes'
+    | '/projects'
+    | '/publications'
     | '/researchers'
     | '/trends'
   fileRoutesById: FileRoutesById
@@ -93,6 +140,9 @@ export interface RootRouteChildren {
   EventsRoute: typeof EventsRoute
   InstitutionsRoute: typeof InstitutionsRoute
   JobsRoute: typeof JobsRoute
+  ProgrammesRoute: typeof ProgrammesRoute
+  ProjectsRoute: typeof ProjectsRoute
+  PublicationsRoute: typeof PublicationsRoute
   ResearchersRoute: typeof ResearchersRoute
   TrendsRoute: typeof TrendsRoute
 }
@@ -127,6 +177,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof JobsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/programmes': {
+      id: '/programmes'
+      path: '/programmes'
+      fullPath: '/programmes'
+      preLoaderRoute: typeof ProgrammesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/publications': {
+      id: '/publications'
+      path: '/publications'
+      fullPath: '/publications'
+      preLoaderRoute: typeof PublicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/researchers': {
       id: '/researchers'
       path: '/researchers'
@@ -149,6 +220,9 @@ const rootRouteChildren: RootRouteChildren = {
   EventsRoute: EventsRoute,
   InstitutionsRoute: InstitutionsRoute,
   JobsRoute: JobsRoute,
+  ProgrammesRoute: ProgrammesRoute,
+  ProjectsRoute: ProjectsRoute,
+  PublicationsRoute: PublicationsRoute,
   ResearchersRoute: ResearchersRoute,
   TrendsRoute: TrendsRoute,
 }
