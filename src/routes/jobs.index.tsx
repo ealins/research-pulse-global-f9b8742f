@@ -42,6 +42,8 @@ export const Route = createFileRoute("/jobs/")({
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
+      { name: "twitter:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
     ],
   }),
   component: JobsPage,
