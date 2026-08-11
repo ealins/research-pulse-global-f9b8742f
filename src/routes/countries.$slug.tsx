@@ -119,7 +119,15 @@ function CountryDetail() {
         </div>
 
         {data.topics.length > 0 ? (
-          <Section title="Research focus in this country" count={data.topics.length}>
+          <Section
+            title="Research focus in this country"
+            count={data.topics.length}
+            action={
+              <Link to="/topics" className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+                Taxonomy →
+              </Link>
+            }
+          >
             <div className="flex flex-wrap gap-1.5">
               {data.topics.map((t) => (
                 <Link
@@ -135,7 +143,15 @@ function CountryDetail() {
           </Section>
         ) : null}
 
-        <Section title="Institutions ranked by academic pulse" count={data.institutions.length}>
+        <Section
+          title="Institutions ranked by academic pulse"
+          count={data.institutions.length}
+          action={
+            <Link to="/institutions" className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+              All institutions →
+            </Link>
+          }
+        >
           <ul className="grid gap-2 lg:grid-cols-2">
             {data.institutions.map((i, idx) => (
               <li key={i.id} className="panel panel-hover flex items-center gap-3 p-4">
@@ -164,7 +180,20 @@ function CountryDetail() {
           </ul>
         </Section>
 
-        <Section title="Open and recent calls" count={data.opportunities.length}>
+        <Section
+          title="Open and recent calls"
+          count={data.opportunities.length}
+          action={
+            <span className="flex gap-3">
+              <Link to="/jobs" search={ sector: "academic" } className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+                Academic jobs →
+              </Link>
+              <Link to="/jobs" search={ sector: "industry" } className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+                Industry roles →
+              </Link>
+            </span>
+          }
+        >
           {data.opportunities.length === 0 ? (
             <p className="text-sm text-muted-foreground">No calls recorded for this country yet.</p>
           ) : (
@@ -202,7 +231,15 @@ function CountryDetail() {
           )}
         </Section>
 
-        <Section title="Degree programmes by level" count={data.courses.length}>
+        <Section
+          title="Degree programmes by level"
+          count={data.courses.length}
+          action={
+            <Link to="/programmes" className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+              Full catalogue →
+            </Link>
+          }
+        >
           {data.courses.length === 0 ? (
             <p className="text-sm text-muted-foreground">No programmes recorded here yet.</p>
           ) : (
@@ -236,7 +273,15 @@ function CountryDetail() {
         </Section>
 
         <div className="grid gap-6 lg:grid-cols-2">
-          <Section title="Projects" count={data.projects.length}>
+          <Section
+            title="Projects"
+            count={data.projects.length}
+            action={
+              <Link to="/projects" className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+                All projects →
+              </Link>
+            }
+          >
             <ul className="space-y-2">
               {data.projects.map((p) => (
                 <li key={p.id} className="panel panel-hover p-3.5">
@@ -258,7 +303,15 @@ function CountryDetail() {
             </ul>
           </Section>
 
-          <Section title="Researchers" count={data.researchers.length}>
+          <Section
+            title="Researchers"
+            count={data.researchers.length}
+            action={
+              <Link to="/researchers" className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+                All researchers →
+              </Link>
+            }
+          >
             <ul className="space-y-2">
               {data.researchers.slice(0, 12).map((r) => (
                 <li key={r.id} className="panel panel-hover p-3.5">
@@ -282,7 +335,15 @@ function CountryDetail() {
           </Section>
         </div>
 
-        <Section title="Events hosted here" count={data.events.length}>
+        <Section
+          title="Events hosted here"
+          count={data.events.length}
+          action={
+            <Link to="/events" className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+              Full calendar →
+            </Link>
+          }
+        >
           {data.events.length === 0 ? (
             <p className="text-sm text-muted-foreground">No events recorded in this country.</p>
           ) : (
