@@ -2592,6 +2592,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_admin_if_unclaimed: { Args: never; Returns: boolean }
       global_search: {
         Args: { max_results?: number; q: string }
         Returns: {
