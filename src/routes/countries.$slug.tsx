@@ -185,10 +185,11 @@ function CountryDetail() {
           count={data.opportunities.length}
           action={
             <span className="flex gap-3">
-              <Link to="/jobs" search={ sector: "academic" } className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+              <Link to="/jobs" search={{ sector: "academic" }} className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
                 Academic jobs →
               </Link>
-              <Link to="/jobs" search={ sector: "industry" } className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+              <Link to="/jobs" search={{ sector: "industry" }} className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline">
+
                 Industry roles →
               </Link>
             </span>
