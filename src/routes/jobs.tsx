@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ExternalLink, Filter, MapPin, Timer, UserRound } from "lucide-react";
@@ -175,9 +175,14 @@ function JobsPage() {
                     />
                   </div>
 
-                  <h2 className="mt-3 text-lg font-semibold leading-snug text-foreground">
+                  <Link
+                    to="/jobs/$slug"
+                    params={{ slug: o.slug }}
+                    className="mt-3 block text-lg font-semibold leading-snug text-foreground hover:text-primary"
+                  >
                     {o.title}
-                  </h2>
+                  </Link>
+
                   <p className="mt-1 text-sm text-muted-foreground">
                     {o.institutions?.name ?? "Institution not stated"}
                   </p>

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 
@@ -51,15 +51,20 @@ function InstitutionsPage() {
             {data?.map((i) => (
               <li key={i.id} className="panel panel-hover rise-in flex flex-col p-5">
                 <div className="flex items-start justify-between gap-3">
-                  <h2 className="text-base font-semibold leading-snug text-foreground">
+                  <Link
+                    to="/institutions/$slug"
+                    params={{ slug: i.slug }}
+                    className="text-base font-semibold leading-snug text-foreground hover:text-primary"
+                  >
                     {i.name}
-                  </h2>
+                  </Link>
                   {i.abbreviation ? (
                     <span className="mono-num rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[0.65rem] text-primary">
                       {i.abbreviation}
                     </span>
                   ) : null}
                 </div>
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   {[i.city, i.country].filter(Boolean).join(", ") || "Location not stated"} ·{" "}
                   {i.institution_type.replace(/_/g, " ")}
