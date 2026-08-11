@@ -175,9 +175,14 @@ function JobsPage() {
                     />
                   </div>
 
-                  <h2 className="mt-3 text-lg font-semibold leading-snug text-foreground">
+                  <Link
+                    to="/jobs/$slug"
+                    params={{ slug: o.slug }}
+                    className="mt-3 block text-lg font-semibold leading-snug text-foreground hover:text-primary"
+                  >
                     {o.title}
-                  </h2>
+                  </Link>
+
                   <p className="mt-1 text-sm text-muted-foreground">
                     {o.institutions?.name ?? "Institution not stated"}
                   </p>
