@@ -507,7 +507,7 @@ export const getAdminStatus = createServerFn({ method: "GET" })
 export const claimAdminRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ isAdmin: boolean }> => {
-    const { data, error } = await context.supabase.rpc("claim_admin_if_unclaimed", {});
+    const { data, error } = await context.supabase.rpc("claim_admin_if_unclaimed");
     if (error) throw new Error(error.message);
     return { isAdmin: data === true };
   });
