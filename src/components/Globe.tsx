@@ -124,7 +124,7 @@ export function Globe({
 
       const cx = w / 2;
       const cy = h / 2;
-      const R = Math.min(w, h) * 0.42;
+      const R = Math.max(12, Math.min(w, h) * 0.42);
       const rotation = rot.current;
       const { pts: P, arcs: A } = dataRef.current;
 
