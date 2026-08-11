@@ -83,7 +83,7 @@ async function crossrefWorks(
           source: { display_name: it["container-title"]?.[0] ?? null },
         },
         authorships: (it.author ?? []).map((a) => ({
-          author: { display_name: a.name ?? [a.given, a.family].filter(Boolean).join(" ") || null },
+          author: { display_name: a.name ?? ([a.given, a.family].filter(Boolean).join(" ") || null) },
         })),
         topics: (it.subject ?? []).map((sub) => ({ display_name: sub })),
       } satisfies OaWork,
