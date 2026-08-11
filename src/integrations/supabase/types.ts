@@ -14,6 +14,95 @@ export type Database = {
   }
   public: {
     Tables: {
+      alert_matches: {
+        Row: {
+          alert_rule_id: string
+          entity_id: string
+          entity_type: string
+          fingerprint: string
+          id: string
+          matched_at: string
+          seen: boolean
+          user_id: string
+        }
+        Insert: {
+          alert_rule_id: string
+          entity_id: string
+          entity_type: string
+          fingerprint: string
+          id?: string
+          matched_at?: string
+          seen?: boolean
+          user_id: string
+        }
+        Update: {
+          alert_rule_id?: string
+          entity_id?: string
+          entity_type?: string
+          fingerprint?: string
+          id?: string
+          matched_at?: string
+          seen?: boolean
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "alert_matches_alert_rule_id_fkey"
+            columns: ["alert_rule_id"]
+            isOneToOne: false
+            referencedRelation: "alert_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      alert_rules: {
+        Row: {
+          active: boolean
+          countries: string[]
+          created_at: string
+          id: string
+          institution_ids: string[]
+          keywords: string[]
+          last_run_at: string | null
+          name: string
+          opportunity_types: Database["public"]["Enums"]["opportunity_type"][]
+          researcher_ids: string[]
+          topic_ids: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          active?: boolean
+          countries?: string[]
+          created_at?: string
+          id?: string
+          institution_ids?: string[]
+          keywords?: string[]
+          last_run_at?: string | null
+          name: string
+          opportunity_types?: Database["public"]["Enums"]["opportunity_type"][]
+          researcher_ids?: string[]
+          topic_ids?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          active?: boolean
+          countries?: string[]
+          created_at?: string
+          id?: string
+          institution_ids?: string[]
+          keywords?: string[]
+          last_run_at?: string | null
+          name?: string
+          opportunity_types?: Database["public"]["Enums"]["opportunity_type"][]
+          researcher_ids?: string[]
+          topic_ids?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -835,6 +924,39 @@ export type Database = {
           slug?: string
           updated_at?: string
           website?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          career_stage: string | null
+          country: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          onboarded: boolean
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          career_stage?: string | null
+          country?: string | null
+          created_at?: string
+          display_name?: string | null
+          id: string
+          onboarded?: boolean
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          career_stage?: string | null
+          country?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          onboarded?: boolean
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1767,6 +1889,33 @@ export type Database = {
           },
         ]
       }
+      saved_searches: {
+        Row: {
+          created_at: string
+          filters: Json
+          id: string
+          name: string
+          target: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name: string
+          target?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          filters?: Json
+          id?: string
+          name?: string
+          target?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       sources: {
         Row: {
           active: boolean
@@ -1938,6 +2087,89 @@ export type Database = {
           },
         ]
       }
+      user_interests: {
+        Row: {
+          created_at: string
+          topic_id: string
+          user_id: string
+          weight: number
+        }
+        Insert: {
+          created_at?: string
+          topic_id: string
+          user_id: string
+          weight?: number
+        }
+        Update: {
+          created_at?: string
+          topic_id?: string
+          user_id?: string
+          weight?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_interests_topic_id_fkey"
+            columns: ["topic_id"]
+            isOneToOne: false
+            referencedRelation: "research_topics"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_preferences: {
+        Row: {
+          countries: string[]
+          created_at: string
+          desired_start_year: number | null
+          funding_preference: string | null
+          method_vs_application: number
+          region_scope: string
+          salaried_preferred: boolean
+          updated_at: string
+          user_id: string
+          weight_ecosystem: number
+          weight_opportunity: number
+          weight_projects: number
+          weight_publications: number
+          weight_supervisor: number
+          weight_topic_fit: number
+        }
+        Insert: {
+          countries?: string[]
+          created_at?: string
+          desired_start_year?: number | null
+          funding_preference?: string | null
+          method_vs_application?: number
+          region_scope?: string
+          salaried_preferred?: boolean
+          updated_at?: string
+          user_id: string
+          weight_ecosystem?: number
+          weight_opportunity?: number
+          weight_projects?: number
+          weight_publications?: number
+          weight_supervisor?: number
+          weight_topic_fit?: number
+        }
+        Update: {
+          countries?: string[]
+          created_at?: string
+          desired_start_year?: number | null
+          funding_preference?: string | null
+          method_vs_application?: number
+          region_scope?: string
+          salaried_preferred?: boolean
+          updated_at?: string
+          user_id?: string
+          weight_ecosystem?: number
+          weight_opportunity?: number
+          weight_projects?: number
+          weight_publications?: number
+          weight_supervisor?: number
+          weight_topic_fit?: number
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1955,6 +2187,36 @@ export type Database = {
           created_at?: string
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      watchlist_items: {
+        Row: {
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          label: string | null
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          label?: string | null
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          label?: string | null
+          notes?: string | null
           user_id?: string
         }
         Relationships: []
