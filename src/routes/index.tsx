@@ -1,10 +1,41 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, queryOptions } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { ArrowUpRight, ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
 import { countsQuery, pulseQuery } from "@/lib/radar-queries";
+import { PulseHub, type Cluster } from "@/components/PulseHub";
+import type { GlobeArc, GlobePoint } from "@/components/Globe";
+import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+
+const hubGlobeQuery = queryOptions({
+  queryKey: ["hub-globe"],
+  queryFn: async () => {
+    const [institutions, opportunities, edges] = await Promise.all([
+      supabase.from("institutions").select("id, name, slug, country, latitude, longitude"),
+      supabase
+        .from("opportunities")
+        .select("institution_id")
+        .in("status", ["open", "closing_soon", "rolling", "possibly_open"]),
+      supabase
+        .from("collaboration_edges")
+        .select("source_entity_id, target_entity_id, weight")
+        .order("weight", { ascending: false })
+        .limit(80),
+    ]);
+    if (institutions.error) throw institutions.error;
+    if (opportunities.error) throw opportunities.error;
+    if (edges.error) throw edges.error;
+    return {
+      institutions: institutions.data ?? [],
+      opportunities: opportunities.data ?? [],
+      edges: edges.data ?? [],
+    };
+  },
+});
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -43,6 +74,76 @@ const CATEGORY: Record<string, { label: string; tone: string }> = {
 function AcademicPulse() {
   const { data: events, isLoading, error } = useQuery(pulseQuery);
   const { data: counts } = useQuery(countsQuery);
+  const { data: globe, isLoading: globeLoading } = useQuery(hubGlobeQuery);
+
+  const points: GlobePoint[] = useMemo(() => {
+    if (!globe) return [];
+    const live = new Set(globe.opportunities.map((o: any) => o.institution_id));
+    return globe.institutions
+      .filter((i: any) => i.latitude !== null && i.longitude !== null)
+      .map((i: any) => ({
+        id: i.id,
+        name: i.name,
+        slug: i.slug,
+        lat: Number(i.latitude),
+        lon: Number(i.longitude),
+        country: i.country,
+        weight: 2,
+        live: live.has(i.id),
+      }));
+  }, [globe]);
+
+  const globeArcs: GlobeArc[] = useMemo(
+    () =>
+      (globe?.edges ?? []).map((e: any) => ({
+        from: e.source_entity_id,
+        to: e.target_entity_id,
+        weight: Number(e.weight) || 1,
+      })),
+    [globe],
+  );
+
+  const clusters: Cluster[] = useMemo(
+    () => [
+      {
+        key: "monitor",
+        label: "Monitor",
+        tone: "monitor",
+        blurb: "Watch the field move: where capacity sits, what is rising, who works with whom.",
+        spokes: [
+          { to: "/atlas", label: "World Monitor", count: points.length },
+          { to: "/trends", label: "Trends" },
+          { to: "/collaboration", label: "Collaboration" },
+        ],
+      },
+      {
+        key: "act",
+        label: "Act",
+        tone: "act",
+        blurb: "Time-critical surfaces: open calls, matched positions and closing deadlines.",
+        spokes: [
+          { to: "/jobs", label: "Jobs & PhDs", count: counts?.opportunities ?? "—" },
+          { to: "/matcher", label: "PhD Matcher" },
+          { to: "/events", label: "Deadlines", count: counts?.events ?? "—" },
+          { to: "/programmes", label: "Programmes" },
+        ],
+      },
+      {
+        key: "knowledge",
+        label: "Knowledge base",
+        tone: "knowledge",
+        blurb: "The sourced record: institutions, people, projects, literature and taxonomy.",
+        spokes: [
+          { to: "/institutions", label: "Institutions", count: counts?.institutions ?? "—" },
+          { to: "/researchers", label: "Researchers", count: counts?.researchers ?? "—" },
+          { to: "/projects", label: "Projects", count: counts?.projects ?? "—" },
+          { to: "/publications", label: "Publications", count: counts?.publications ?? "—" },
+          { to: "/topics", label: "Topics" },
+        ],
+      },
+    ],
+    [counts, points.length],
+  );
 
   return (
     <AppShell>
@@ -61,7 +162,22 @@ function AcademicPulse() {
       />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
-        <section className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+        <section className="grid-lines rounded-lg border border-border/70 bg-card/40 px-4 py-6 md:px-10">
+          <p className="mx-auto max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
+            The centre is the sourced world: every mapped institution, green where a call is live.
+            The rings are the three ways in — pick a spoke to enter that part of the record.
+          </p>
+          <div className="mt-4">
+            <PulseHub
+              clusters={clusters}
+              points={points}
+              arcs={globeArcs}
+              loading={globeLoading}
+            />
+          </div>
+        </section>
+
+        <section className="mt-8 grid grid-cols-2 gap-4 lg:grid-cols-6">
           <StatTile label="Institutions" value={counts?.institutions ?? "—"} />
           <StatTile label="Researchers" value={counts?.researchers ?? "—"} tone="signal" />
           <StatTile label="Positions" value={counts?.opportunities ?? "—"} tone="deadline" />
@@ -69,6 +185,7 @@ function AcademicPulse() {
           <StatTile label="Projects" value={counts?.projects ?? "—"} />
           <StatTile label="Events" value={counts?.events ?? "—"} tone="signal" />
         </section>
+
 
         <section className="mt-10">
           <div className="flex items-center justify-between">
