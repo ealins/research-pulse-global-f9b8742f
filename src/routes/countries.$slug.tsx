@@ -43,22 +43,28 @@ export const Route = createFileRoute("/countries/$slug")({
 function Section({
   title,
   count,
+  action,
   children,
 }: {
   title: string;
   count?: number;
+  action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="mt-8">
-      <h2 className="flex items-baseline gap-2 text-[0.68rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
-        {title}
-        {typeof count === "number" ? <span className="mono-num opacity-70">{count}</span> : null}
-      </h2>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="flex items-baseline gap-2 text-[0.68rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
+          {title}
+          {typeof count === "number" ? <span className="mono-num opacity-70">{count}</span> : null}
+        </h2>
+        {action}
+      </div>
       <div className="mt-3">{children}</div>
     </section>
   );
 }
+
 
 function CountryDetail() {
   const { slug } = Route.useParams();
