@@ -53,7 +53,14 @@ function ResearchersPage() {
                 <p className="text-[0.65rem] uppercase tracking-[0.16em] text-primary">
                   {r.academic_title ?? "Title not stated"}
                 </p>
-                <h2 className="mt-1.5 text-base font-semibold text-foreground">{r.full_name}</h2>
+                <Link
+                  to="/researchers/$slug"
+                  params={{ slug: r.slug }}
+                  className="mt-1.5 text-base font-semibold text-foreground hover:text-primary"
+                >
+                  {r.full_name}
+                </Link>
+
                 <p className="mt-1 text-xs text-muted-foreground">
                   {r.current_position ?? "Position not stated"}
                 </p>
