@@ -389,7 +389,7 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const started = Date.now();
   const { data: source, error } = await supabaseAdmin
     .from("sources")
-    .select("id, url, institution_id, adapter_key, category")
+    .select("id, url, institution_id, adapter_key, category, refresh_frequency_hours")
     .eq("id", sourceId)
     .maybeSingle();
   if (error) throw error;
