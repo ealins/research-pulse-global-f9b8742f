@@ -1,7 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 
 type Body = {
-  action?: "enqueue-discovery" | "drain" | "refresh-due" | "deadline-sweep";
+  action?:
+    | "enqueue-discovery"
+    | "drain"
+    | "refresh-due"
+    | "deadline-sweep"
+    | "backfill-raw"
+    | "backfill-providers"
+    | "drain-providers";
   limit?: number;
   trigger?: string;
 };
@@ -86,6 +93,30 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             names: targets.map((t) => t.name),
             remaining: backlog.length - targets.length,
           });
+        }
+
+        // One-time backfill planners. They only ENQUEUE work from data that is
+        // already stored; the autonomous drain loop does the processing.
+        if (action === "backfill-raw") {
+          const { enqueueRawBackfill } = await import("@/lib/backfill.server");
+          const result = await enqueueRawBackfill(Math.min(1000, Math.max(1, body.limit ?? 400)));
+          return json({ action, ...result });
+        }
+        if (action === "backfill-providers") {
+          const { enqueueProviderBackfill } = await import("@/lib/backfill.server");
+          const result = await enqueueProviderBackfill(Math.min(400, Math.max(1, body.limit ?? 120)));
+          return json({ action, ...result });
+        }
+
+        // Structured-provider drain (OpenAlex/Crossref only). Never calls a model,
+        // so it is safe to run on its own cheap cadence.
+        if (action === "drain-providers") {
+          const { runQueueBatch } = await import("@/lib/ingest.server");
+          const result = await runQueueBatch(Math.min(25, Math.max(1, body.limit ?? 5)), [
+            "PROMOTE_INSTITUTION",
+            "IMPORT_PUBLICATIONS",
+          ]);
+          return json({ action, ...result });
         }
 
         // Time-based source refresh: turns elapsed intervals into fetch work.
