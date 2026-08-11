@@ -144,15 +144,33 @@ export function Globe({
       ctx.fill();
       ctx.globalAlpha = 1;
 
-      // ocean sphere with a lit north-west shoulder
-      const body = ctx.createRadialGradient(cx - R * 0.35, cy - R * 0.4, R * 0.1, cx, cy, R);
-      body.addColorStop(0, theme.signal);
-      body.addColorStop(0.45, theme.ocean);
-      body.addColorStop(1, "oklch(0.16 0.03 250)");
+      // ocean sphere
+      const body = ctx.createRadialGradient(cx - R * 0.3, cy - R * 0.35, R * 0.05, cx, cy, R);
+      body.addColorStop(0, "oklch(0.32 0.05 235)");
+      body.addColorStop(0.55, "oklch(0.24 0.04 240)");
+      body.addColorStop(1, "oklch(0.15 0.03 250)");
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.fillStyle = body;
       ctx.fill();
+
+      // tight specular highlight
+      const spec = ctx.createRadialGradient(
+        cx - R * 0.38,
+        cy - R * 0.42,
+        0,
+        cx - R * 0.38,
+        cy - R * 0.42,
+        R * 0.55,
+      );
+      spec.addColorStop(0, theme.primary);
+      spec.addColorStop(1, "transparent");
+      ctx.globalAlpha = 0.13;
+      ctx.fillStyle = spec;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.globalAlpha = 1;
 
       ctx.save();
       ctx.beginPath();
@@ -160,8 +178,8 @@ export function Globe({
       ctx.clip();
 
       // graticule
-      ctx.strokeStyle = theme.grid;
-      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = theme.primary;
+      ctx.globalAlpha = 0.22;
       ctx.lineWidth = 0.6;
       for (let lat = -60; lat <= 60; lat += 30) {
         ctx.beginPath();
@@ -190,7 +208,10 @@ export function Globe({
       ctx.globalAlpha = 1;
 
       // land masses
-      ctx.fillStyle = theme.land;
+      const landFill = ctx.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+      landFill.addColorStop(0, "oklch(0.44 0.045 205)");
+      landFill.addColorStop(1, "oklch(0.3 0.035 220)");
+      ctx.fillStyle = landFill;
       ctx.strokeStyle = theme.primary;
       ctx.lineWidth = 0.5;
       for (const ring of LAND_RINGS) {
@@ -210,9 +231,9 @@ export function Globe({
         }
         if (!visible) continue;
         ctx.closePath();
-        ctx.globalAlpha = 0.85;
+        ctx.globalAlpha = 0.92;
         ctx.fill();
-        ctx.globalAlpha = 0.35;
+        ctx.globalAlpha = 0.55;
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
@@ -318,11 +339,20 @@ export function Globe({
       const limb = ctx.createRadialGradient(cx, cy, R * 0.55, cx, cy, R);
       limb.addColorStop(0, "transparent");
       limb.addColorStop(1, "oklch(0.12 0.02 250)");
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.5;
       ctx.fillStyle = limb;
       ctx.beginPath();
       ctx.arc(cx, cy, R, 0, Math.PI * 2);
       ctx.fill();
+      ctx.globalAlpha = 1;
+
+      // fresnel rim light
+      ctx.strokeStyle = theme.primary;
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.arc(cx, cy, R - 0.6, 0, Math.PI * 2);
+      ctx.stroke();
       ctx.globalAlpha = 1;
 
       raf = requestAnimationFrame(frame);
