@@ -24,6 +24,8 @@ export const Route = createFileRoute("/topics/$slug")({
         },
         { property: "og:type", content: "article" },
         { name: "twitter:card", content: "summary_large_image" },
+        { property: "og:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
+        { name: "twitter:image", content: "https://geoacademic.app/og-geoacademic-radar.jpg" },
       ],
     };
   },
