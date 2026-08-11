@@ -17,6 +17,9 @@ export type OpportunityRow = {
   application_url: string | null;
   official_source_url: string | null;
   supervisor_name: string | null;
+  sector: string;
+  employer_name: string | null;
+  seniority: string | null;
   status: string;
   confidence: string;
   verification_status: string;
@@ -34,7 +37,8 @@ export const opportunitiesQuery = queryOptions({
       .select(
         `id, title, slug, city, country, opportunity_type, description, requirements,
          funding_type, salary_text, start_date, application_deadline, application_url,
-         official_source_url, supervisor_name, status, confidence, verification_status,
+         official_source_url, supervisor_name, sector, employer_name, seniority,
+         status, confidence, verification_status,
          last_checked_at, is_demo,
          institutions ( name, slug, abbreviation ),
          opportunity_topics ( research_topics ( name, slug ) )`,
@@ -155,7 +159,8 @@ export const eventsQuery = queryOptions({
       .from("events")
       .select(
         `id, title, slug, organization, location, country, recurrence, summary, website,
-         start_date, abstract_deadline, paper_deadline, verification_status, is_demo,
+         start_date, end_date, event_kind, abstract_deadline, paper_deadline,
+         verification_status, is_demo,
          event_topics ( research_topics ( name, slug ) )`,
       )
       .order("title");
