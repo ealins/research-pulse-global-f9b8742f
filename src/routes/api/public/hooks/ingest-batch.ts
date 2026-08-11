@@ -146,7 +146,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
 
         try {
-          const result = await runQueueBatch(limit);
+          const result = await runQueueBatch(batch);
           const { data: llm } = await supabaseAdmin
             .from("llm_processing_runs")
             .select("cached")
@@ -165,11 +165,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
                 nvidia_calls: calls.length,
                 nvidia_cached: calls.filter((c) => c.cached).length,
                 errors: result.failed + result.dead,
-                details: { sample: result.details.slice(0, 20) } as never,
+                details: { mode: queueState.mode, batch_size: batch, sample: result.details.slice(0, 20) } as never,
               })
               .eq("id", run.id);
           }
-          return json({ action: "drain", run_id: run?.id ?? null, ...result });
+          return json({ action: "drain", run_id: run?.id ?? null, mode: queueState.mode, ...result });
+
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
           if (run?.id) {
