@@ -9,6 +9,7 @@ import {
   Globe2,
   GraduationCap,
   LineChart,
+  MapPinned,
   Network,
   ScrollText,
   ShieldCheck,
@@ -27,6 +28,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/", label: "Academic Pulse", icon: Activity },
       { to: "/atlas", label: "World Monitor", icon: Globe2 },
+      { to: "/countries", label: "Countries", icon: MapPinned },
       { to: "/trends", label: "Research trends", icon: LineChart },
       { to: "/collaboration", label: "Collaboration graph", icon: Network },
     ],
