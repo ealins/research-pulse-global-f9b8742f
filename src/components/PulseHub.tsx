@@ -125,7 +125,7 @@ export function PulseHub({
           viewBox={`0 0 ${SIZE} ${SIZE}`}
           className="pointer-events-none absolute inset-0 h-full w-full"
         >
-          {[RING - 34, RING, RING + 26].map((r) => (
+          {[RING - 40, RING, RING + 34].map((r) => (
             <circle
               key={r}
               cx={C}
@@ -139,7 +139,7 @@ export function PulseHub({
 
           {laidOut.map(({ cluster, ring, start, end, segments }) => {
             const tone = TONE[cluster.tone];
-            const head = polar(ring + 20, (start + end) / 2);
+            const head = polar(ring + 52, (start + end) / 2);
             return (
               <g key={cluster.key}>
                 <path
@@ -159,7 +159,7 @@ export function PulseHub({
 
                 {segments.map(({ spoke, from, to, mid }) => {
                   const active = hover === spoke.to;
-                  const label = polar(ring - 22, mid);
+                  const label = polar(ring + 20, mid);
                   const dot = polar(ring, mid);
                   return (
                     <g key={spoke.to}>
