@@ -169,6 +169,7 @@ function MatcherPage() {
                       max={5}
                       step={1}
                       value={[value]}
+                      aria-label={`Weight for ${t.name}`}
                       onValueChange={([v]) =>
                         setWeights((w) => ({ ...w, [t.slug]: v ?? 0 }))
                       }

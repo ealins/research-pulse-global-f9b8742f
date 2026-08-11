@@ -165,6 +165,7 @@ function JobsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search title, topic, supervisor…"
+              aria-label="Search positions"
               className="rounded-md border border-input bg-background/60 px-3 py-2 text-sm text-foreground outline-none placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-ring/30"
             />
             <Select value={status} onChange={setStatus} label="Status">

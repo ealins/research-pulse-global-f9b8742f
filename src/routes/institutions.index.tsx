@@ -113,6 +113,7 @@ function InstitutionsPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search institution, city or country"
+              aria-label="Search institutions"
               className="pl-9"
             />
           </div>
