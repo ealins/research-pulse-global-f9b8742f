@@ -1,8 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpRight, ExternalLink } from "lucide-react";
+
+import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
+import { countsQuery, pulseQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/")({
@@ -12,13 +13,13 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Live intelligence feed for photogrammetry, remote sensing and geoinformatics: PhD positions, publications, projects and events with full provenance.",
+          "Live intelligence feed for photogrammetry, remote sensing and geoinformatics: PhD jobs, publications, projects and events, each with a source link and verification status.",
       },
       { property: "og:title", content: "Academic Pulse — GeoAcademic Radar" },
       {
         property: "og:description",
         content:
-          "Live intelligence feed for photogrammetry, remote sensing and geoinformatics, with source links on every record.",
+          "Live academic intelligence for photogrammetry, remote sensing and geoinformatics, with provenance on every record.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -27,166 +28,126 @@ export const Route = createFileRoute("/")({
   component: AcademicPulse,
 });
 
-const CATEGORY_LABEL: Record<string, string> = {
-  PHD: "PhD / position",
-  PAPER: "Publication",
-  PROJECT: "Project",
-  EVENT: "Event",
-  PEOPLE: "People",
-  DATASET: "Dataset",
-  DISSERTATION: "Dissertation",
-  STANDARD: "Standard",
-  FUNDING: "Funding",
+const CATEGORY: Record<string, { label: string; tone: string }> = {
+  PHD: { label: "Position", tone: "border-deadline/40 bg-deadline/12 text-deadline" },
+  PAPER: { label: "Publication", tone: "border-primary/40 bg-primary/10 text-primary" },
+  PROJECT: { label: "Project", tone: "border-signal/40 bg-signal/12 text-signal" },
+  EVENT: { label: "Event", tone: "border-growth/40 bg-growth/12 text-growth" },
+  PEOPLE: { label: "People", tone: "border-border bg-muted/60 text-muted-foreground" },
+  DATASET: { label: "Dataset", tone: "border-border bg-muted/60 text-muted-foreground" },
+  DISSERTATION: { label: "Dissertation", tone: "border-border bg-muted/60 text-muted-foreground" },
+  STANDARD: { label: "Standard", tone: "border-border bg-muted/60 text-muted-foreground" },
+  FUNDING: { label: "Funding", tone: "border-border bg-muted/60 text-muted-foreground" },
 };
 
-function usePulse() {
-  return useQuery({
-    queryKey: ["pulse-events"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("pulse_events")
-        .select(
-          "id, category, title, summary, event_date, importance, link_url, source_url, verification_status, confidence, is_demo, country",
-        )
-        .order("importance", { ascending: false })
-        .order("event_date", { ascending: false })
-        .limit(60);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-}
-
-function useCounts() {
-  return useQuery({
-    queryKey: ["pulse-counts"],
-    queryFn: async () => {
-      const tables = ["institutions", "researchers", "opportunities", "publications"] as const;
-      const results = await Promise.all(
-        tables.map(async (t) => {
-          const { count, error } = await supabase
-            .from(t)
-            .select("id", { count: "exact", head: true });
-          if (error) throw error;
-          return [t, count ?? 0] as const;
-        }),
-      );
-      return Object.fromEntries(results) as Record<(typeof tables)[number], number>;
-    },
-  });
-}
-
 function AcademicPulse() {
-  const { data: events, isLoading, error } = usePulse();
-  const { data: counts } = useCounts();
+  const { data: events, isLoading, error } = useQuery(pulseQuery);
+  const { data: counts } = useQuery(countsQuery);
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-6 py-12">
-      <header className="border-b border-border pb-8">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">
-          GeoAcademic Radar
-        </p>
-        <h1 className="mt-3 text-4xl font-semibold tracking-tight text-foreground">
-          Academic Pulse
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted-foreground">
-          Global intelligence feed for photogrammetry, remote sensing and geoinformatics. Every
-          record carries a source link and a verification status — nothing is asserted without
-          provenance.
-        </p>
-      </header>
+    <AppShell>
+      <PageHeader
+        eyebrow="Global academic intelligence"
+        title="Academic Pulse"
+        description="What moved in photogrammetry, remote sensing and geoinformatics: new positions, publications, projects and events. Every signal keeps its source link and verification status — nothing is inferred or invented."
+        actions={
+          <Link
+            to="/jobs"
+            className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+          >
+            Open jobs radar <ArrowUpRight className="h-4 w-4" />
+          </Link>
+        }
+      />
 
-      <section className="mt-8 grid grid-cols-2 gap-4 md:grid-cols-4">
-        {(
-          [
-            ["Institutions", counts?.institutions],
-            ["Researchers", counts?.researchers],
-            ["Open positions", counts?.opportunities],
-            ["Publications", counts?.publications],
-          ] as const
-        ).map(([label, value]) => (
-          <Card key={label} className="bg-card/60">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                {label}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-semibold tabular-nums text-foreground">
-                {value ?? "—"}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
+      <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        <section className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+          <StatTile label="Institutions" value={counts?.institutions ?? "—"} />
+          <StatTile label="Researchers" value={counts?.researchers ?? "—"} tone="signal" />
+          <StatTile label="Positions" value={counts?.opportunities ?? "—"} tone="deadline" />
+          <StatTile label="Publications" value={counts?.publications ?? "—"} tone="growth" />
+          <StatTile label="Projects" value={counts?.projects ?? "—"} />
+          <StatTile label="Events" value={counts?.events ?? "—"} tone="signal" />
+        </section>
 
-      <section className="mt-10">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-          Latest signals
-        </h2>
-
-        {error ? (
-          <p className="mt-4 text-sm text-destructive">
-            The feed could not be loaded. Please try again.
-          </p>
-        ) : null}
-
-        {isLoading ? (
-          <div className="mt-4 space-y-3">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="h-20 w-full" />
-            ))}
+        <section className="mt-10">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+              Latest signals
+            </h2>
+            <span className="mono-num text-xs text-muted-foreground">
+              {events?.length ?? 0} entries
+            </span>
           </div>
-        ) : (
-          <ul className="mt-4 divide-y divide-border">
-            {events?.map((e) => (
-              <li key={e.id} className="py-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="secondary">{CATEGORY_LABEL[e.category] ?? e.category}</Badge>
-                  {e.country ? (
-                    <span className="text-xs text-muted-foreground">{e.country}</span>
-                  ) : null}
-                  <span className="text-xs text-muted-foreground">
-                    {e.event_date ? new Date(e.event_date).toLocaleDateString() : "Date not stated"}
-                  </span>
-                  <Badge variant="outline">
-                    {e.verification_status === "verified" ? "Verified" : "Not verified"}
-                  </Badge>
-                  {e.is_demo ? <Badge variant="outline">Demonstration data</Badge> : null}
-                </div>
-                <h3 className="mt-2 text-base font-medium leading-snug text-foreground">
-                  {e.title}
-                </h3>
-                {e.summary ? (
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{e.summary}</p>
-                ) : null}
-                {e.link_url ?? e.source_url ? (
-                  <a
-                    href={(e.link_url ?? e.source_url) as string}
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="mt-2 inline-block text-xs font-medium text-primary underline underline-offset-4"
-                  >
-                    Open source
-                  </a>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
 
-        {!isLoading && !error && (events?.length ?? 0) === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">No signals recorded yet.</p>
-        ) : null}
-      </section>
+          {error ? (
+            <p className="mt-4 text-sm text-destructive">The feed could not be loaded.</p>
+          ) : null}
 
-      <footer className="mt-12 border-t border-border pt-6 text-xs text-muted-foreground">
-        <Link to="/" className="underline underline-offset-4">
-          GeoAcademic Radar
-        </Link>{" "}
-        — records are collected from official institutional and society sources and are never
-        inferred or invented.
-      </footer>
-    </main>
+          {isLoading ? (
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Skeleton key={i} className="h-28 w-full" />
+              ))}
+            </div>
+          ) : (
+            <ul className="mt-4 grid gap-3 md:grid-cols-2">
+              {events?.map((e) => {
+                const cat = CATEGORY[e.category] ?? CATEGORY["PEOPLE"]!;
+                const href = e.link_url ?? e.source_url;
+                return (
+                  <li key={e.id} className="panel panel-hover rise-in p-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className={`rounded-full border px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider ${cat.tone}`}
+                      >
+                        {cat.label}
+                      </span>
+                      <span className="mono-num text-[0.68rem] text-muted-foreground">
+                        {new Date(e.event_date).toLocaleDateString()}
+                      </span>
+                      {e.country ? (
+                        <span className="text-[0.68rem] text-muted-foreground">{e.country}</span>
+                      ) : null}
+                    </div>
+
+                    <h3 className="mt-2.5 text-sm font-semibold leading-snug text-foreground">
+                      {e.title}
+                    </h3>
+                    {e.summary ? (
+                      <p className="mt-1.5 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+                        {e.summary}
+                      </p>
+                    ) : null}
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+                      <ProvenanceChips
+                        verification={e.verification_status}
+                        confidence={e.confidence}
+                        isDemo={e.is_demo}
+                      />
+                      {href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                        >
+                          Source <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : null}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {!isLoading && !error && (events?.length ?? 0) === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">No signals recorded yet.</p>
+          ) : null}
+        </section>
+      </div>
+    </AppShell>
   );
 }
