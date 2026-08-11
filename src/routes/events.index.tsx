@@ -47,7 +47,7 @@ function EventsPage() {
     const map = new Map<string, number>();
     for (const e of data ?? []) map.set(e.event_kind, (map.get(e.event_kind) ?? 0) + 1);
     return [
-      { key: "all", label: "All kinds", count: data?.length },
+      { key: "all", label: "All kinds", count: data?.length ?? 0 },
       ...[...map.entries()].map(([k, c]) => ({ key: k, label: KIND_LABEL[k] ?? k, count: c })),
     ];
   }, [data]);
