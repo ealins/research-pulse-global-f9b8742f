@@ -271,8 +271,8 @@ export async function importInstitutionPublications(
     .select("id, name, openalex_id")
     .eq("id", institutionId)
     .maybeSingle();
-  if (!inst?.openalex_id) {
-    return { institution: inst?.name ?? institutionId, queries: 0, seen: 0, inserted: 0, updated: 0, skipped: 0 };
+  if (!inst) {
+    return { institution: institutionId, queries: 0, seen: 0, inserted: 0, updated: 0, skipped: 0 };
   }
 
   const perQuery = Math.min(50, opts.perQuery ?? 25);
@@ -285,10 +285,12 @@ export async function importInstitutionPublications(
       `${API}/works?filter=institutions.lineage:${inst.openalex_id},from_publication_date:${since}-01-01` +
       `&search=${encodeURIComponent(q)}&per_page=${perQuery}&sort=cited_by_count:desc`;
     let works: OaWork[] = [];
-    try {
-      works = (await getJson<{ results: OaWork[] }>(url))?.results ?? [];
-    } catch {
-      works = [];
+    if (inst.openalex_id) {
+      try {
+        works = (await getJson<{ results: OaWork[] }>(url))?.results ?? [];
+      } catch {
+        works = [];
+      }
     }
     if (works.length === 0) works = await crossrefWorks(inst.name, q, since, perQuery);
     for (const w of works) {
