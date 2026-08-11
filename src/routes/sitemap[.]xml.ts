@@ -68,7 +68,7 @@ export const Route = createFileRoute("/sitemap.xml")({
             prefix: string,
             rows: { slug?: string | null }[] | null,
             priority: string,
-            changefreq: SitemapEntry["changefreq"],
+            changefreq: NonNullable<SitemapEntry["changefreq"]>,
           ) => {
             for (const row of rows ?? []) {
               if (!row.slug) continue;

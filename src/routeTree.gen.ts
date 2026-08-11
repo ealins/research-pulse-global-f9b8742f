@@ -14,6 +14,7 @@ import { Route as AtlasRouteImport } from './routes/atlas'
 import { Route as CollaborationRouteImport } from './routes/collaboration'
 import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TopRouteImport } from './routes/top'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
@@ -58,6 +59,11 @@ const MatcherRoute = MatcherRouteImport.update({
 const MethodologyRoute = MethodologyRouteImport.update({
   id: '/methodology',
   path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
+  id: '/sitemap.xml',
+  path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TopRoute = TopRouteImport.update({
@@ -167,6 +173,7 @@ export interface FileRoutesByFullPath {
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByTo {
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
@@ -222,6 +230,7 @@ export interface FileRoutesById {
   '/collaboration': typeof CollaborationRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
@@ -251,6 +260,7 @@ export interface FileRouteTypes {
     | '/collaboration'
     | '/matcher'
     | '/methodology'
+    | '/sitemap.xml'
     | '/top'
     | '/trends'
     | '/countries/$slug'
@@ -278,6 +288,7 @@ export interface FileRouteTypes {
     | '/collaboration'
     | '/matcher'
     | '/methodology'
+    | '/sitemap.xml'
     | '/top'
     | '/trends'
     | '/countries/$slug'
@@ -305,6 +316,7 @@ export interface FileRouteTypes {
     | '/collaboration'
     | '/matcher'
     | '/methodology'
+    | '/sitemap.xml'
     | '/top'
     | '/trends'
     | '/countries/$slug'
@@ -333,6 +345,7 @@ export interface RootRouteChildren {
   CollaborationRoute: typeof CollaborationRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
+  SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TopRoute: typeof TopRoute
   TrendsRoute: typeof TrendsRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
@@ -390,6 +403,13 @@ declare module '@tanstack/react-router' {
       path: '/methodology'
       fullPath: '/methodology'
       preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/sitemap.xml': {
+      id: '/sitemap.xml'
+      path: '/sitemap.xml'
+      fullPath: '/sitemap.xml'
+      preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/top': {
@@ -541,6 +561,7 @@ const rootRouteChildren: RootRouteChildren = {
   CollaborationRoute: CollaborationRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
+  SitemapDotxmlRoute: SitemapDotxmlRoute,
   TopRoute: TopRoute,
   TrendsRoute: TrendsRoute,
   CountriesSlugRoute: CountriesSlugRoute,
@@ -565,3 +586,13 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
