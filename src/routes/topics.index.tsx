@@ -68,6 +68,7 @@ function TopicsPage() {
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Filter topics…"
+            aria-label="Filter topics"
             className="w-56 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:border-primary/50 focus:outline-none"
           />
         }
