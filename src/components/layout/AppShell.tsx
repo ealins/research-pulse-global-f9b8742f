@@ -6,34 +6,59 @@ import {
   Building2,
   CalendarDays,
   FlaskConical,
+  Globe2,
   GraduationCap,
   LineChart,
   Network,
   ScrollText,
+  ShieldCheck,
+  Tags,
   Target,
   Users,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
 import { openJobCountQuery } from "@/lib/radar-queries";
+import { CommandPalette } from "@/components/CommandPalette";
 
-const NAV = [
-  { to: "/", label: "Academic Pulse", icon: Activity },
-  { to: "/jobs", label: "Jobs & PhD radar", icon: Briefcase },
-  { to: "/matcher", label: "PhD Matcher", icon: Target },
-  { to: "/institutions", label: "Institutions", icon: Building2 },
-  { to: "/researchers", label: "Researchers", icon: Users },
-  { to: "/projects", label: "Projects", icon: FlaskConical },
-  { to: "/publications", label: "Publications", icon: ScrollText },
-  { to: "/programmes", label: "Programmes", icon: GraduationCap },
-  { to: "/trends", label: "Research trends", icon: LineChart },
-  { to: "/collaboration", label: "Collaboration graph", icon: Network },
-  { to: "/events", label: "Events", icon: CalendarDays },
+const NAV_GROUPS = [
+  {
+    label: "Monitor",
+    items: [
+      { to: "/", label: "Academic Pulse", icon: Activity },
+      { to: "/atlas", label: "World Monitor", icon: Globe2 },
+      { to: "/trends", label: "Research trends", icon: LineChart },
+      { to: "/collaboration", label: "Collaboration graph", icon: Network },
+    ],
+  },
+  {
+    label: "Act",
+    items: [
+      { to: "/jobs", label: "Jobs & PhD radar", icon: Briefcase },
+      { to: "/matcher", label: "PhD Matcher", icon: Target },
+      { to: "/events", label: "Events & deadlines", icon: CalendarDays },
+      { to: "/programmes", label: "Programmes", icon: GraduationCap },
+    ],
+  },
+  {
+    label: "Knowledge base",
+    items: [
+      { to: "/institutions", label: "Institutions", icon: Building2 },
+      { to: "/researchers", label: "Researchers", icon: Users },
+      { to: "/projects", label: "Projects", icon: FlaskConical },
+      { to: "/publications", label: "Publications", icon: ScrollText },
+      { to: "/topics", label: "Topic taxonomy", icon: Tags },
+    ],
+  },
+  {
+    label: "Trust",
+    items: [{ to: "/methodology", label: "Methodology", icon: ShieldCheck }],
+  },
 ] as const;
-
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: openJobs } = useQuery(openJobCountQuery);
+
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16.5rem_1fr]">

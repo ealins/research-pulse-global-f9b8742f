@@ -16,6 +16,7 @@ import { Route as EventsRouteImport } from './routes/events'
 import { Route as InstitutionsRouteImport } from './routes/institutions'
 import { Route as JobsRouteImport } from './routes/jobs'
 import { Route as MatcherRouteImport } from './routes/matcher'
+import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as ProgrammesRouteImport } from './routes/programmes'
 import { Route as ProjectsRouteImport } from './routes/projects'
 import { Route as PublicationsRouteImport } from './routes/publications'
@@ -60,6 +61,11 @@ const JobsRoute = JobsRouteImport.update({
 const MatcherRoute = MatcherRouteImport.update({
   id: '/matcher',
   path: '/matcher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MethodologyRoute = MethodologyRouteImport.update({
+  id: '/methodology',
+  path: '/methodology',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProgrammesRoute = ProgrammesRouteImport.update({
@@ -121,6 +127,7 @@ export interface FileRoutesByFullPath {
   '/institutions': typeof InstitutionsRouteWithChildren
   '/jobs': typeof JobsRouteWithChildren
   '/matcher': typeof MatcherRoute
+  '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
@@ -140,6 +147,7 @@ export interface FileRoutesByTo {
   '/institutions': typeof InstitutionsRouteWithChildren
   '/jobs': typeof JobsRouteWithChildren
   '/matcher': typeof MatcherRoute
+  '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
@@ -160,6 +168,7 @@ export interface FileRoutesById {
   '/institutions': typeof InstitutionsRouteWithChildren
   '/jobs': typeof JobsRouteWithChildren
   '/matcher': typeof MatcherRoute
+  '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/institutions'
     | '/jobs'
     | '/matcher'
+    | '/methodology'
     | '/programmes'
     | '/projects'
     | '/publications'
@@ -200,6 +210,7 @@ export interface FileRouteTypes {
     | '/institutions'
     | '/jobs'
     | '/matcher'
+    | '/methodology'
     | '/programmes'
     | '/projects'
     | '/publications'
@@ -219,6 +230,7 @@ export interface FileRouteTypes {
     | '/institutions'
     | '/jobs'
     | '/matcher'
+    | '/methodology'
     | '/programmes'
     | '/projects'
     | '/publications'
@@ -239,6 +251,7 @@ export interface RootRouteChildren {
   InstitutionsRoute: typeof InstitutionsRouteWithChildren
   JobsRoute: typeof JobsRouteWithChildren
   MatcherRoute: typeof MatcherRoute
+  MethodologyRoute: typeof MethodologyRoute
   ProgrammesRoute: typeof ProgrammesRoute
   ProjectsRoute: typeof ProjectsRoute
   PublicationsRoute: typeof PublicationsRoute
@@ -296,6 +309,13 @@ declare module '@tanstack/react-router' {
       path: '/matcher'
       fullPath: '/matcher'
       preLoaderRoute: typeof MatcherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/methodology': {
+      id: '/methodology'
+      path: '/methodology'
+      fullPath: '/methodology'
+      preLoaderRoute: typeof MethodologyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/programmes': {
@@ -424,6 +444,7 @@ const rootRouteChildren: RootRouteChildren = {
   InstitutionsRoute: InstitutionsRouteWithChildren,
   JobsRoute: JobsRouteWithChildren,
   MatcherRoute: MatcherRoute,
+  MethodologyRoute: MethodologyRoute,
   ProgrammesRoute: ProgrammesRoute,
   ProjectsRoute: ProjectsRoute,
   PublicationsRoute: PublicationsRoute,
