@@ -10,33 +10,167 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CollaborationRouteImport } from './routes/collaboration'
+import { Route as EventsRouteImport } from './routes/events'
+import { Route as InstitutionsRouteImport } from './routes/institutions'
+import { Route as JobsRouteImport } from './routes/jobs'
+import { Route as MatcherRouteImport } from './routes/matcher'
+import { Route as ProgrammesRouteImport } from './routes/programmes'
+import { Route as ProjectsRouteImport } from './routes/projects'
+import { Route as PublicationsRouteImport } from './routes/publications'
+import { Route as ResearchersRouteImport } from './routes/researchers'
+import { Route as TrendsRouteImport } from './routes/trends'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CollaborationRoute = CollaborationRouteImport.update({
+  id: '/collaboration',
+  path: '/collaboration',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsRoute = EventsRouteImport.update({
+  id: '/events',
+  path: '/events',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InstitutionsRoute = InstitutionsRouteImport.update({
+  id: '/institutions',
+  path: '/institutions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JobsRoute = JobsRouteImport.update({
+  id: '/jobs',
+  path: '/jobs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MatcherRoute = MatcherRouteImport.update({
+  id: '/matcher',
+  path: '/matcher',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProgrammesRoute = ProgrammesRouteImport.update({
+  id: '/programmes',
+  path: '/programmes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsRoute = ProjectsRouteImport.update({
+  id: '/projects',
+  path: '/projects',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PublicationsRoute = PublicationsRouteImport.update({
+  id: '/publications',
+  path: '/publications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResearchersRoute = ResearchersRouteImport.update({
+  id: '/researchers',
+  path: '/researchers',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TrendsRoute = TrendsRouteImport.update({
+  id: '/trends',
+  path: '/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/collaboration': typeof CollaborationRoute
+  '/events': typeof EventsRoute
+  '/institutions': typeof InstitutionsRoute
+  '/jobs': typeof JobsRoute
+  '/matcher': typeof MatcherRoute
+  '/programmes': typeof ProgrammesRoute
+  '/projects': typeof ProjectsRoute
+  '/publications': typeof PublicationsRoute
+  '/researchers': typeof ResearchersRoute
+  '/trends': typeof TrendsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/collaboration': typeof CollaborationRoute
+  '/events': typeof EventsRoute
+  '/institutions': typeof InstitutionsRoute
+  '/jobs': typeof JobsRoute
+  '/matcher': typeof MatcherRoute
+  '/programmes': typeof ProgrammesRoute
+  '/projects': typeof ProjectsRoute
+  '/publications': typeof PublicationsRoute
+  '/researchers': typeof ResearchersRoute
+  '/trends': typeof TrendsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/collaboration': typeof CollaborationRoute
+  '/events': typeof EventsRoute
+  '/institutions': typeof InstitutionsRoute
+  '/jobs': typeof JobsRoute
+  '/matcher': typeof MatcherRoute
+  '/programmes': typeof ProgrammesRoute
+  '/projects': typeof ProjectsRoute
+  '/publications': typeof PublicationsRoute
+  '/researchers': typeof ResearchersRoute
+  '/trends': typeof TrendsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/collaboration'
+    | '/events'
+    | '/institutions'
+    | '/jobs'
+    | '/matcher'
+    | '/programmes'
+    | '/projects'
+    | '/publications'
+    | '/researchers'
+    | '/trends'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/collaboration'
+    | '/events'
+    | '/institutions'
+    | '/jobs'
+    | '/matcher'
+    | '/programmes'
+    | '/projects'
+    | '/publications'
+    | '/researchers'
+    | '/trends'
+  id:
+    | '__root__'
+    | '/'
+    | '/collaboration'
+    | '/events'
+    | '/institutions'
+    | '/jobs'
+    | '/matcher'
+    | '/programmes'
+    | '/projects'
+    | '/publications'
+    | '/researchers'
+    | '/trends'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CollaborationRoute: typeof CollaborationRoute
+  EventsRoute: typeof EventsRoute
+  InstitutionsRoute: typeof InstitutionsRoute
+  JobsRoute: typeof JobsRoute
+  MatcherRoute: typeof MatcherRoute
+  ProgrammesRoute: typeof ProgrammesRoute
+  ProjectsRoute: typeof ProjectsRoute
+  PublicationsRoute: typeof PublicationsRoute
+  ResearchersRoute: typeof ResearchersRoute
+  TrendsRoute: typeof TrendsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +182,91 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/collaboration': {
+      id: '/collaboration'
+      path: '/collaboration'
+      fullPath: '/collaboration'
+      preLoaderRoute: typeof CollaborationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events': {
+      id: '/events'
+      path: '/events'
+      fullPath: '/events'
+      preLoaderRoute: typeof EventsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/institutions': {
+      id: '/institutions'
+      path: '/institutions'
+      fullPath: '/institutions'
+      preLoaderRoute: typeof InstitutionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/jobs': {
+      id: '/jobs'
+      path: '/jobs'
+      fullPath: '/jobs'
+      preLoaderRoute: typeof JobsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/matcher': {
+      id: '/matcher'
+      path: '/matcher'
+      fullPath: '/matcher'
+      preLoaderRoute: typeof MatcherRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/programmes': {
+      id: '/programmes'
+      path: '/programmes'
+      fullPath: '/programmes'
+      preLoaderRoute: typeof ProgrammesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects': {
+      id: '/projects'
+      path: '/projects'
+      fullPath: '/projects'
+      preLoaderRoute: typeof ProjectsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/publications': {
+      id: '/publications'
+      path: '/publications'
+      fullPath: '/publications'
+      preLoaderRoute: typeof PublicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/researchers': {
+      id: '/researchers'
+      path: '/researchers'
+      fullPath: '/researchers'
+      preLoaderRoute: typeof ResearchersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/trends': {
+      id: '/trends'
+      path: '/trends'
+      fullPath: '/trends'
+      preLoaderRoute: typeof TrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CollaborationRoute: CollaborationRoute,
+  EventsRoute: EventsRoute,
+  InstitutionsRoute: InstitutionsRoute,
+  JobsRoute: JobsRoute,
+  MatcherRoute: MatcherRoute,
+  ProgrammesRoute: ProgrammesRoute,
+  ProjectsRoute: ProjectsRoute,
+  PublicationsRoute: PublicationsRoute,
+  ResearchersRoute: ResearchersRoute,
+  TrendsRoute: TrendsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

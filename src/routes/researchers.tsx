@@ -1,0 +1,94 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { ExternalLink } from "lucide-react";
+
+import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
+import { researchersQuery } from "@/lib/radar-queries";
+import { Skeleton } from "@/components/ui/skeleton";
+
+export const Route = createFileRoute("/researchers")({
+  head: () => ({
+    meta: [
+      { title: "Researchers — GeoAcademic Radar" },
+      {
+        name: "description",
+        content:
+          "Professors and researchers in photogrammetry, remote sensing and geoinformatics, with position, institution, research focus and official profile links.",
+      },
+      { property: "og:title", content: "Researchers — GeoAcademic Radar" },
+      {
+        property: "og:description",
+        content:
+          "People behind photogrammetry, remote sensing and geoinformatics research, sourced from official institutional profiles.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
+    ],
+  }),
+  component: ResearchersPage,
+});
+
+function ResearchersPage() {
+  const { data, isLoading, error } = useQuery(researchersQuery);
+
+  return (
+    <AppShell>
+      <PageHeader
+        eyebrow="People"
+        title="Researchers"
+        description="Names, positions and stated research focus, taken from official institutional profile pages. Positions change — each entry links back to the page it came from."
+      />
+      <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        {error ? <p className="text-sm text-destructive">Researchers could not be loaded.</p> : null}
+        {isLoading ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <Skeleton key={i} className="h-40 w-full" />
+            ))}
+          </div>
+        ) : (
+          <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            {data?.map((r) => (
+              <li key={r.id} className="panel panel-hover rise-in flex flex-col p-5">
+                <p className="text-[0.65rem] uppercase tracking-[0.16em] text-primary">
+                  {r.academic_title ?? "Title not stated"}
+                </p>
+                <h2 className="mt-1.5 text-base font-semibold text-foreground">{r.full_name}</h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {r.current_position ?? "Position not stated"}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {r.institutions?.name ?? "Institution not stated"}
+                  {r.institutions?.country ? ` · ${r.institutions.country}` : ""}
+                </p>
+                {r.research_summary ? (
+                  <p className="mt-3 line-clamp-3 text-sm leading-relaxed text-foreground/80">
+                    {r.research_summary}
+                  </p>
+                ) : null}
+                <div className="mt-3">
+                  <TopicPills
+                    topics={(r.researcher_topics ?? []).map((t) => t.research_topics?.name)}
+                  />
+                </div>
+                <div className="mt-auto pt-4">
+                  <ProvenanceChips verification={r.verification_status} isDemo={r.is_demo} />
+                  {r.official_profile_url ? (
+                    <a
+                      href={r.official_profile_url}
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="mt-3 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+                    >
+                      Official profile <ExternalLink className="h-3 w-3" />
+                    </a>
+                  ) : null}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </AppShell>
+  );
+}
