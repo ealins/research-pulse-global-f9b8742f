@@ -636,10 +636,20 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     await supabaseAdmin.from("raw_records").update({ normalization_status: status, normalization_error: error }).eq("id", raw.id);
   };
 
+  const rawTitle = (raw.page_title ?? "").trim();
+
+  // Non-vacancy record types now have their own gates + extractors.
   if (raw.classification !== "VACANCY") {
-    await mark("SKIPPED", `unsupported record type for canonical extraction: ${raw.classification}`);
-    return { status: "SKIPPED", reason: `unsupported record type: ${raw.classification}` };
+    if (!rawTitle) {
+      await mark("SKIPPED", "no page title to extract from");
+      return { status: "SKIPPED", reason: "no page title" };
+    }
+    const { normalizeNonVacancy } = await import("./extraction/canonical.server");
+    const outcome = await normalizeNonVacancy(raw, rawTitle.split(/\s*[|·–—]\s*/)[0]?.trim() || rawTitle);
+    await mark(outcome.status, outcome.status === "NORMALIZED" ? null : (outcome.reason ?? null));
+    return outcome;
   }
+
   if (!raw.institution_id) {
     await mark("FAILED", "missing institution");
     return { status: "FAILED", reason: "missing institution" };

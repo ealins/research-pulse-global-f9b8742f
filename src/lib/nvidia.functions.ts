@@ -226,3 +226,117 @@ export const runVacancyExtractionTest = createServerFn({ method: "POST" })
 
     return { rows };
   });
+
+export type EntityTestRow = {
+  url: string;
+  title: string;
+  deterministic: string;
+  nemotron: string;
+  final: string;
+  confidence: number | null;
+  topics: string[];
+  dropped: string[];
+  error: string | null;
+};
+
+export type EntityKind = "PROJECT" | "PROGRAMME" | "RESEARCHER" | "EVENT";
+
+/**
+ * Controlled precision test per entity type. Runs stored pages through the
+ * deterministic gate and the extractor WITHOUT writing canonical records.
+ */
+export const runEntityExtractionTest = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input: { entity: EntityKind; limit?: number }) => input)
+  .handler(async ({ data, context }): Promise<{ rows: EntityTestRow[] }> => {
+    await assertAdmin(context as never);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const gating = await import("./llm-gating.server");
+    const entities = await import("./extraction/entities.server");
+
+    const limit = Math.min(12, Math.max(2, data.limit ?? 10));
+    const classifications = data.entity === "PROGRAMME" ? ["PROGRAMME", "COURSE"] : [data.entity];
+
+    const { data: pages } = await supabaseAdmin
+      .from("raw_records")
+      .select("id, source_id, final_url, page_title, text_content, classification, content_hash")
+      .in("classification", classifications)
+      .not("text_content", "is", null)
+      .order("fetched_at", { ascending: false })
+      .limit(limit);
+
+    const rows: EntityTestRow[] = [];
+    for (const raw of pages ?? []) {
+      const url = raw.final_url ?? "";
+      const rawTitle = (raw.page_title ?? "").trim();
+      const title = rawTitle.split(/\s*[|·–—]\s*/)[0]?.trim() || rawTitle;
+      const text = raw.text_content ?? "";
+
+      const gate =
+        data.entity === "PROJECT"
+          ? gating.projectGate(url, title, text)
+          : data.entity === "PROGRAMME"
+            ? gating.programmeGate(url, title, text)
+            : data.entity === "RESEARCHER"
+              ? gating.researcherGate(url, title, text)
+              : gating.eventGate(url, title, text);
+
+      if (!gate.ok) {
+        rows.push({
+          url,
+          title,
+          deterministic: `REJECTED — ${gate.reason}`,
+          nemotron: "not called (cost gate)",
+          final: "REJECTED",
+          confidence: null,
+          topics: [],
+          dropped: [],
+          error: null,
+        });
+        continue;
+      }
+
+      const input = {
+        url,
+        title,
+        text,
+        sourceId: raw.source_id,
+        rawRecordId: raw.id,
+        contentHash: raw.content_hash,
+      };
+      const out =
+        data.entity === "PROJECT"
+          ? await entities.extractProject(input)
+          : data.entity === "PROGRAMME"
+            ? await entities.extractProgramme(input)
+            : data.entity === "RESEARCHER"
+              ? await entities.extractResearcher(input)
+              : await entities.extractEvent(input);
+
+      const v = out.value as Record<string, unknown> | null;
+      const accepted =
+        v?.["is_single_real_project"] === true ||
+        v?.["is_single_real_programme"] === true ||
+        v?.["is_single_real_profile"] === true ||
+        v?.["is_single_real_event"] === true;
+      const label = (v?.["title"] as string) ?? (v?.["name"] as string) ?? (v?.["full_name"] as string) ?? "";
+
+      rows.push({
+        url,
+        title,
+        deterministic: "ACCEPTED — deterministic gate passed",
+        nemotron: v
+          ? accepted
+            ? `ACCEPTED${out.cached ? " (cached)" : ""} — ${label}`
+            : `REJECTED — ${(v["rejection_reason"] as string) ?? "not a single record"}`
+          : `unavailable — ${out.errorCode ?? "unknown"}`,
+        final: v ? (accepted ? "ACCEPTED" : "REJECTED") : "REJECTED (no usable extraction)",
+        confidence: typeof v?.["confidence"] === "number" ? (v["confidence"] as number) : null,
+        topics: Array.isArray(v?.["topics"]) ? (v["topics"] as string[]) : [],
+        dropped: out.droppedFields ?? [],
+        error: out.errorMessage,
+      });
+    }
+
+    return { rows };
+  });

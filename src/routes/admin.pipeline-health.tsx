@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getPipelineHealth, runDiscovery, runQueue, requeueDeadTasks } from "@/lib/pipeline.functions";
 import { NvidiaEnginePanel } from "@/components/admin/NvidiaEnginePanel";
+import { SchedulerPanel } from "@/components/admin/SchedulerPanel";
 
 export const Route = createFileRoute("/admin/pipeline-health")({
   head: () => ({
@@ -218,6 +219,8 @@ function PipelineHealthPage() {
             </section>
 
             <NvidiaEnginePanel />
+
+            <SchedulerPanel />
 
 
 

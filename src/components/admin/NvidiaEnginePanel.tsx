@@ -5,7 +5,22 @@ import { BrainCircuit, FlaskConical, Plug } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { getNvidiaStatus, runVacancyExtractionTest, testNvidiaConnection, type VacancyTestRow } from "@/lib/nvidia.functions";
+import {
+  getNvidiaStatus,
+  runEntityExtractionTest,
+  runVacancyExtractionTest,
+  testNvidiaConnection,
+  type EntityKind,
+  type EntityTestRow,
+  type VacancyTestRow,
+} from "@/lib/nvidia.functions";
+
+const ENTITY_TESTS: { kind: EntityKind; label: string }[] = [
+  { kind: "PROJECT", label: "Projects" },
+  { kind: "PROGRAMME", label: "Programmes" },
+  { kind: "RESEARCHER", label: "Researchers" },
+  { kind: "EVENT", label: "Events" },
+];
 
 function Metric({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "bad" | "warn" }) {
   const color =
@@ -23,8 +38,9 @@ export function NvidiaEnginePanel() {
   const status = useServerFn(getNvidiaStatus);
   const test = useServerFn(testNvidiaConnection);
   const runTest = useServerFn(runVacancyExtractionTest);
+  const runEntityTest = useServerFn(runEntityExtractionTest);
   const [busy, setBusy] = useState<string | null>(null);
-  const [rows, setRows] = useState<VacancyTestRow[] | null>(null);
+  const [rows, setRows] = useState<(VacancyTestRow | EntityTestRow)[] | null>(null);
 
   const { data, refetch, error } = useQuery({
     queryKey: ["nvidia-status"],
@@ -68,6 +84,20 @@ export function NvidiaEnginePanel() {
     }
   };
 
+  const onEntityTest = async (kind: EntityKind) => {
+    setBusy(kind);
+    try {
+      const result = await runEntityTest({ data: { entity: kind, limit: 10 } });
+      setRows(result.rows);
+      toast.success(`${kind.toLowerCase()} test finished`, { description: `${result.rows.length} pages evaluated` });
+      await refetch();
+    } catch (e) {
+      toast.error("Extraction test failed", { description: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
     <section className="rounded-xl border border-border/60 bg-card/40 p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -85,8 +115,13 @@ export function NvidiaEnginePanel() {
             <Plug className="mr-1.5 h-3.5 w-3.5" /> Test NVIDIA
           </Button>
           <Button size="sm" variant="outline" disabled={busy !== null} onClick={onPrecisionTest}>
-            <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Run 10-page test
+            <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> Vacancies: 10-page test
           </Button>
+          {ENTITY_TESTS.map((t) => (
+            <Button key={t.kind} size="sm" variant="outline" disabled={busy !== null} onClick={() => onEntityTest(t.kind)}>
+              <FlaskConical className="mr-1.5 h-3.5 w-3.5" /> {t.label}: 10-page test
+            </Button>
+          ))}
         </div>
       </div>
 
@@ -171,8 +206,8 @@ export function NvidiaEnginePanel() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.url} className="border-t border-border/40 align-top">
+              {rows.map((r, i) => (
+                <tr key={`${r.url}-${i}`} className="border-t border-border/40 align-top">
                   <td className="max-w-[22rem] px-3 py-2">
                     <p className="text-foreground">{r.title || "(untitled)"}</p>
                     <p className="break-all font-mono text-[10px] text-muted-foreground">{r.url}</p>
