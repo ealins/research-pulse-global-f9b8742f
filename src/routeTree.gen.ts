@@ -26,6 +26,7 @@ import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsSlugRouteImport } from './routes/jobs.$slug'
 import { Route as ProjectsSlugRouteImport } from './routes/projects.$slug'
+import { Route as PublicationsIdRouteImport } from './routes/publications.$id'
 import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
 import { Route as TopicsSlugRouteImport } from './routes/topics.$slug'
 
@@ -114,6 +115,11 @@ const ProjectsSlugRoute = ProjectsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => ProjectsRoute,
 } as any)
+const PublicationsIdRoute = PublicationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => PublicationsRoute,
+} as any)
 const ResearchersSlugRoute = ResearchersSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -136,13 +142,14 @@ export interface FileRoutesByFullPath {
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRouteWithChildren
-  '/publications': typeof PublicationsRoute
+  '/publications': typeof PublicationsRouteWithChildren
   '/researchers': typeof ResearchersRouteWithChildren
   '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
+  '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
 }
@@ -157,13 +164,14 @@ export interface FileRoutesByTo {
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRouteWithChildren
-  '/publications': typeof PublicationsRoute
+  '/publications': typeof PublicationsRouteWithChildren
   '/researchers': typeof ResearchersRouteWithChildren
   '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
+  '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
 }
@@ -179,13 +187,14 @@ export interface FileRoutesById {
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRouteWithChildren
-  '/publications': typeof PublicationsRoute
+  '/publications': typeof PublicationsRouteWithChildren
   '/researchers': typeof ResearchersRouteWithChildren
   '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
+  '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
 }
@@ -209,6 +218,7 @@ export interface FileRouteTypes {
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/projects/$slug'
+    | '/publications/$id'
     | '/researchers/$slug'
     | '/topics/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/projects/$slug'
+    | '/publications/$id'
     | '/researchers/$slug'
     | '/topics/$slug'
   id:
@@ -251,6 +262,7 @@ export interface FileRouteTypes {
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/projects/$slug'
+    | '/publications/$id'
     | '/researchers/$slug'
     | '/topics/$slug'
   fileRoutesById: FileRoutesById
@@ -266,7 +278,7 @@ export interface RootRouteChildren {
   MethodologyRoute: typeof MethodologyRoute
   ProgrammesRoute: typeof ProgrammesRoute
   ProjectsRoute: typeof ProjectsRouteWithChildren
-  PublicationsRoute: typeof PublicationsRoute
+  PublicationsRoute: typeof PublicationsRouteWithChildren
   ResearchersRoute: typeof ResearchersRouteWithChildren
   TopicsRoute: typeof TopicsRouteWithChildren
   TrendsRoute: typeof TrendsRoute
@@ -393,6 +405,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectsSlugRouteImport
       parentRoute: typeof ProjectsRoute
     }
+    '/publications/$id': {
+      id: '/publications/$id'
+      path: '/$id'
+      fullPath: '/publications/$id'
+      preLoaderRoute: typeof PublicationsIdRouteImport
+      parentRoute: typeof PublicationsRoute
+    }
     '/researchers/$slug': {
       id: '/researchers/$slug'
       path: '/$slug'
@@ -444,6 +463,18 @@ const ProjectsRouteWithChildren = ProjectsRoute._addFileChildren(
   ProjectsRouteChildren,
 )
 
+interface PublicationsRouteChildren {
+  PublicationsIdRoute: typeof PublicationsIdRoute
+}
+
+const PublicationsRouteChildren: PublicationsRouteChildren = {
+  PublicationsIdRoute: PublicationsIdRoute,
+}
+
+const PublicationsRouteWithChildren = PublicationsRoute._addFileChildren(
+  PublicationsRouteChildren,
+)
+
 interface ResearchersRouteChildren {
   ResearchersSlugRoute: typeof ResearchersSlugRoute
 }
@@ -478,7 +509,7 @@ const rootRouteChildren: RootRouteChildren = {
   MethodologyRoute: MethodologyRoute,
   ProgrammesRoute: ProgrammesRoute,
   ProjectsRoute: ProjectsRouteWithChildren,
-  PublicationsRoute: PublicationsRoute,
+  PublicationsRoute: PublicationsRouteWithChildren,
   ResearchersRoute: ResearchersRouteWithChildren,
   TopicsRoute: TopicsRouteWithChildren,
   TrendsRoute: TrendsRoute,
