@@ -349,7 +349,11 @@ export async function importInstitutionPublications(
 
       let pubId = existingId;
       if (existingId) {
-        await supabaseAdmin.from("publications").update(payloadRow as never).eq("id", existingId);
+        // Never re-point an existing publication at the importing institution —
+        // co-authored works keep their first canonical owner; the extra
+        // affiliation is recorded through publication_institutions instead.
+        const { institution_id: _ignored, ...updateRow } = payloadRow;
+        await supabaseAdmin.from("publications").update(updateRow as never).eq("id", existingId);
         out.updated += 1;
       } else {
         const { data, error } = await supabaseAdmin
