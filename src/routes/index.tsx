@@ -168,7 +168,14 @@ function AcademicPulse() {
       />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
-        <section className="grid-lines rounded-lg border border-border/70 bg-card/40 px-4 py-6 md:px-10">
+        <section className="panel signal-wash p-6 text-center">
+          <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
+            Every record links back to an official source and carries a verification status.
+            Nothing here is inferred.
+          </p>
+        </section>
+
+        <section className="grid-lines mt-8 rounded-lg border border-border/70 bg-card/40 px-4 py-6 md:px-10">
           <p className="mx-auto max-w-xl text-center text-xs leading-relaxed text-muted-foreground">
             The centre is the sourced world: every mapped institution, green where a call is live.
             The rings are the three ways in — pick a spoke to enter that part of the record.
@@ -201,7 +208,7 @@ function AcademicPulse() {
               Latest signals
             </h2>
             <span className="mono-num text-xs text-muted-foreground">
-              {events?.length ?? 0} entries
+              {(events?.length ?? 0) > 0 ? `${events?.length} entries` : <EmptyState variant="badge" />}
             </span>
           </div>
 
@@ -269,7 +276,9 @@ function AcademicPulse() {
           )}
 
           {!isLoading && !error && (events?.length ?? 0) === 0 ? (
-            <p className="mt-4 text-sm text-muted-foreground">No signals recorded yet.</p>
+            <div className="mt-4">
+              <EmptyState />
+            </div>
           ) : null}
         </section>
       </div>

@@ -31,7 +31,11 @@ export function CategoryTabs({
         >
           <span>{t.label}</span>
           {typeof t.count === "number" ? (
-            <span className="mono-num text-[0.65rem] opacity-70">{t.count}</span>
+            t.count === 0 ? (
+              <EmptyState variant="badge" />
+            ) : (
+              <span className="mono-num text-[0.65rem] opacity-70">{t.count}</span>
+            )
           ) : null}
         </button>
       ))}

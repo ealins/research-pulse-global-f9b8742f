@@ -117,14 +117,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
 
-        <div className="hidden px-5 pb-6 lg:block">
-          <div className="panel signal-wash p-3">
-            <p className="text-[0.68rem] leading-relaxed text-muted-foreground">
-              Every record links back to an official source and carries a verification status.
-              Nothing here is inferred.
-            </p>
-          </div>
-        </div>
       </aside>
 
       <div className="min-w-0">{children}</div>
@@ -167,6 +159,10 @@ export function PageHeader({
   );
 }
 
+function isEmptyStat(value: string | number): boolean {
+  return value === "—" || value === 0 || value === "0";
+}
+
 export function StatTile({
   label,
   value,
@@ -186,13 +182,20 @@ export function StatTile({
         : tone === "growth"
           ? "text-growth"
           : "text-primary";
+  const empty = isEmptyStat(value);
   return (
     <div className="panel panel-hover rise-in p-4">
       <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
-      <p className={`mono-num mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
-      {hint ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      {empty ? (
+        <div className="mt-2">
+          <EmptyState variant="compact" />
+        </div>
+      ) : (
+        <p className={`mono-num mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
+      )}
+      {hint && !empty ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }
