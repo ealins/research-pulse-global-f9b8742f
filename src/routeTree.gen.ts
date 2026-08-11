@@ -18,6 +18,7 @@ import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as ProgrammesRouteImport } from './routes/programmes'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
+import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
 import { Route as InstitutionsIndexRouteImport } from './routes/institutions.index'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
@@ -74,6 +75,11 @@ const TrendsRoute = TrendsRouteImport.update({
 const CountriesIndexRoute = CountriesIndexRouteImport.update({
   id: '/countries/',
   path: '/countries/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CountriesSlugRoute = CountriesSlugRouteImport.update({
+  id: '/countries/$slug',
+  path: '/countries/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstitutionsIndexRoute = InstitutionsIndexRouteImport.update({
@@ -146,6 +152,7 @@ export interface FileRoutesByFullPath {
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
+  '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
@@ -169,6 +176,7 @@ export interface FileRoutesByTo {
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
+  '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
@@ -193,6 +201,7 @@ export interface FileRoutesById {
   '/methodology': typeof MethodologyRoute
   '/programmes': typeof ProgrammesRoute
   '/trends': typeof TrendsRoute
+  '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
@@ -218,6 +227,7 @@ export interface FileRouteTypes {
     | '/methodology'
     | '/programmes'
     | '/trends'
+    | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/projects/$slug'
@@ -241,6 +251,7 @@ export interface FileRouteTypes {
     | '/methodology'
     | '/programmes'
     | '/trends'
+    | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/projects/$slug'
@@ -264,6 +275,7 @@ export interface FileRouteTypes {
     | '/methodology'
     | '/programmes'
     | '/trends'
+    | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/projects/$slug'
@@ -288,6 +300,7 @@ export interface RootRouteChildren {
   MethodologyRoute: typeof MethodologyRoute
   ProgrammesRoute: typeof ProgrammesRoute
   TrendsRoute: typeof TrendsRoute
+  CountriesSlugRoute: typeof CountriesSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
   JobsSlugRoute: typeof JobsSlugRoute
   ProjectsSlugRoute: typeof ProjectsSlugRoute
@@ -366,6 +379,13 @@ declare module '@tanstack/react-router' {
       path: '/countries'
       fullPath: '/countries/'
       preLoaderRoute: typeof CountriesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/countries/$slug': {
+      id: '/countries/$slug'
+      path: '/countries/$slug'
+      fullPath: '/countries/$slug'
+      preLoaderRoute: typeof CountriesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/institutions/': {
@@ -464,6 +484,7 @@ const rootRouteChildren: RootRouteChildren = {
   MethodologyRoute: MethodologyRoute,
   ProgrammesRoute: ProgrammesRoute,
   TrendsRoute: TrendsRoute,
+  CountriesSlugRoute: CountriesSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,
   JobsSlugRoute: JobsSlugRoute,
   ProjectsSlugRoute: ProjectsSlugRoute,
