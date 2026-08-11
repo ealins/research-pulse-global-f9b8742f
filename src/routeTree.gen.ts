@@ -12,12 +12,14 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AtlasRouteImport } from './routes/atlas'
 import { Route as CollaborationRouteImport } from './routes/collaboration'
-import { Route as EventsRouteImport } from './routes/events'
 import { Route as MatcherRouteImport } from './routes/matcher'
 import { Route as MethodologyRouteImport } from './routes/methodology'
+import { Route as TopRouteImport } from './routes/top'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
 import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
+import { Route as EventsIndexRouteImport } from './routes/events.index'
+import { Route as EventsSlugRouteImport } from './routes/events.$slug'
 import { Route as InstitutionsIndexRouteImport } from './routes/institutions.index'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
@@ -48,11 +50,6 @@ const CollaborationRoute = CollaborationRouteImport.update({
   path: '/collaboration',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EventsRoute = EventsRouteImport.update({
-  id: '/events',
-  path: '/events',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const MatcherRoute = MatcherRouteImport.update({
   id: '/matcher',
   path: '/matcher',
@@ -61,6 +58,11 @@ const MatcherRoute = MatcherRouteImport.update({
 const MethodologyRoute = MethodologyRouteImport.update({
   id: '/methodology',
   path: '/methodology',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TopRoute = TopRouteImport.update({
+  id: '/top',
+  path: '/top',
   getParentRoute: () => rootRouteImport,
 } as any)
 const TrendsRoute = TrendsRouteImport.update({
@@ -76,6 +78,16 @@ const CountriesIndexRoute = CountriesIndexRouteImport.update({
 const CountriesSlugRoute = CountriesSlugRouteImport.update({
   id: '/countries/$slug',
   path: '/countries/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsIndexRoute = EventsIndexRouteImport.update({
+  id: '/events/',
+  path: '/events/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EventsSlugRoute = EventsSlugRouteImport.update({
+  id: '/events/$slug',
+  path: '/events/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const InstitutionsIndexRoute = InstitutionsIndexRouteImport.update({
@@ -153,11 +165,12 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
   '/collaboration': typeof CollaborationRoute
-  '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
+  '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/programmes/$slug': typeof ProgrammesSlugRoute
@@ -166,6 +179,7 @@ export interface FileRoutesByFullPath {
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
   '/countries/': typeof CountriesIndexRoute
+  '/events/': typeof EventsIndexRoute
   '/institutions/': typeof InstitutionsIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/programmes/': typeof ProgrammesIndexRoute
@@ -178,11 +192,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
   '/collaboration': typeof CollaborationRoute
-  '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
+  '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/programmes/$slug': typeof ProgrammesSlugRoute
@@ -191,6 +206,7 @@ export interface FileRoutesByTo {
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
   '/countries': typeof CountriesIndexRoute
+  '/events': typeof EventsIndexRoute
   '/institutions': typeof InstitutionsIndexRoute
   '/jobs': typeof JobsIndexRoute
   '/programmes': typeof ProgrammesIndexRoute
@@ -204,11 +220,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/atlas': typeof AtlasRoute
   '/collaboration': typeof CollaborationRoute
-  '/events': typeof EventsRoute
   '/matcher': typeof MatcherRoute
   '/methodology': typeof MethodologyRoute
+  '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
   '/countries/$slug': typeof CountriesSlugRoute
+  '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/programmes/$slug': typeof ProgrammesSlugRoute
@@ -217,6 +234,7 @@ export interface FileRoutesById {
   '/researchers/$slug': typeof ResearchersSlugRoute
   '/topics/$slug': typeof TopicsSlugRoute
   '/countries/': typeof CountriesIndexRoute
+  '/events/': typeof EventsIndexRoute
   '/institutions/': typeof InstitutionsIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/programmes/': typeof ProgrammesIndexRoute
@@ -231,11 +249,12 @@ export interface FileRouteTypes {
     | '/'
     | '/atlas'
     | '/collaboration'
-    | '/events'
     | '/matcher'
     | '/methodology'
+    | '/top'
     | '/trends'
     | '/countries/$slug'
+    | '/events/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/programmes/$slug'
@@ -244,6 +263,7 @@ export interface FileRouteTypes {
     | '/researchers/$slug'
     | '/topics/$slug'
     | '/countries/'
+    | '/events/'
     | '/institutions/'
     | '/jobs/'
     | '/programmes/'
@@ -256,11 +276,12 @@ export interface FileRouteTypes {
     | '/'
     | '/atlas'
     | '/collaboration'
-    | '/events'
     | '/matcher'
     | '/methodology'
+    | '/top'
     | '/trends'
     | '/countries/$slug'
+    | '/events/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/programmes/$slug'
@@ -269,6 +290,7 @@ export interface FileRouteTypes {
     | '/researchers/$slug'
     | '/topics/$slug'
     | '/countries'
+    | '/events'
     | '/institutions'
     | '/jobs'
     | '/programmes'
@@ -281,11 +303,12 @@ export interface FileRouteTypes {
     | '/'
     | '/atlas'
     | '/collaboration'
-    | '/events'
     | '/matcher'
     | '/methodology'
+    | '/top'
     | '/trends'
     | '/countries/$slug'
+    | '/events/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/programmes/$slug'
@@ -294,6 +317,7 @@ export interface FileRouteTypes {
     | '/researchers/$slug'
     | '/topics/$slug'
     | '/countries/'
+    | '/events/'
     | '/institutions/'
     | '/jobs/'
     | '/programmes/'
@@ -307,11 +331,12 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AtlasRoute: typeof AtlasRoute
   CollaborationRoute: typeof CollaborationRoute
-  EventsRoute: typeof EventsRoute
   MatcherRoute: typeof MatcherRoute
   MethodologyRoute: typeof MethodologyRoute
+  TopRoute: typeof TopRoute
   TrendsRoute: typeof TrendsRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
+  EventsSlugRoute: typeof EventsSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
   JobsSlugRoute: typeof JobsSlugRoute
   ProgrammesSlugRoute: typeof ProgrammesSlugRoute
@@ -320,6 +345,7 @@ export interface RootRouteChildren {
   ResearchersSlugRoute: typeof ResearchersSlugRoute
   TopicsSlugRoute: typeof TopicsSlugRoute
   CountriesIndexRoute: typeof CountriesIndexRoute
+  EventsIndexRoute: typeof EventsIndexRoute
   InstitutionsIndexRoute: typeof InstitutionsIndexRoute
   JobsIndexRoute: typeof JobsIndexRoute
   ProgrammesIndexRoute: typeof ProgrammesIndexRoute
@@ -352,13 +378,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CollaborationRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/events': {
-      id: '/events'
-      path: '/events'
-      fullPath: '/events'
-      preLoaderRoute: typeof EventsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/matcher': {
       id: '/matcher'
       path: '/matcher'
@@ -371,6 +390,13 @@ declare module '@tanstack/react-router' {
       path: '/methodology'
       fullPath: '/methodology'
       preLoaderRoute: typeof MethodologyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/top': {
+      id: '/top'
+      path: '/top'
+      fullPath: '/top'
+      preLoaderRoute: typeof TopRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/trends': {
@@ -392,6 +418,20 @@ declare module '@tanstack/react-router' {
       path: '/countries/$slug'
       fullPath: '/countries/$slug'
       preLoaderRoute: typeof CountriesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/': {
+      id: '/events/'
+      path: '/events'
+      fullPath: '/events/'
+      preLoaderRoute: typeof EventsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/events/$slug': {
+      id: '/events/$slug'
+      path: '/events/$slug'
+      fullPath: '/events/$slug'
+      preLoaderRoute: typeof EventsSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/institutions/': {
@@ -499,11 +539,12 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtlasRoute: AtlasRoute,
   CollaborationRoute: CollaborationRoute,
-  EventsRoute: EventsRoute,
   MatcherRoute: MatcherRoute,
   MethodologyRoute: MethodologyRoute,
+  TopRoute: TopRoute,
   TrendsRoute: TrendsRoute,
   CountriesSlugRoute: CountriesSlugRoute,
+  EventsSlugRoute: EventsSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,
   JobsSlugRoute: JobsSlugRoute,
   ProgrammesSlugRoute: ProgrammesSlugRoute,
@@ -512,6 +553,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResearchersSlugRoute: ResearchersSlugRoute,
   TopicsSlugRoute: TopicsSlugRoute,
   CountriesIndexRoute: CountriesIndexRoute,
+  EventsIndexRoute: EventsIndexRoute,
   InstitutionsIndexRoute: InstitutionsIndexRoute,
   JobsIndexRoute: JobsIndexRoute,
   ProgrammesIndexRoute: ProgrammesIndexRoute,

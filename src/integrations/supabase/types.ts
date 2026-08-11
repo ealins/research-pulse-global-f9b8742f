@@ -538,6 +538,7 @@ export type Database = {
           country: string | null
           created_at: string
           end_date: string | null
+          event_kind: string
           id: string
           is_demo: boolean
           last_verified_at: string | null
@@ -561,6 +562,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           end_date?: string | null
+          event_kind?: string
           id?: string
           is_demo?: boolean
           last_verified_at?: string | null
@@ -584,6 +586,7 @@ export type Database = {
           country?: string | null
           created_at?: string
           end_date?: string | null
+          event_kind?: string
           id?: string
           is_demo?: boolean
           last_verified_at?: string | null
@@ -728,6 +731,7 @@ export type Database = {
           dedupe_key: string | null
           department_id: string | null
           description: string | null
+          employer_name: string | null
           first_discovered_at: string
           funding_type: string | null
           id: string
@@ -742,6 +746,8 @@ export type Database = {
           requirements: string | null
           research_group_id: string | null
           salary_text: string | null
+          sector: string
+          seniority: string | null
           slug: string
           start_date: string | null
           status: Database["public"]["Enums"]["opportunity_status"]
@@ -762,6 +768,7 @@ export type Database = {
           dedupe_key?: string | null
           department_id?: string | null
           description?: string | null
+          employer_name?: string | null
           first_discovered_at?: string
           funding_type?: string | null
           id?: string
@@ -776,6 +783,8 @@ export type Database = {
           requirements?: string | null
           research_group_id?: string | null
           salary_text?: string | null
+          sector?: string
+          seniority?: string | null
           slug: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["opportunity_status"]
@@ -796,6 +805,7 @@ export type Database = {
           dedupe_key?: string | null
           department_id?: string | null
           description?: string | null
+          employer_name?: string | null
           first_discovered_at?: string
           funding_type?: string | null
           id?: string
@@ -810,6 +820,8 @@ export type Database = {
           requirements?: string | null
           research_group_id?: string | null
           salary_text?: string | null
+          sector?: string
+          seniority?: string | null
           slug?: string
           start_date?: string | null
           status?: Database["public"]["Enums"]["opportunity_status"]

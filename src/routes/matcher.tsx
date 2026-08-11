@@ -13,21 +13,29 @@ import {
   topicsQuery,
 } from "@/lib/radar-queries";
 import { Slider } from "@/components/ui/slider";
+import { CategoryTabs } from "@/components/CategoryTabs";
+import { SECTOR_LABEL } from "@/lib/relevance-queries";
+import { Link } from "@tanstack/react-router";
+
+type MatchMode = "academic" | "industry";
 
 export const Route = createFileRoute("/matcher")({
+  validateSearch: (search: Record<string, unknown>): { mode: MatchMode } => ({
+    mode: search["mode"] === "industry" ? "industry" : "academic",
+  }),
   head: () => ({
     meta: [
-      { title: "PhD Matcher — GeoAcademic Radar" },
+      { title: "Matcher — academic & industry fit | GeoAcademic Radar" },
       {
         name: "description",
         content:
-          "Weight your research interests and see which tracked PhD and research positions in photogrammetry, remote sensing and geoinformatics fit best.",
+          "Weight your interests once, then switch between academic fit (PhD, postdoc, research staff) and industry fit (engineering, data science, product) across tracked geospatial positions.",
       },
-      { property: "og:title", content: "PhD Matcher — GeoAcademic Radar" },
+      { property: "og:title", content: "Matcher — academic & industry fit" },
       {
         property: "og:description",
         content:
-          "Rank open doctoral positions against your weighted research interests, with transparent scoring.",
+          "Rank open academic and industry positions against your weighted interests, with transparent arithmetic scoring.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -38,9 +46,13 @@ export const Route = createFileRoute("/matcher")({
 
 const OPEN_STATUSES = new Set(["open", "closing_soon", "rolling", "possibly_open"]);
 
+const ACADEMIC_TYPES = new Set(["phd", "doctoral_researcher", "postdoc", "research_assistant"]);
+
 function MatcherPage() {
   const { data: topics } = useQuery(topicsQuery);
   const { data: opportunities } = useQuery(opportunitiesQuery);
+  const { mode } = Route.useSearch();
+  const navigate = Route.useNavigate();
 
   const [weights, setWeights] = useState<Record<string, number>>({});
   const [openOnly, setOpenOnly] = useState(true);
@@ -48,10 +60,13 @@ function MatcherPage() {
   const selected = Object.entries(weights).filter(([, w]) => w > 0);
   const totalWeight = selected.reduce((sum, [, w]) => sum + w, 0);
 
+  const pool = useMemo(
+    () => (opportunities ?? []).filter((o) => o.sector === mode),
+    [opportunities, mode],
+  );
+
   const ranked = useMemo(() => {
-    const rows = (opportunities ?? []).filter(
-      (o) => !openOnly || OPEN_STATUSES.has(o.status),
-    );
+    const rows = pool.filter((o) => !openOnly || OPEN_STATUSES.has(o.status));
     if (!totalWeight) return [];
     return rows
       .map((o) => {
@@ -60,12 +75,19 @@ function MatcherPage() {
         );
         const matched = selected.filter(([slug]) => slugs.has(slug));
         const raw = matched.reduce((sum, [, w]) => sum + w, 0);
-        const fit = Math.round((raw / totalWeight) * 100);
+        // Academic fit rewards research-track roles; industry fit rewards named employers
+        // and stated seniority, since those signal a real production role.
+        const bonus =
+          mode === "academic"
+            ? (ACADEMIC_TYPES.has(o.opportunity_type) ? 0.08 : 0) +
+              (o.supervisor_name ? 0.04 : 0)
+            : (o.employer_name ? 0.06 : 0) + (o.seniority ? 0.06 : 0);
+        const fit = Math.min(100, Math.round((raw / totalWeight) * 100 * (1 + bonus)));
         return { o, fit, matched: matched.map(([slug]) => slug) };
       })
       .filter((r) => r.fit > 0)
       .sort((a, b) => b.fit - a.fit || (daysUntil(a.o.application_deadline) ?? 999) - (daysUntil(b.o.application_deadline) ?? 999));
-  }, [opportunities, openOnly, selected, totalWeight]);
+  }, [pool, openOnly, selected, totalWeight, mode]);
 
   const topicName = (slug: string) => topics?.find((t) => t.slug === slug)?.name ?? slug;
 
@@ -73,14 +95,35 @@ function MatcherPage() {
     <AppShell>
       <PageHeader
         eyebrow="Personal fit"
-        title="PhD Matcher"
-        description="Set a weight for each research interest. Positions are ranked by the share of your weighted interests they actually cover — the score is arithmetic on tracked topic links, not a hidden model."
+        title="Matcher"
+        description="Set a weight for each interest once, then compare two career tracks. Positions are ranked by the share of your weighted interests they actually cover, with a small track-specific bonus — arithmetic on tracked topic links, not a hidden model."
       />
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        <CategoryTabs
+          className="mb-6"
+          tabs={[
+            {
+              key: "academic",
+              label: "Academic fit",
+              count: (opportunities ?? []).filter((o) => o.sector === "academic").length,
+            },
+            {
+              key: "industry",
+              label: "Industry fit",
+              count: (opportunities ?? []).filter((o) => o.sector === "industry").length,
+            },
+          ]}
+          active={mode}
+          onSelect={(key) => navigate({ search: { mode: key as MatchMode } })}
+        />
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile label="Interests weighted" value={selected.length} tone="signal" />
           <StatTile label="Weight total" value={totalWeight} />
-          <StatTile label="Positions matched" value={ranked.length} tone="growth" />
+          <StatTile
+            label={mode === "academic" ? "Academic calls matched" : "Industry roles matched"}
+            value={ranked.length}
+            tone="growth"
+          />
           <StatTile
             label="Best fit"
             value={ranked[0] ? `${ranked[0].fit}%` : "—"}
@@ -144,8 +187,9 @@ function MatcherPage() {
               </div>
             ) : ranked.length === 0 ? (
               <div className="panel p-14 text-center text-sm text-muted-foreground">
-                No tracked position covers those interests right now. Widen your weights or turn off
-                “only live calls”.
+                No tracked {mode === "academic" ? "academic call" : "industry role"} covers those
+                interests right now. Widen your weights, switch track, or turn off “only live
+                calls”.
               </div>
             ) : (
               <ul className="space-y-2.5">
@@ -162,12 +206,20 @@ function MatcherPage() {
                             <span className="text-muted-foreground">
                               {TYPE_LABEL[o.opportunity_type] ?? o.opportunity_type}
                             </span>
+                            <span className="text-signal">{SECTOR_LABEL[o.sector] ?? o.sector}</span>
+                            {o.seniority ? (
+                              <span className="text-muted-foreground">{o.seniority}</span>
+                            ) : null}
                           </div>
-                          <h3 className="mt-2 text-[0.95rem] font-semibold text-foreground">
+                          <Link
+                            to="/jobs/$slug"
+                            params={{ slug: o.slug }}
+                            className="mt-2 block text-[0.95rem] font-semibold text-foreground hover:text-primary"
+                          >
                             {o.title}
-                          </h3>
+                          </Link>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            {o.institutions?.name ?? "Institution not stated"} ·{" "}
+                            {o.institutions?.name ?? o.employer_name ?? "Employer not stated"} ·{" "}
                             {[o.city, o.country].filter(Boolean).join(", ") || "Location not stated"}
                           </p>
                         </div>
@@ -204,7 +256,11 @@ function MatcherPage() {
                           Deadline: {formatDate(o.application_deadline)}
                           {days !== null && days >= 0 ? ` (${days} d left)` : ""}
                         </span>
-                        <span>{o.supervisor_name ?? "Supervisor not stated"}</span>
+                        <span>
+                          {mode === "academic"
+                            ? (o.supervisor_name ?? "Supervisor not stated")
+                            : (o.employer_name ?? "Employer not stated")}
+                        </span>
                         <span>{o.funding_type ?? "Funding not stated"}</span>
                       </div>
 

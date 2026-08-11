@@ -11,22 +11,34 @@ import {
   formatDate,
   opportunitiesQuery,
 } from "@/lib/radar-queries";
+import { CategoryTabs } from "@/components/CategoryTabs";
+import { SECTOR_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type JobSector = "academic" | "industry" | "all";
+
 export const Route = createFileRoute("/jobs/")({
+  validateSearch: (search: Record<string, unknown>): { sector: JobSector } => ({
+    sector:
+      search["sector"] === "industry"
+        ? "industry"
+        : search["sector"] === "all"
+          ? "all"
+          : "academic",
+  }),
   head: () => ({
     meta: [
-      { title: "Jobs & PhD Radar — GeoAcademic Radar" },
+      { title: "Academic & industry jobs — GeoAcademic Radar" },
       {
         name: "description",
         content:
-          "PhD positions, doctoral researcher posts, postdocs and research assistant jobs in photogrammetry, remote sensing and geoinformatics — each with deadline, supervisor and official source link.",
+          "Academic vacancies (PhD, postdoc, research staff) and industry roles at geospatial employers in photogrammetry, remote sensing and geoinformatics, each with deadline and official source link.",
       },
-      { property: "og:title", content: "Jobs & PhD Radar — GeoAcademic Radar" },
+      { property: "og:title", content: "Academic & industry jobs — GeoAcademic Radar" },
       {
         property: "og:description",
         content:
-          "Academic vacancies in photogrammetry, remote sensing and geoinformatics, with deadlines and official source links.",
+          "Two career tracks in one radar: academic vacancies and industry roles across photogrammetry, remote sensing and geoinformatics.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -46,28 +58,55 @@ const STATUS_TONE: Record<string, string> = {
 
 function JobsPage() {
   const { data, isLoading, error } = useQuery(opportunitiesQuery);
+  const { sector } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [status, setStatus] = useState<string>("live");
   const [type, setType] = useState<string>("all");
   const [country, setCountry] = useState<string>("all");
+  const [seniority, setSeniority] = useState<string>("all");
   const [q, setQ] = useState("");
 
+  const sectorRows = useMemo(
+    () => (data ?? []).filter((o) => sector === "all" || o.sector === sector),
+    [data, sector],
+  );
+
+  const sectorTabs = useMemo(() => {
+    const academic = (data ?? []).filter((o) => o.sector === "academic").length;
+    const industry = (data ?? []).filter((o) => o.sector === "industry").length;
+    return [
+      { key: "academic", label: "Academic track", count: academic },
+      { key: "industry", label: "Industry track", count: industry },
+      { key: "all", label: "Both tracks", count: data?.length ?? 0 },
+    ];
+  }, [data]);
+
+  const seniorities = useMemo(
+    () =>
+      Array.from(new Set(sectorRows.map((o) => o.seniority).filter(Boolean) as string[])).sort(),
+    [sectorRows],
+  );
+
   const countries = useMemo(
-    () => Array.from(new Set((data ?? []).map((o) => o.country).filter(Boolean) as string[])).sort(),
-    [data],
+    () => Array.from(new Set(sectorRows.map((o) => o.country).filter(Boolean) as string[])).sort(),
+    [sectorRows],
   );
 
   const rows = useMemo(() => {
     const live = ["open", "closing_soon", "rolling", "possibly_open"];
-    return (data ?? []).filter((o) => {
+    return sectorRows.filter((o) => {
       if (status === "live" && !live.includes(o.status)) return false;
       if (status !== "live" && status !== "all" && o.status !== status) return false;
       if (type !== "all" && o.opportunity_type !== type) return false;
       if (country !== "all" && o.country !== country) return false;
+      if (seniority !== "all" && o.seniority !== seniority) return false;
       if (q.trim()) {
         const hay = [
           o.title,
           o.description,
           o.supervisor_name,
+          o.employer_name,
+          o.seniority,
           o.institutions?.name,
           ...o.opportunity_topics.map((t) => t.research_topics?.name),
         ]
@@ -78,35 +117,48 @@ function JobsPage() {
       }
       return true;
     });
-  }, [data, status, type, country, q]);
+  }, [sectorRows, status, type, country, seniority, q]);
 
-  const closingSoon = (data ?? []).filter((o) => o.status === "closing_soon").length;
-  const openNow = (data ?? []).filter((o) => o.status === "open").length;
-  const withDeadline = (data ?? []).filter(
+  const closingSoon = sectorRows.filter((o) => o.status === "closing_soon").length;
+  const openNow = sectorRows.filter((o) => o.status === "open").length;
+  const withDeadline = sectorRows.filter(
     (o) => (daysUntil(o.application_deadline) ?? -1) >= 0,
   ).length;
+  const employers = new Set(
+    sectorRows.map((o) => o.employer_name ?? o.institutions?.name).filter(Boolean),
+  ).size;
 
   return (
     <AppShell>
       <PageHeader
-        eyebrow="Opportunity radar"
-        title="Jobs & PhD positions"
-        description="Doctoral, postdoctoral and research staff vacancies across photogrammetry, remote sensing and geoinformatics. Statuses are deliberately cautious — a position is only 'open' when the source says so."
+        eyebrow="Career radar"
+        title="Academic & industry jobs"
+        description="Two tracks, one radar: doctoral, postdoctoral and research staff vacancies on the academic side, and engineering, data science and product roles at geospatial employers on the industry side. Statuses stay cautious — a position is only 'open' when the source says so."
       />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        <CategoryTabs
+          tabs={sectorTabs}
+          active={sector}
+          onSelect={(key) => navigate({ search: { sector: key as JobSector } })}
+          className="mb-6"
+        />
+
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile label="Open now" value={openNow} tone="growth" />
           <StatTile label="Closing soon" value={closingSoon} tone="deadline" hint="Within 14 days" />
           <StatTile label="Dated calls" value={withDeadline} tone="signal" />
-          <StatTile label="Tracked total" value={data?.length ?? "—"} />
+          <StatTile
+            label={sector === "industry" ? "Employers" : "Institutions & employers"}
+            value={employers || "—"}
+          />
         </section>
 
         <section className="panel mt-8 p-4">
           <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
             <Filter className="h-3.5 w-3.5" /> Filters
           </div>
-          <div className="mt-3 grid gap-3 md:grid-cols-4">
+          <div className="mt-3 grid gap-3 md:grid-cols-5">
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
@@ -127,6 +179,14 @@ function JobsPage() {
               {Object.entries(TYPE_LABEL).map(([v, l]) => (
                 <option key={v} value={v}>
                   {l}
+                </option>
+              ))}
+            </Select>
+            <Select value={seniority} onChange={setSeniority} label="Level">
+              <option value="all">All levels</option>
+              {seniorities.map((s) => (
+                <option key={s} value={s}>
+                  {s}
                 </option>
               ))}
             </Select>
@@ -168,6 +228,14 @@ function JobsPage() {
                     <span className="rounded-full border border-border bg-muted/50 px-2.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
                       {TYPE_LABEL[o.opportunity_type] ?? o.opportunity_type}
                     </span>
+                    <span className="rounded-full border border-signal/40 bg-signal/10 px-2.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-signal">
+                      {SECTOR_LABEL[o.sector] ?? o.sector}
+                    </span>
+                    {o.seniority ? (
+                      <span className="rounded-full border border-border bg-muted/40 px-2.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-muted-foreground">
+                        {o.seniority}
+                      </span>
+                    ) : null}
                     <ProvenanceChips
                       verification={o.verification_status}
                       confidence={o.confidence}
@@ -184,7 +252,7 @@ function JobsPage() {
                   </Link>
 
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {o.institutions?.name ?? "Institution not stated"}
+                    {o.institutions?.name ?? o.employer_name ?? "Employer not stated"}
                   </p>
 
                   {o.description ? (
