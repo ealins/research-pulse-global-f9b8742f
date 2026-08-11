@@ -22,6 +22,7 @@ import { Route as PublicationsRouteImport } from './routes/publications'
 import { Route as ResearchersRouteImport } from './routes/researchers'
 import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
+import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +89,11 @@ const InstitutionsSlugRoute = InstitutionsSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => InstitutionsRoute,
 } as any)
+const ResearchersSlugRoute = ResearchersSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => ResearchersRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -100,9 +106,10 @@ export interface FileRoutesByFullPath {
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
-  '/researchers': typeof ResearchersRoute
+  '/researchers': typeof ResearchersRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
+  '/researchers/$slug': typeof ResearchersSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -115,9 +122,10 @@ export interface FileRoutesByTo {
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
-  '/researchers': typeof ResearchersRoute
+  '/researchers': typeof ResearchersRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
+  '/researchers/$slug': typeof ResearchersSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -131,9 +139,10 @@ export interface FileRoutesById {
   '/programmes': typeof ProgrammesRoute
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
-  '/researchers': typeof ResearchersRoute
+  '/researchers': typeof ResearchersRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
+  '/researchers/$slug': typeof ResearchersSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,6 +160,7 @@ export interface FileRouteTypes {
     | '/researchers'
     | '/trends'
     | '/institutions/$slug'
+    | '/researchers/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,6 +176,7 @@ export interface FileRouteTypes {
     | '/researchers'
     | '/trends'
     | '/institutions/$slug'
+    | '/researchers/$slug'
   id:
     | '__root__'
     | '/'
@@ -181,6 +192,7 @@ export interface FileRouteTypes {
     | '/researchers'
     | '/trends'
     | '/institutions/$slug'
+    | '/researchers/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -194,7 +206,7 @@ export interface RootRouteChildren {
   ProgrammesRoute: typeof ProgrammesRoute
   ProjectsRoute: typeof ProjectsRoute
   PublicationsRoute: typeof PublicationsRoute
-  ResearchersRoute: typeof ResearchersRoute
+  ResearchersRoute: typeof ResearchersRouteWithChildren
   TrendsRoute: typeof TrendsRoute
 }
 
@@ -291,6 +303,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InstitutionsSlugRouteImport
       parentRoute: typeof InstitutionsRoute
     }
+    '/researchers/$slug': {
+      id: '/researchers/$slug'
+      path: '/$slug'
+      fullPath: '/researchers/$slug'
+      preLoaderRoute: typeof ResearchersSlugRouteImport
+      parentRoute: typeof ResearchersRoute
+    }
   }
 }
 
@@ -306,6 +325,18 @@ const InstitutionsRouteWithChildren = InstitutionsRoute._addFileChildren(
   InstitutionsRouteChildren,
 )
 
+interface ResearchersRouteChildren {
+  ResearchersSlugRoute: typeof ResearchersSlugRoute
+}
+
+const ResearchersRouteChildren: ResearchersRouteChildren = {
+  ResearchersSlugRoute: ResearchersSlugRoute,
+}
+
+const ResearchersRouteWithChildren = ResearchersRoute._addFileChildren(
+  ResearchersRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtlasRoute: AtlasRoute,
@@ -317,7 +348,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProgrammesRoute: ProgrammesRoute,
   ProjectsRoute: ProjectsRoute,
   PublicationsRoute: PublicationsRoute,
-  ResearchersRoute: ResearchersRoute,
+  ResearchersRoute: ResearchersRouteWithChildren,
   TrendsRoute: TrendsRoute,
 }
 export const routeTree = rootRouteImport
