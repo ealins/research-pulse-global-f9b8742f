@@ -160,7 +160,7 @@ function JobsPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <span
                       className={`rounded-full border px-2.5 py-0.5 text-[0.65rem] font-medium uppercase tracking-wider ${
-                        STATUS_TONE[o.status] ?? STATUS_TONE.closed
+                        STATUS_TONE[o.status] ?? STATUS_TONE["closed"]
                       }`}
                     >
                       {STATUS_LABEL[o.status] ?? o.status}
