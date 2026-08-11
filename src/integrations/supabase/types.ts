@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      academic_changes: {
+        Row: {
+          change_type: string
+          created_at: string
+          details: Json
+          detected_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          source_id: string | null
+          summary: string | null
+          title: string
+        }
+        Insert: {
+          change_type: string
+          created_at?: string
+          details?: Json
+          detected_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          source_id?: string | null
+          summary?: string | null
+          title: string
+        }
+        Update: {
+          change_type?: string
+          created_at?: string
+          details?: Json
+          detected_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          source_id?: string | null
+          summary?: string | null
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "academic_changes_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       alert_matches: {
         Row: {
           alert_rule_id: string
@@ -605,6 +652,72 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
+      }
+      ingestion_tasks: {
+        Row: {
+          attempts: number
+          completed_at: string | null
+          created_at: string
+          id: string
+          institution_id: string | null
+          last_error: string | null
+          max_attempts: number
+          payload: Json
+          run_after: string
+          source_id: string | null
+          started_at: string | null
+          status: string
+          task_type: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          payload?: Json
+          run_after?: string
+          source_id?: string | null
+          started_at?: string | null
+          status?: string
+          task_type: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          institution_id?: string | null
+          last_error?: string | null
+          max_attempts?: number
+          payload?: Json
+          run_after?: string
+          source_id?: string | null
+          started_at?: string | null
+          status?: string
+          task_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ingestion_tasks_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingestion_tasks_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       institution_topics: {
         Row: {
@@ -1487,39 +1600,79 @@ export type Database = {
           adapter_key: string
           canonical_entity_id: string | null
           canonical_entity_type: string | null
+          classification: string | null
+          classification_confidence: number | null
+          content_hash: string | null
           external_id: string | null
           fetched_at: string
+          final_url: string | null
+          http_status: number | null
           id: string
+          institution_id: string | null
+          normalization_error: string | null
+          normalization_status: string | null
+          page_title: string | null
           payload: Json
           processed_at: string | null
           processing_error: string | null
           source_id: string | null
+          source_url: string | null
+          text_content: string | null
         }
         Insert: {
           adapter_key: string
           canonical_entity_id?: string | null
           canonical_entity_type?: string | null
+          classification?: string | null
+          classification_confidence?: number | null
+          content_hash?: string | null
           external_id?: string | null
           fetched_at?: string
+          final_url?: string | null
+          http_status?: number | null
           id?: string
+          institution_id?: string | null
+          normalization_error?: string | null
+          normalization_status?: string | null
+          page_title?: string | null
           payload: Json
           processed_at?: string | null
           processing_error?: string | null
           source_id?: string | null
+          source_url?: string | null
+          text_content?: string | null
         }
         Update: {
           adapter_key?: string
           canonical_entity_id?: string | null
           canonical_entity_type?: string | null
+          classification?: string | null
+          classification_confidence?: number | null
+          content_hash?: string | null
           external_id?: string | null
           fetched_at?: string
+          final_url?: string | null
+          http_status?: number | null
           id?: string
+          institution_id?: string | null
+          normalization_error?: string | null
+          normalization_status?: string | null
+          page_title?: string | null
           payload?: Json
           processed_at?: string | null
           processing_error?: string | null
           source_id?: string | null
+          source_url?: string | null
+          text_content?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "raw_records_institution_id_fkey"
+            columns: ["institution_id"]
+            isOneToOne: false
+            referencedRelation: "institutions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "raw_records_source_id_fkey"
             columns: ["source_id"]
@@ -1932,17 +2085,23 @@ export type Database = {
         Row: {
           active: boolean
           adapter_key: string | null
+          canonical_url: string | null
+          category: string | null
           created_at: string
+          discovered_from: string | null
           id: string
           institution_id: string | null
           last_error: string | null
           last_failure_at: string | null
+          last_http_status: number | null
           last_success_at: string | null
           name: string
           notes: string | null
           organization: string | null
+          priority: number
           refresh_frequency_hours: number
           source_type: Database["public"]["Enums"]["source_type"]
+          status: string
           trust_level: number
           updated_at: string
           url: string
@@ -1950,17 +2109,23 @@ export type Database = {
         Insert: {
           active?: boolean
           adapter_key?: string | null
+          canonical_url?: string | null
+          category?: string | null
           created_at?: string
+          discovered_from?: string | null
           id?: string
           institution_id?: string | null
           last_error?: string | null
           last_failure_at?: string | null
+          last_http_status?: number | null
           last_success_at?: string | null
           name: string
           notes?: string | null
           organization?: string | null
+          priority?: number
           refresh_frequency_hours?: number
           source_type?: Database["public"]["Enums"]["source_type"]
+          status?: string
           trust_level?: number
           updated_at?: string
           url: string
@@ -1968,17 +2133,23 @@ export type Database = {
         Update: {
           active?: boolean
           adapter_key?: string | null
+          canonical_url?: string | null
+          category?: string | null
           created_at?: string
+          discovered_from?: string | null
           id?: string
           institution_id?: string | null
           last_error?: string | null
           last_failure_at?: string | null
+          last_http_status?: number | null
           last_success_at?: string | null
           name?: string
           notes?: string | null
           organization?: string | null
+          priority?: number
           refresh_frequency_hours?: number
           source_type?: Database["public"]["Enums"]["source_type"]
+          status?: string
           trust_level?: number
           updated_at?: string
           url?: string

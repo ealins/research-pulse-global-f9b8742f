@@ -17,6 +17,7 @@ import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TopRouteImport } from './routes/top'
 import { Route as TrendsRouteImport } from './routes/trends'
+import { Route as AdminPipelineHealthRouteImport } from './routes/admin.pipeline-health'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
 import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
@@ -74,6 +75,11 @@ const TopRoute = TopRouteImport.update({
 const TrendsRoute = TrendsRouteImport.update({
   id: '/trends',
   path: '/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminPipelineHealthRoute = AdminPipelineHealthRouteImport.update({
+  id: '/admin/pipeline-health',
+  path: '/admin/pipeline-health',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CountriesIndexRoute = CountriesIndexRouteImport.update({
@@ -176,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
+  '/admin/pipeline-health': typeof AdminPipelineHealthRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -204,6 +211,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
+  '/admin/pipeline-health': typeof AdminPipelineHealthRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -233,6 +241,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
+  '/admin/pipeline-health': typeof AdminPipelineHealthRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -263,6 +272,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/top'
     | '/trends'
+    | '/admin/pipeline-health'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -291,6 +301,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/top'
     | '/trends'
+    | '/admin/pipeline-health'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -319,6 +330,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/top'
     | '/trends'
+    | '/admin/pipeline-health'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -348,6 +360,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TopRoute: typeof TopRoute
   TrendsRoute: typeof TrendsRoute
+  AdminPipelineHealthRoute: typeof AdminPipelineHealthRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
   EventsSlugRoute: typeof EventsSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/trends'
       fullPath: '/trends'
       preLoaderRoute: typeof TrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/pipeline-health': {
+      id: '/admin/pipeline-health'
+      path: '/admin/pipeline-health'
+      fullPath: '/admin/pipeline-health'
+      preLoaderRoute: typeof AdminPipelineHealthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/countries/': {
@@ -564,6 +584,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TopRoute: TopRoute,
   TrendsRoute: TrendsRoute,
+  AdminPipelineHealthRoute: AdminPipelineHealthRoute,
   CountriesSlugRoute: CountriesSlugRoute,
   EventsSlugRoute: EventsSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,
@@ -586,13 +607,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
