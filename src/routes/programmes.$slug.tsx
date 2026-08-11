@@ -83,7 +83,16 @@ function ProgrammeDetail() {
             ? `${inst.name}${inst.city ? `, ${inst.city}` : ""}${inst.country ? ` — ${inst.country}` : ""}`
             : "Host institution not stated"
         }
-        actions={<EvidenceDrawer entityType="course" entityId={c.id} title={c.title} />}
+        actions={
+          <EvidenceDrawer
+            entityType="course"
+            entityId={c.id}
+            title={c.title}
+            verification={c.verification_status}
+            lastVerified={c.last_verified_at}
+            isDemo={c.is_demo}
+          />
+        }
       />
 
       <div className="mx-auto w-full max-w-6xl px-6 py-8">

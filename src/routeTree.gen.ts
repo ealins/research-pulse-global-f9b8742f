@@ -24,6 +24,7 @@ import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slu
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
 import { Route as JobsSlugRouteImport } from './routes/jobs.$slug'
 import { Route as ProgrammesIndexRouteImport } from './routes/programmes.index'
+import { Route as ProgrammesSlugRouteImport } from './routes/programmes.$slug'
 import { Route as ProjectsIndexRouteImport } from './routes/projects.index'
 import { Route as ProjectsSlugRouteImport } from './routes/projects.$slug'
 import { Route as PublicationsIndexRouteImport } from './routes/publications.index'
@@ -108,6 +109,11 @@ const ProgrammesIndexRoute = ProgrammesIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ProgrammesRoute,
 } as any)
+const ProgrammesSlugRoute = ProgrammesSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => ProgrammesRoute,
+} as any)
 const ProjectsIndexRoute = ProjectsIndexRouteImport.update({
   id: '/projects/',
   path: '/projects/',
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/programmes/$slug': typeof ProgrammesSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
   '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
@@ -185,6 +192,7 @@ export interface FileRoutesByTo {
   '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/programmes/$slug': typeof ProgrammesSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
   '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
@@ -211,6 +219,7 @@ export interface FileRoutesById {
   '/countries/$slug': typeof CountriesSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
+  '/programmes/$slug': typeof ProgrammesSlugRoute
   '/projects/$slug': typeof ProjectsSlugRoute
   '/publications/$id': typeof PublicationsIdRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
@@ -238,6 +247,7 @@ export interface FileRouteTypes {
     | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/programmes/$slug'
     | '/projects/$slug'
     | '/publications/$id'
     | '/researchers/$slug'
@@ -262,6 +272,7 @@ export interface FileRouteTypes {
     | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/programmes/$slug'
     | '/projects/$slug'
     | '/publications/$id'
     | '/researchers/$slug'
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/countries/$slug'
     | '/institutions/$slug'
     | '/jobs/$slug'
+    | '/programmes/$slug'
     | '/projects/$slug'
     | '/publications/$id'
     | '/researchers/$slug'
@@ -433,6 +445,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProgrammesIndexRouteImport
       parentRoute: typeof ProgrammesRoute
     }
+    '/programmes/$slug': {
+      id: '/programmes/$slug'
+      path: '/$slug'
+      fullPath: '/programmes/$slug'
+      preLoaderRoute: typeof ProgrammesSlugRouteImport
+      parentRoute: typeof ProgrammesRoute
+    }
     '/projects/': {
       id: '/projects/'
       path: '/projects'
@@ -493,10 +512,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface ProgrammesRouteChildren {
+  ProgrammesSlugRoute: typeof ProgrammesSlugRoute
   ProgrammesIndexRoute: typeof ProgrammesIndexRoute
 }
 
 const ProgrammesRouteChildren: ProgrammesRouteChildren = {
+  ProgrammesSlugRoute: ProgrammesSlugRoute,
   ProgrammesIndexRoute: ProgrammesIndexRoute,
 }
 
