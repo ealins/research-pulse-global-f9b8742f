@@ -588,6 +588,39 @@ function deriveStatus(deadline: string | null, rolling: boolean): string {
 
 export type NormalizeResult = { status: "NORMALIZED" | "SKIPPED" | "FAILED"; reason?: string | undefined; entity_id?: string | undefined };
 
+/* ------------------------------------------------------------------ */
+/* SINGLE-POSTING GATE                                                 */
+/* ------------------------------------------------------------------ */
+
+/** Words that mark a page as a careers *landing/listing* page, not one posting. */
+const LISTING_TITLE = /^(careers?|jobs?|vacancies|open (job )?positions?|positions?|recruitment|stellenangebote|stellen|job ?board|work (with|for) us|join (our team|us)|life at|our people|talent|employment)\b/i;
+const NON_POSTING = /(meet [a-z]|faces|blog|news|resources?|contact|use ?cases?|products?|solutions?|api\b|webinar|podcast|events?|privacy|imprint|impressum|cookie|newsletter|about us|our story|benefits|culture|diversity|internship programme overview)/i;
+/** A real posting names a role in its title. */
+const ROLE_TITLE = /(phd|ph\.d|doctoral|doktorand|promotionsstelle|post ?doc|postdoctoral|professor|professur|juniorprofessur|lecturer|research(er)?|scientist|engineer|ingenieur|developer|analyst|technician|techniker|specialist|consultant|surveyor|geomatics|remote sensing|photogrammetr|gis\b|wissenschaftliche[rn]? mitarbeiter|w\/?m\/?d|m\/?w\/?d|f\/?m\/?d|assistant|associate|fellow|intern(ship)?|trainee|manager|lead|head of)/i;
+/** A real posting reads like a job ad. */
+const POSTING_BODY = /(application deadline|apply by|closing date|deadline for applications|bewerbungsfrist|bewerbungen? bis|reference number|kennziffer|ref\.? no|job id|requisition|full[- ]time|part[- ]time|vollzeit|teilzeit|fixed[- ]term|befristet|salary|remuneration|entgeltgruppe|verg[uü]tung|tv-?l|tv-?[oö]d|e ?13|start(ing)? date|eintrittstermin|your (tasks|profile|responsibilities)|ihre aufgaben|ihr profil|we offer|wir bieten|required qualifications|qualification[s]? required|how to apply|submit your application|bewerbungsunterlagen)/i;
+
+/**
+ * True only when a fetched page really is ONE vacancy posting.
+ * Careers hubs, marketing and resource pages under a /careers/ path must never
+ * become an opportunity row — that is how the domain loses credibility.
+ */
+export function looksLikeSinglePosting(url: string, title: string, text: string): { ok: boolean; reason?: string } {
+  const t = (title || "").trim();
+  const body = text || "";
+  const path = pathOf(url);
+  if (!t) return { ok: false, reason: "no title" };
+  if (LISTING_TITLE.test(t)) return { ok: false, reason: "careers listing/landing page title" };
+  if (NON_POSTING.test(t)) return { ok: false, reason: "marketing/resource page, not a posting" };
+  if (/^\/?(careers?|jobs?|vacancies|stellenangebote|stellen|recruitment)\/?$/i.test(path)) {
+    return { ok: false, reason: "careers index path" };
+  }
+  if (body.length < 600) return { ok: false, reason: "page too thin to be a posting" };
+  if (!ROLE_TITLE.test(t)) return { ok: false, reason: "title does not name a role" };
+  if (!POSTING_BODY.test(body)) return { ok: false, reason: "no job-ad signals (deadline, contract, tasks, salary)" };
+  return { ok: true };
+}
+
 export async function normalizeSource(sourceId: string): Promise<NormalizeResult> {
   const { data: raw } = await supabaseAdmin
     .from("raw_records")
@@ -622,6 +655,11 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   }
 
   const text = raw.text_content ?? "";
+  const gate = looksLikeSinglePosting(raw.final_url ?? "", title, text);
+  if (!gate.ok) {
+    await mark("SKIPPED", `not a single vacancy posting: ${gate.reason}`);
+    return { status: "SKIPPED", reason: `not a single vacancy posting: ${gate.reason}` };
+  }
   const rolling = /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
   const deadline = parseDeadline(text);
   const status = deriveStatus(deadline, rolling);
