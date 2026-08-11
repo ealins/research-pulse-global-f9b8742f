@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-type Body = { action?: "enqueue-discovery" | "drain"; limit?: number; trigger?: string };
+type Body = {
+  action?: "enqueue-discovery" | "drain" | "refresh-due" | "deadline-sweep";
+  limit?: number;
+  trigger?: string;
+};
+
 
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
