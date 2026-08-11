@@ -25,6 +25,7 @@ import { Route as TrendsRouteImport } from './routes/trends'
 import { Route as InstitutionsSlugRouteImport } from './routes/institutions.$slug'
 import { Route as JobsSlugRouteImport } from './routes/jobs.$slug'
 import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
+import { Route as TopicsSlugRouteImport } from './routes/topics.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -106,6 +107,11 @@ const ResearchersSlugRoute = ResearchersSlugRouteImport.update({
   path: '/$slug',
   getParentRoute: () => ResearchersRoute,
 } as any)
+const TopicsSlugRoute = TopicsSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => TopicsRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -119,11 +125,12 @@ export interface FileRoutesByFullPath {
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRouteWithChildren
-  '/topics': typeof TopicsRoute
+  '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
+  '/topics/$slug': typeof TopicsSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -137,11 +144,12 @@ export interface FileRoutesByTo {
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRouteWithChildren
-  '/topics': typeof TopicsRoute
+  '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
+  '/topics/$slug': typeof TopicsSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -156,11 +164,12 @@ export interface FileRoutesById {
   '/projects': typeof ProjectsRoute
   '/publications': typeof PublicationsRoute
   '/researchers': typeof ResearchersRouteWithChildren
-  '/topics': typeof TopicsRoute
+  '/topics': typeof TopicsRouteWithChildren
   '/trends': typeof TrendsRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
   '/jobs/$slug': typeof JobsSlugRoute
   '/researchers/$slug': typeof ResearchersSlugRoute
+  '/topics/$slug': typeof TopicsSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/researchers/$slug'
+    | '/topics/$slug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/researchers/$slug'
+    | '/topics/$slug'
   id:
     | '__root__'
     | '/'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/institutions/$slug'
     | '/jobs/$slug'
     | '/researchers/$slug'
+    | '/topics/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -231,7 +243,7 @@ export interface RootRouteChildren {
   ProjectsRoute: typeof ProjectsRoute
   PublicationsRoute: typeof PublicationsRoute
   ResearchersRoute: typeof ResearchersRouteWithChildren
-  TopicsRoute: typeof TopicsRoute
+  TopicsRoute: typeof TopicsRouteWithChildren
   TrendsRoute: typeof TrendsRoute
 }
 
@@ -349,6 +361,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ResearchersSlugRouteImport
       parentRoute: typeof ResearchersRoute
     }
+    '/topics/$slug': {
+      id: '/topics/$slug'
+      path: '/$slug'
+      fullPath: '/topics/$slug'
+      preLoaderRoute: typeof TopicsSlugRouteImport
+      parentRoute: typeof TopicsRoute
+    }
   }
 }
 
@@ -386,6 +405,17 @@ const ResearchersRouteWithChildren = ResearchersRoute._addFileChildren(
   ResearchersRouteChildren,
 )
 
+interface TopicsRouteChildren {
+  TopicsSlugRoute: typeof TopicsSlugRoute
+}
+
+const TopicsRouteChildren: TopicsRouteChildren = {
+  TopicsSlugRoute: TopicsSlugRoute,
+}
+
+const TopicsRouteWithChildren =
+  TopicsRoute._addFileChildren(TopicsRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AtlasRoute: AtlasRoute,
@@ -398,7 +428,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProjectsRoute: ProjectsRoute,
   PublicationsRoute: PublicationsRoute,
   ResearchersRoute: ResearchersRouteWithChildren,
-  TopicsRoute: TopicsRoute,
+  TopicsRoute: TopicsRouteWithChildren,
   TrendsRoute: TrendsRoute,
 }
 export const routeTree = rootRouteImport
