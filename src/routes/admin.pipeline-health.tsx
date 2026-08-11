@@ -11,6 +11,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getPipelineHealth, runDiscovery, runQueue, requeueDeadTasks } from "@/lib/pipeline.functions";
 import { NvidiaEnginePanel } from "@/components/admin/NvidiaEnginePanel";
 import { SchedulerPanel } from "@/components/admin/SchedulerPanel";
+import { OperatingModePanel } from "@/components/admin/OperatingModePanel";
+
 
 export const Route = createFileRoute("/admin/pipeline-health")({
   head: () => ({
