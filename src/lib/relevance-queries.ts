@@ -42,7 +42,7 @@ export function eventDetailQuery(slug: string) {
               .from("opportunities")
               .select("id, title, slug, sector, status, application_deadline, employer_name")
               .eq("country", event.country)
-              .in("status", LIVE_STATUSES as unknown as string[])
+              .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
               .order("application_deadline", { ascending: true, nullsFirst: false })
               .limit(6)
           : Promise.resolve({ data: [], error: null }),
@@ -80,7 +80,7 @@ export const topPicksQuery = queryOptions({
            application_deadline, institutions ( name, slug )`,
         )
         .eq("sector", "academic")
-        .in("status", LIVE_STATUSES as unknown as string[])
+        .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
         .order("application_deadline", { ascending: true, nullsFirst: false })
         .limit(8),
       supabase
@@ -90,7 +90,7 @@ export const topPicksQuery = queryOptions({
            application_deadline, institutions ( name, slug )`,
         )
         .eq("sector", "industry")
-        .in("status", LIVE_STATUSES as unknown as string[])
+        .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
         .order("application_deadline", { ascending: true, nullsFirst: false })
         .limit(8),
       supabase
@@ -136,7 +136,7 @@ export const topPicksQuery = queryOptions({
     const { data: liveCalls } = await supabase
       .from("opportunities")
       .select("institution_id")
-      .in("status", LIVE_STATUSES as unknown as string[])
+      .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
       .limit(1000);
     const callCount = new Map<string, number>();
     for (const c of liveCalls ?? []) {
