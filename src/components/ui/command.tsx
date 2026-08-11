@@ -25,7 +25,7 @@ Command.displayName = CommandPrimitive.displayName;
 
 const CommandDialog = ({
   children,
-  shouldFilter,
+  shouldFilter = true,
   ...props
 }: DialogProps & { shouldFilter?: boolean }) => {
   return (
