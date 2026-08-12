@@ -300,6 +300,38 @@ export function extractLinks(html: string, baseUrl: string): { url: string; labe
   return out;
 }
 
+/**
+ * Rejects navigation/support/download URLs before they ever become sources.
+ * These patterns were responsible for many of the recent false candidates
+ * (feedback pages, salary PDFs, application forms and generic FAQs).
+ */
+function junkDiscoveryReason(url: string, label = ""): string | null {
+  let u: URL;
+  try {
+    u = new URL(url);
+  } catch {
+    return "invalid-url";
+  }
+  const path = decodeURIComponent(u.pathname).toLowerCase();
+  const haystack = `${path} ${u.search.toLowerCase()} ${label.toLowerCase()}`;
+
+  if (/\.(?:pdf|docx?|xlsx?|pptx?|zip|jpg|jpeg|png|gif|svg)(?:\/|$)/i.test(path))
+    return "document-or-asset";
+  if (/(?:\/|^)(?:feedback|print|login|logout|privacy|impressum|sitemap)(?:\/|$)/i.test(path))
+    return "utility-page";
+  if (/(?:faq|frequently[-_ ]asked|application[-_ ]?form|sollicitatieformulier|salary[-_ ]?scale|salarisschaal)/i.test(haystack))
+    return "support-or-form";
+  if (/[?&](?:download|attachment|format|output)=(?:1|true|pdf|doc|docx)/i.test(u.search))
+    return "download-link";
+  if (/\/(?:view|feedback)\/?$/i.test(path) && /\.(?:pdf|docx?)\//i.test(path))
+    return "document-view";
+  return null;
+}
+
+function isJunkDiscoveryUrl(url: string, label = ""): boolean {
+  return junkDiscoveryReason(url, label) !== null;
+}
+
 
 
 const DETAIL_KIND_BY_CATEGORY: Record<string, string> = {
@@ -327,7 +359,7 @@ function likelyDetailLink(category: string, url: string, label: string, parentUr
     return false;
   }
   if (child.host !== parent.host || child.toString() === parent.toString()) return false;
-  if (/\.(pdf|jpg|jpeg|png|gif|zip|docx?|pptx?|xlsx?)$/i.test(child.pathname)) return false;
+  if (isJunkDiscoveryUrl(child.toString(), label)) return false;
 
   const text = `${child.pathname} ${label}`.toLowerCase();
   const generic = /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?)$/i;
@@ -365,35 +397,82 @@ async function registerDetailSources(input: {
   adapterKey: string | null;
 }): Promise<number> {
   const category = input.category ?? "";
-  if (!DETAIL_KIND_BY_CATEGORY[category] || input.adapterKey?.endsWith("-detail")) return 0;
+  if (input.adapterKey?.endsWith("-detail")) return 0;
   if (category === "vacancies") return 0; // vacancy expansion has stricter legacy logic below
 
-  const links = extractLinks(input.html, input.finalUrl).filter((l) =>
-    likelyDetailLink(category, l.url, l.label, input.finalUrl),
+  const allLinks = extractLinks(input.html, input.finalUrl).filter(
+    (l) => !isJunkDiscoveryUrl(l.url, l.label),
   );
+
+  // Research-group/chair pages often contain both staff profiles and project
+  // links. Expand both instead of treating the group page itself as a record.
+  const targetCategories =
+    category === "research_groups"
+      ? (["people", "projects"] as const)
+      : DETAIL_KIND_BY_CATEGORY[category]
+        ? ([category] as const)
+        : ([] as const);
+  if (targetCategories.length === 0) return 0;
+
+  const candidates: { url: string; label: string; category: string }[] = [];
+  for (const targetCategory of targetCategories) {
+    for (const link of allLinks) {
+      if (likelyDetailLink(targetCategory, link.url, link.label, input.finalUrl)) {
+        candidates.push({ ...link, category: targetCategory });
+      }
+    }
+  }
+
   let insertedCount = 0;
   const seen = new Set<string>();
-  for (const link of links.slice(0, 80)) {
+  for (const link of candidates.slice(0, 100)) {
     if (seen.has(link.url)) continue;
     seen.add(link.url);
-    const { data: existing } = await supabaseAdmin.from("sources").select("id").eq("url", link.url).maybeSingle();
-    if (existing) continue;
+
+    const { data: existing } = await supabaseAdmin
+      .from("sources")
+      .select("id, adapter_key, category")
+      .eq("url", link.url)
+      .maybeSingle();
+
+    if (existing) {
+      // Upgrade a previously generic source to a detail adapter so its next
+      // fetch gets the stronger detail-page classification fallback.
+      if (!existing.adapter_key?.endsWith("-detail")) {
+        await supabaseAdmin
+          .from("sources")
+          .update({
+            adapter_key: `html-${link.category}-detail`,
+            category: link.category,
+            priority:
+              link.category === "people" || link.category === "projects" || link.category === "events"
+                ? 1
+                : 2,
+          })
+          .eq("id", existing.id);
+      }
+      continue;
+    }
+
     const { data: child, error } = await supabaseAdmin
       .from("sources")
       .insert({
         url: link.url,
         canonical_url: link.url,
         name: (link.label || link.url).slice(0, 200),
-        source_type: category === "projects" ? ("project" as never) : ("institution" as never),
-        adapter_key: `html-${category}-detail`,
+        source_type: link.category === "projects" ? ("project" as never) : ("institution" as never),
+        adapter_key: `html-${link.category}-detail`,
         institution_id: input.institutionId,
-        category,
-        priority: category === "people" || category === "projects" || category === "events" ? 1 : 2,
+        category: link.category,
+        priority:
+          link.category === "people" || link.category === "projects" || link.category === "events"
+            ? 1
+            : 2,
         status: "PENDING",
         discovered_from: input.finalUrl,
         trust_level: 5,
         active: true,
-        notes: `Individual ${category} detail page expanded from an institutional listing`,
+        notes: `Individual ${link.category} detail page expanded from an institutional listing`,
       })
       .select("id")
       .maybeSingle();
@@ -403,6 +482,7 @@ async function registerDetailSources(input: {
   }
   return insertedCount;
 }
+
 /* ------------------------------------------------------------------ */
 /* DISCOVERY                                                           */
 /* ------------------------------------------------------------------ */
@@ -467,7 +547,7 @@ export async function discoverInstitutionSources(
         const u = new URL(link.url);
         const inScope = scopes.some((s) => u.host === s.host);
         if (!inScope) continue;
-        if (/\.(pdf|jpg|jpeg|png|gif|zip|docx?|pptx?|xlsx?)$/i.test(u.pathname)) continue;
+        if (isJunkDiscoveryUrl(u.toString(), link.label)) continue;
         if (!isDomainRelevant(u.toString(), link.label)) continue;
         if (!candidates.has(u.toString()))
           candidates.set(u.toString(), { label: link.label, from: finalUrl });
@@ -543,6 +623,87 @@ export async function discoverInstitutionSources(
     if (inserted) await enqueue("FETCH", { source_id: inserted.id, institution_id: inst.id });
   }
   return result;
+}
+
+
+const HIGH_VALUE_RESEED_CATEGORIES = new Set([
+  "people",
+  "projects",
+  "events",
+  "vacancies",
+  "programmes",
+  "courses",
+  "research_groups",
+]);
+
+const RESEED_PRIORITY: Record<string, number> = {
+  people: 0,
+  projects: 1,
+  events: 2,
+  vacancies: 3,
+  research_groups: 4,
+  programmes: 5,
+  courses: 6,
+};
+
+/**
+ * One-time/bounded deep-discovery reseed for listing/index sources that were
+ * fetched before detail-page expansion existed. No raw records are deleted.
+ * Each source is marked in notes after being queued so an idle worker does not
+ * continuously refetch the same directory.
+ */
+export async function enqueueHighValueReseed(
+  limit = 150,
+): Promise<{ scanned: number; eligible: number; queued: number; by_category: Record<string, number> }> {
+  const marker = "deep-discovery-v6";
+  const { data: sources, error } = await supabaseAdmin
+    .from("sources")
+    .select("id, url, category, adapter_key, institution_id, notes, status, active, last_success_at")
+    .eq("active", true)
+    .limit(5000);
+  if (error) throw error;
+
+  const rows = (sources ?? [])
+    .filter((source) => {
+      const category = source.category ?? "";
+      if (!HIGH_VALUE_RESEED_CATEGORIES.has(category)) return false;
+      if (source.adapter_key?.endsWith("-detail") || source.adapter_key === "html-vacancy") return false;
+      if (source.status === "BLOCKED") return false;
+      if (isJunkDiscoveryUrl(source.url)) return false;
+      if ((source.notes ?? "").includes(marker)) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const ap = RESEED_PRIORITY[a.category ?? ""] ?? 99;
+      const bp = RESEED_PRIORITY[b.category ?? ""] ?? 99;
+      if (ap !== bp) return ap - bp;
+      const at = a.last_success_at ? new Date(a.last_success_at).getTime() : 0;
+      const bt = b.last_success_at ? new Date(b.last_success_at).getTime() : 0;
+      return at - bt;
+    });
+
+  const chosen = rows.slice(0, Math.max(1, Math.min(limit, 300)));
+  const byCategory: Record<string, number> = {};
+  let queued = 0;
+  for (const source of chosen) {
+    await enqueue("FETCH", {
+      source_id: source.id,
+      institution_id: source.institution_id ?? undefined,
+      payload: { reason: marker, category: source.category ?? null },
+    });
+    const nextNotes = `${source.notes ?? ""}${source.notes ? "\n" : ""}${marker}: queued ${new Date().toISOString()}`.slice(0, 4000);
+    await supabaseAdmin.from("sources").update({ notes: nextNotes }).eq("id", source.id);
+    queued += 1;
+    const category = source.category ?? "unknown";
+    byCategory[category] = (byCategory[category] ?? 0) + 1;
+  }
+
+  return {
+    scanned: (sources ?? []).length,
+    eligible: rows.length,
+    queued,
+    by_category: byCategory,
+  };
 }
 
 /* ------------------------------------------------------------------ */

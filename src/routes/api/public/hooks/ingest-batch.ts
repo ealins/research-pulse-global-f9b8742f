@@ -9,7 +9,8 @@ type Body = {
     | "backfill-raw"
     | "backfill-providers"
     | "drain-providers"
-    | "sync-pulse";
+    | "sync-pulse"
+    | "reseed-high-value";
   limit?: number;
   trigger?: string;
 };
@@ -112,6 +113,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         if (action === "sync-pulse") {
           const { backfillPulseEvents } = await import("@/lib/pulse.server");
           const result = await backfillPulseEvents(Math.min(250, Math.max(10, body.limit ?? 120)));
+          return json({ action, ...result });
+        }
+
+        if (action === "reseed-high-value") {
+          const { enqueueHighValueReseed } = await import("@/lib/ingest.server");
+          const result = await enqueueHighValueReseed(
+            Math.min(300, Math.max(10, body.limit ?? 150)),
+          );
           return json({ action, ...result });
         }
 

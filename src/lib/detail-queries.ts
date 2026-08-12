@@ -93,6 +93,7 @@ export function institutionDetailQuery(slug: string) {
            institution_topics ( weight, research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
       if (!institution) return null;
@@ -104,16 +105,19 @@ export function institutionDetailQuery(slug: string) {
             .from("departments")
             .select("id, name, slug, website, description, verification_status")
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("name"),
           supabase
             .from("research_groups")
             .select("id, name, slug, website, description")
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("name"),
           supabase
             .from("researchers")
             .select("id, full_name, slug, academic_title, current_position, verification_status")
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("full_name"),
           supabase
             .from("opportunities")
@@ -121,6 +125,7 @@ export function institutionDetailQuery(slug: string) {
               "id, title, slug, opportunity_type, status, application_deadline, application_url, verification_status",
             )
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("application_deadline", { ascending: true, nullsFirst: false }),
           supabase
             .from("projects")
@@ -128,17 +133,20 @@ export function institutionDetailQuery(slug: string) {
               "id, name, slug, acronym, status, start_date, end_date, funding_organization, website",
             )
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("start_date", { ascending: false, nullsFirst: false }),
           supabase
             .from("publications")
             .select("id, title, doi, venue, year, citation_count, is_open_access, landing_url")
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("year", { ascending: false, nullsFirst: false })
             .limit(25),
           supabase
             .from("courses")
             .select("id, title, slug, degree_type, language, duration, website")
             .eq("institution_id", id)
+            .eq("is_demo", false)
             .order("title"),
         ]);
 
@@ -172,6 +180,7 @@ export function researcherDetailQuery(slug: string) {
            researcher_topics ( weight, research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
       if (!researcher) return null;
@@ -190,13 +199,13 @@ export function researcherDetailQuery(slug: string) {
           .from("publication_researchers")
           .select(
             `author_position,
-             publications ( id, title, doi, venue, year, citation_count, is_open_access, landing_url )`,
+             publications ( id, title, doi, venue, year, citation_count, is_open_access, landing_url, is_demo )`,
           )
           .eq("researcher_id", id)
           .limit(50),
         supabase
           .from("project_researchers")
-          .select(`role, projects ( id, name, slug, acronym, status, funding_organization, website )`)
+          .select(`role, projects ( id, name, slug, acronym, status, funding_organization, website, is_demo )`)
           .eq("researcher_id", id),
         supabase
           .from("opportunities")
@@ -204,10 +213,11 @@ export function researcherDetailQuery(slug: string) {
             "id, title, slug, opportunity_type, status, application_deadline, application_url",
           )
           .eq("supervisor_id", id)
+          .eq("is_demo", false)
           .order("application_deadline", { ascending: true, nullsFirst: false }),
         supabase
           .from("course_researchers")
-          .select(`courses ( id, title, slug, degree_type )`)
+          .select(`courses ( id, title, slug, degree_type, is_demo )`)
           .eq("researcher_id", id),
       ]);
 
@@ -216,13 +226,13 @@ export function researcherDetailQuery(slug: string) {
         roles: roles.data ?? [],
         publications: (pubs.data ?? [])
           .map((r: any) => ({ ...r.publications, author_position: r.author_position }))
-          .filter((p: any) => p?.id)
+          .filter((p: any) => p?.id && !p.is_demo)
           .sort((a: any, b: any) => (b.year ?? 0) - (a.year ?? 0)),
         projects: (projects.data ?? [])
           .map((r: any) => ({ ...r.projects, member_role: r.role }))
-          .filter((p: any) => p?.id),
+          .filter((p: any) => p?.id && !p.is_demo),
         supervising: supervising.data ?? [],
-        courses: (courses.data ?? []).map((r: any) => r.courses).filter(Boolean),
+        courses: (courses.data ?? []).map((r: any) => r.courses).filter((c: any) => c && !c.is_demo),
       };
     },
   });
@@ -247,6 +257,7 @@ export function opportunityDetailQuery(slug: string) {
            opportunity_topics ( research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
       return data;
@@ -281,36 +292,36 @@ export function topicDetailQuery(slug: string) {
             .from("opportunity_topics")
             .select(
               `opportunities ( id, title, slug, opportunity_type, status, application_deadline,
-                 institutions ( name, slug ) )`,
+                 institutions ( name, slug, is_demo ) )`,
             )
             .eq("topic_id", id),
           supabase
             .from("publication_topics")
-            .select(`publications ( id, title, doi, venue, year, citation_count, landing_url )`)
+            .select(`publications ( id, title, doi, venue, year, citation_count, landing_url, is_demo )`)
             .eq("topic_id", id),
           supabase
             .from("project_topics")
-            .select(`projects ( id, name, slug, acronym, status, funding_organization )`)
+            .select(`projects ( id, name, slug, acronym, status, funding_organization, is_demo )`)
             .eq("topic_id", id),
           supabase
             .from("researcher_topics")
             .select(
-              `weight, researchers ( id, full_name, slug, current_position, institutions ( name, slug ) )`,
+              `weight, researchers ( id, full_name, slug, current_position, is_demo, institutions ( name, slug, is_demo ) )`,
             )
             .eq("topic_id", id),
           supabase
             .from("institution_topics")
-            .select(`weight, institutions ( id, name, slug, country )`)
+            .select(`weight, institutions ( id, name, slug, country, is_demo )`)
             .eq("topic_id", id)
             .order("weight", { ascending: false }),
           supabase
             .from("event_topics")
-            .select(`events ( id, title, slug, start_date, location, abstract_deadline )`)
+            .select(`events ( id, title, slug, start_date, location, abstract_deadline, is_demo )`)
             .eq("topic_id", id),
         ]);
 
       const pick = <T,>(rows: any[] | null, key: string): T[] =>
-        (rows ?? []).map((r) => r[key]).filter(Boolean) as T[];
+        (rows ?? []).map((r) => r[key]).filter((value: any) => value && !value.is_demo) as T[];
 
       return {
         topic,
@@ -322,10 +333,10 @@ export function topicDetailQuery(slug: string) {
         projects: pick<any>(projects.data, "projects"),
         researchers: (researchers.data ?? [])
           .map((r: any) => ({ ...r.researchers, weight: r.weight }))
-          .filter((r: any) => r?.id),
+          .filter((r: any) => r?.id && !r.is_demo),
         institutions: (institutions.data ?? [])
           .map((r: any) => ({ ...r.institutions, weight: r.weight }))
-          .filter((r: any) => r?.id),
+          .filter((r: any) => r?.id && !r.is_demo),
         events: pick<any>(events.data, "events"),
       };
     },
@@ -376,6 +387,7 @@ export function projectDetailQuery(slug: string) {
            project_topics ( research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
       if (!project) return null;
@@ -385,12 +397,12 @@ export function projectDetailQuery(slug: string) {
         supabase
           .from("project_researchers")
           .select(
-            `role, researchers ( id, full_name, slug, current_position, institutions ( name, slug ) )`,
+            `role, researchers ( id, full_name, slug, current_position, is_demo, institutions ( name, slug ) )`,
           )
           .eq("project_id", id),
         supabase
           .from("project_institutions")
-          .select(`role, institutions ( id, name, slug, country )`)
+          .select(`role, institutions ( id, name, slug, country, is_demo )`)
           .eq("project_id", id),
         supabase
           .from("project_organizations")
@@ -401,20 +413,21 @@ export function projectDetailQuery(slug: string) {
           .select(
             "id, title, slug, opportunity_type, status, application_deadline, application_url",
           )
-          .eq("project_id", id),
+          .eq("project_id", id)
+          .eq("is_demo", false),
       ]);
 
       return {
         project,
         people: (people.data ?? [])
           .map((r: any) => ({ ...r.researchers, member_role: r.role }))
-          .filter((r: any) => r?.id),
+          .filter((r: any) => r?.id && !r.is_demo),
         partners: (partners.data ?? [])
           .map((r: any) => ({ ...r.institutions, partner_role: r.role }))
-          .filter((r: any) => r?.id),
+          .filter((r: any) => r?.id && !r.is_demo),
         organizations: (orgs.data ?? [])
           .map((r: any) => ({ ...r.organizations, partner_role: r.role }))
-          .filter((r: any) => r?.id),
+          .filter((r: any) => r?.id && !r.is_demo),
         opportunities: opportunities.data ?? [],
       };
     },
@@ -435,6 +448,7 @@ export function publicationDetailQuery(id: string) {
            publication_topics ( research_topics ( name, slug ) )`,
         )
         .eq("id", id)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
       if (!publication) return null;
@@ -443,13 +457,13 @@ export function publicationDetailQuery(id: string) {
         supabase
           .from("publication_researchers")
           .select(
-            `author_position, researchers ( id, full_name, slug, current_position, institutions ( name, slug ) )`,
+            `author_position, researchers ( id, full_name, slug, current_position, is_demo, institutions ( name, slug ) )`,
           )
           .eq("publication_id", publication.id)
           .order("author_position", { ascending: true, nullsFirst: false }),
         supabase
           .from("publication_institutions")
-          .select(`institutions ( id, name, slug, country )`)
+          .select(`institutions ( id, name, slug, country, is_demo )`)
           .eq("publication_id", publication.id),
       ]);
 
@@ -457,10 +471,10 @@ export function publicationDetailQuery(id: string) {
         publication,
         authors: (authors.data ?? [])
           .map((r: any) => ({ ...r.researchers, author_position: r.author_position }))
-          .filter((r: any) => r?.id),
+          .filter((r: any) => r?.id && !r.is_demo),
         institutions: (institutions.data ?? [])
           .map((r: any) => r.institutions)
-          .filter(Boolean),
+          .filter((i: any) => i && !i.is_demo),
       };
     },
   });
