@@ -2,10 +2,32 @@
 export const AI_PROVIDER = "NVIDIA" as const;
 export const NVIDIA_SECRET_NAME = "Nvidia" as const;
 export const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
-export const NVIDIA_MODEL = "nvidia/nemotron-3-ultra-550b-a55b";
+
+// One NVIDIA API key is used for the whole routing ladder. Model ids can be
+// overridden per environment without changing source code.
+export const NVIDIA_MODEL_NANO =
+  process.env["NVIDIA_MODEL_NANO"] ?? "nvidia/nemotron-3-nano-30b-a3b";
+export const NVIDIA_MODEL_SUPER =
+  process.env["NVIDIA_MODEL_SUPER"] ?? "nvidia/nemotron-3-super-120b-a12b";
+export const NVIDIA_MODEL_ULTRA =
+  process.env["NVIDIA_MODEL_ULTRA"] ?? "nvidia/nemotron-3-ultra-550b-a55b";
+
+// Backwards-compatible alias used by older status/provenance code. The primary
+// routine model is Nano; difficult operations route upward automatically.
+export const NVIDIA_MODEL = NVIDIA_MODEL_NANO;
+export const NVIDIA_MODEL_CHAIN_LABEL = "Nano → Super → Ultra";
+
+export type NvidiaModelTier = "NANO" | "SUPER" | "ULTRA";
+export const NVIDIA_MODEL_BY_TIER: Record<NvidiaModelTier, string> = {
+  NANO: NVIDIA_MODEL_NANO,
+  SUPER: NVIDIA_MODEL_SUPER,
+  ULTRA: NVIDIA_MODEL_ULTRA,
+};
+
 export const NVIDIA_MAX_CONCURRENCY = 2;
-export const NVIDIA_RETRY_LIMIT = 3;
-export const NVIDIA_TIMEOUT_MS = 90_000;
+// Keep retries short inside one model. The extraction engine can escalate to a
+// stronger model instead of spending several minutes retrying the same model.
+export const NVIDIA_RETRY_LIMIT = 2;
 export const LLM_EXTRACTION_ENABLED = true;
 /** Hard cap on characters sent to the model per request. */
 export const LLM_MAX_INPUT_CHARS = 12_000;
@@ -22,38 +44,57 @@ export type LlmOperation =
   | "RELEVANCE_CLASSIFICATION";
 
 /**
- * Output budget per operation. Deliberately tight: the model spends reasoning
- * tokens before the JSON, so each budget is the smallest value that reliably
- * returns a complete object for that schema.
+ * Model routing policy.
+ *
+ * - Nano handles cheap, high-volume extraction.
+ * - Super is the default for the two hardest entity types and the first
+ *   fallback for routine extractors.
+ * - Ultra is a rare last resort for difficult canonical extraction.
  */
-export const LLM_MAX_TOKENS: Record<LlmOperation, number> = {
-  CONNECTION_TEST: 24,
-  VACANCY_EXTRACTION: 3000,
-  PROGRAMME_EXTRACTION: 1600,
-  PROJECT_EXTRACTION: 1800,
-  RESEARCHER_EXTRACTION: 1600,
-  EVENT_EXTRACTION: 1200,
-  RELEVANCE_CLASSIFICATION: 700,
+export const NVIDIA_MODEL_CHAIN: Record<LlmOperation, readonly NvidiaModelTier[]> = {
+  CONNECTION_TEST: ["NANO"],
+  RELEVANCE_CLASSIFICATION: ["NANO", "SUPER"],
+  PROGRAMME_EXTRACTION: ["NANO", "SUPER", "ULTRA"],
+  EVENT_EXTRACTION: ["NANO", "SUPER", "ULTRA"],
+  VACANCY_EXTRACTION: ["NANO", "SUPER", "ULTRA"],
+  PROJECT_EXTRACTION: ["SUPER", "ULTRA"],
+  RESEARCHER_EXTRACTION: ["SUPER", "ULTRA"],
+};
+
+/** Per-model request timeout with reasoning disabled. */
+export const NVIDIA_TIMEOUT_BY_TIER: Record<NvidiaModelTier, number> = {
+  NANO: 35_000,
+  SUPER: 60_000,
+  ULTRA: 90_000,
 };
 
 /**
- * Input budget per operation. Deliberately smaller than the hard cap: long
- * pages made the model reason for minutes and hit the 90s timeout, so each
- * budget is sized to the amount of text the schema actually needs.
+ * Output budget per operation. Thinking is disabled, so these budgets are for
+ * the JSON payload itself rather than hidden reasoning traces.
+ */
+export const LLM_MAX_TOKENS: Record<LlmOperation, number> = {
+  CONNECTION_TEST: 64,
+  VACANCY_EXTRACTION: 1800,
+  PROGRAMME_EXTRACTION: 1200,
+  PROJECT_EXTRACTION: 1500,
+  RESEARCHER_EXTRACTION: 1200,
+  EVENT_EXTRACTION: 900,
+  RELEVANCE_CLASSIFICATION: 400,
+};
+
+/**
+ * Input budget per operation. Keep routine extraction compact even though the
+ * hosted models support much larger contexts.
  */
 export const LLM_INPUT_CHARS: Record<LlmOperation, number> = {
   CONNECTION_TEST: 500,
-  VACANCY_EXTRACTION: LLM_MAX_INPUT_CHARS,
-  PROGRAMME_EXTRACTION: 6_000,
-  PROJECT_EXTRACTION: 7_000,
-  RESEARCHER_EXTRACTION: 6_000,
-  EVENT_EXTRACTION: 5_000,
-  RELEVANCE_CLASSIFICATION: 4_000,
+  VACANCY_EXTRACTION: 8_000,
+  PROGRAMME_EXTRACTION: 5_500,
+  PROJECT_EXTRACTION: 6_500,
+  RESEARCHER_EXTRACTION: 5_500,
+  EVENT_EXTRACTION: 4_500,
+  RELEVANCE_CLASSIFICATION: 3_500,
 };
 
-/**
- * Shrink factor applied on a single retry after a TIMEOUT or a truncated
- * completion — a smaller page means less reasoning and a completed object.
- */
+/** One shrink retry per model after a timeout or truncated JSON response. */
 export const LLM_SHRINK_RETRY_FACTOR = 0.5;
-

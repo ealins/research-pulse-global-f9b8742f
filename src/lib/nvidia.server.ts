@@ -8,10 +8,12 @@ import {
   NVIDIA_BASE_URL,
   NVIDIA_MAX_CONCURRENCY,
   NVIDIA_MODEL,
+  NVIDIA_MODEL_BY_TIER,
   NVIDIA_RETRY_LIMIT,
   NVIDIA_SECRET_NAME,
-  NVIDIA_TIMEOUT_MS,
+  NVIDIA_TIMEOUT_BY_TIER,
   type LlmOperation,
+  type NvidiaModelTier,
 } from "./llm-config.server";
 
 export type NemotronCall = {
@@ -24,6 +26,9 @@ export type NemotronCall = {
   contentReduced?: boolean;
   maxTokens?: number;
   temperature?: number;
+  model?: string;
+  modelTier?: NvidiaModelTier;
+  retryLimit?: number;
 };
 
 export type NemotronResult = {
@@ -81,7 +86,16 @@ async function logRun(row: Record<string, unknown>): Promise<string | null> {
  * llm_processing_runs. Retries only on 429 / 5xx / network errors.
  */
 export async function callNemotron(call: NemotronCall): Promise<NemotronResult> {
-  const model = NVIDIA_MODEL;
+  const model =
+    call.model ?? (call.modelTier ? NVIDIA_MODEL_BY_TIER[call.modelTier] : NVIDIA_MODEL);
+  const tier: NvidiaModelTier =
+    call.modelTier ??
+    (model === NVIDIA_MODEL_BY_TIER.ULTRA
+      ? "ULTRA"
+      : model === NVIDIA_MODEL_BY_TIER.SUPER
+        ? "SUPER"
+        : "NANO");
+  const retryLimit = Math.max(1, call.retryLimit ?? NVIDIA_RETRY_LIMIT);
   const base = {
     provider: AI_PROVIDER,
     model,
@@ -119,7 +133,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
 
   let lastResult: NemotronResult | null = null;
 
-  for (let attempt = 1; attempt <= NVIDIA_RETRY_LIMIT; attempt += 1) {
+  for (let attempt = 1; attempt <= retryLimit; attempt += 1) {
     const startedAt = new Date();
     const t0 = Date.now();
     await acquire();
@@ -133,7 +147,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
 
     try {
       const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), NVIDIA_TIMEOUT_MS);
+      const timer = setTimeout(() => controller.abort(), NVIDIA_TIMEOUT_BY_TIER[tier]);
       const response = await fetch(NVIDIA_BASE_URL, {
         method: "POST",
         headers: {
@@ -242,7 +256,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       errorCode === "TIMEOUT" ||
       httpStatus === 429 ||
       (httpStatus !== null && httpStatus >= 500);
-    if (!retriable || attempt === NVIDIA_RETRY_LIMIT) return lastResult;
+    if (!retriable || attempt === retryLimit) return lastResult;
 
     // Capacity/rate-limit failures benefit from a slightly longer cool-down.
     // Honour Retry-After when NVIDIA provides it; otherwise use bounded

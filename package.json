@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "worker:ingest": "node --env-file=.env scripts/ingestion-worker.mjs"
+    "worker:ingest": "node --env-file=.env scripts/ingestion-worker.mjs",
+    "nvidia:models": "node --env-file=.env scripts/nvidia-models.mjs",
+    "worker:ingest:prod": "node scripts/ingestion-worker.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
