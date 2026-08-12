@@ -361,25 +361,35 @@ function likelyDetailLink(category: string, url: string, label: string, parentUr
   if (child.host !== parent.host || child.toString() === parent.toString()) return false;
   if (isJunkDiscoveryUrl(child.toString(), label)) return false;
 
-  const text = `${child.pathname} ${label}`.toLowerCase();
-  const generic = /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?)$/i;
-  if (generic.test(label.trim())) return false;
+  const cleanLabel = label.replace(/\s+/g, " ").trim();
+  const text = `${child.pathname} ${child.search} ${cleanLabel}`.toLowerCase();
+  const generic = /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?|research|news|contact)$/i;
+  if (!cleanLabel || generic.test(cleanLabel)) return false;
 
   const depth = child.pathname.split("/").filter(Boolean).length;
   const parentDepth = parent.pathname.split("/").filter(Boolean).length;
-  if (depth < Math.max(2, parentDepth)) return false;
+  const deeper = depth > parentDepth;
+  const detailQuery = /[?&](?:id|uid|pid|event(?:id)?|project(?:id)?|person(?:id)?|profile(?:id)?|detail|view|article|bbsidx|tx_[^=]*\[(?:uid|id)\])=/i.test(child.search);
+  const wordCount = cleanLabel.split(/\s+/).filter(Boolean).length;
+  const informative = cleanLabel.length >= 8 && wordCount >= 2;
+  const personLike = /^(?:(?:prof(?:essor)?\.?|dr\.?|ph\.?d\.?|pd)\s+)*(?:[\p{L}][\p{L}'’.-]+\s+){1,5}[\p{L}][\p{L}'’.-]+$/iu.test(cleanLabel);
 
+  // Parent listings are already category-scoped. Requiring the category word
+  // again in every child URL dropped many legitimate records such as /john-doe,
+  // /urban-digital-twin, or calendar links that differ only by ?id=. Structural
+  // evidence is therefore accepted here; the deterministic entity gate still
+  // decides whether the fetched page is a real record before any model call.
   switch (category) {
     case "people":
-      return /(people|staff|team|faculty|profile|person|member|researcher|professor|mitarbeiter)/i.test(text) && depth >= 2;
+      return /(people|staff|team|faculty|profile|person|member|researcher|professor|mitarbeiter)/i.test(text) || personLike;
     case "projects":
-      return /(project|projekt|research[-_/ ]?project)/i.test(text) && depth >= 2;
+      return /(project|projekt|research[-_/ ]?project)/i.test(text) || detailQuery || (deeper && informative) || (depth === parentDepth && wordCount >= 3);
     case "events":
-      return /(event|conference|workshop|seminar|colloqui|symposium|tagung|veranstaltung|summer[-_/ ]?school)/i.test(text) && depth >= 2;
+      return /(event|conference|workshop|seminar|colloqui|symposium|tagung|veranstaltung|summer[-_/ ]?school)/i.test(text) || detailQuery || (deeper && informative) || (depth === parentDepth && wordCount >= 3);
     case "programmes":
-      return /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(text) && depth >= 2;
+      return /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(text) || detailQuery || (deeper && informative);
     case "courses":
-      return /(course|module|lecture|class|teaching|lehre|vorlesung)/i.test(text) && depth >= 2;
+      return /(course|module|lecture|class|teaching|lehre|vorlesung)/i.test(text) || detailQuery || (deeper && informative);
     default:
       return false;
   }
@@ -431,25 +441,62 @@ async function registerDetailSources(input: {
 
     const { data: existing } = await supabaseAdmin
       .from("sources")
-      .select("id, adapter_key, category")
+      .select("id, adapter_key, category, status, active, institution_id")
       .eq("url", link.url)
       .maybeSingle();
 
     if (existing) {
-      // Upgrade a previously generic source to a detail adapter so its next
-      // fetch gets the stronger detail-page classification fallback.
+      const targetClassification = DETAIL_KIND_BY_CATEGORY[link.category] ?? null;
+      const nextPriority =
+        link.category === "people" || link.category === "projects" || link.category === "events"
+          ? 1
+          : 2;
+
+      // Critical recovery path: v6 could discover a detail link that already
+      // existed as a generic source, upgrade its adapter, and then stop. If its
+      // content had already been fetched, the next fetch was unchanged and it
+      // never entered NORMALIZE. Reuse the stored raw page instead of waiting
+      // for the website to change.
       if (!existing.adapter_key?.endsWith("-detail")) {
         await supabaseAdmin
           .from("sources")
           .update({
             adapter_key: `html-${link.category}-detail`,
             category: link.category,
-            priority:
-              link.category === "people" || link.category === "projects" || link.category === "events"
-                ? 1
-                : 2,
+            priority: nextPriority,
           })
           .eq("id", existing.id);
+      }
+
+      const { data: latestRaw } = await supabaseAdmin
+        .from("raw_records")
+        .select("id, normalization_status, classification, classification_confidence")
+        .eq("source_id", existing.id)
+        .order("fetched_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (latestRaw && targetClassification && latestRaw.normalization_status !== "NORMALIZED") {
+        await supabaseAdmin
+          .from("raw_records")
+          .update({
+            classification: targetClassification,
+            classification_confidence: Math.max(Number(latestRaw.classification_confidence ?? 0), 0.72),
+            normalization_status: "PENDING",
+            normalization_error: null,
+          } as never)
+          .eq("id", latestRaw.id);
+        await enqueue("NORMALIZE", {
+          source_id: existing.id,
+          institution_id: existing.institution_id ?? input.institutionId ?? undefined,
+          payload: { classification: targetClassification, reason: "deep-discovery-v6.1-existing-detail" },
+        });
+      } else if (!latestRaw && existing.status !== "BLOCKED" && existing.active !== false) {
+        await enqueue("FETCH", {
+          source_id: existing.id,
+          institution_id: existing.institution_id ?? input.institutionId ?? undefined,
+          payload: { reason: "deep-discovery-v6.1-existing-detail" },
+        });
       }
       continue;
     }
@@ -655,7 +702,7 @@ const RESEED_PRIORITY: Record<string, number> = {
 export async function enqueueHighValueReseed(
   limit = 150,
 ): Promise<{ scanned: number; eligible: number; queued: number; by_category: Record<string, number> }> {
-  const marker = "deep-discovery-v6";
+  const marker = "deep-discovery-v6.1";
   const { data: sources, error } = await supabaseAdmin
     .from("sources")
     .select("id, url, category, adapter_key, institution_id, notes, status, active, last_success_at")
@@ -703,6 +750,80 @@ export async function enqueueHighValueReseed(
     eligible: rows.length,
     queued,
     by_category: byCategory,
+  };
+}
+
+/**
+ * Repairs detail sources that v6 already discovered/upgraded but never sent
+ * back through normalization because their stored page content was unchanged.
+ * This is database-only when raw HTML/text is already present: no refetch and
+ * no model call until the deterministic entity gate accepts the page.
+ */
+export async function enqueueExistingDetailRecovery(
+  limit = 300,
+): Promise<{ scanned: number; normalize_queued: number; fetch_queued: number; already_normalized: number }> {
+  const { data: sources, error } = await supabaseAdmin
+    .from("sources")
+    .select("id, adapter_key, institution_id, status, active")
+    .eq("active", true)
+    .like("adapter_key", "html-%-detail")
+    .limit(Math.max(1, Math.min(limit, 1000)));
+  if (error) throw error;
+
+  let normalizeQueued = 0;
+  let fetchQueued = 0;
+  let alreadyNormalized = 0;
+
+  for (const source of sources ?? []) {
+    const classification = detailKindFromAdapter(source.adapter_key);
+    if (!classification) continue;
+
+    const { data: raw } = await supabaseAdmin
+      .from("raw_records")
+      .select("id, normalization_status, classification, classification_confidence")
+      .eq("source_id", source.id)
+      .order("fetched_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (raw) {
+      if (raw.normalization_status === "NORMALIZED") {
+        alreadyNormalized += 1;
+        continue;
+      }
+      await supabaseAdmin
+        .from("raw_records")
+        .update({
+          classification,
+          classification_confidence: Math.max(Number(raw.classification_confidence ?? 0), 0.72),
+          normalization_status: "PENDING",
+          normalization_error: null,
+        } as never)
+        .eq("id", raw.id);
+      await enqueue("NORMALIZE", {
+        source_id: source.id,
+        institution_id: source.institution_id ?? undefined,
+        payload: { classification, reason: "detail-recovery-v6.1" },
+      });
+      normalizeQueued += 1;
+      continue;
+    }
+
+    if (source.status !== "BLOCKED") {
+      await enqueue("FETCH", {
+        source_id: source.id,
+        institution_id: source.institution_id ?? undefined,
+        payload: { reason: "detail-recovery-v6.1" },
+      });
+      fetchQueued += 1;
+    }
+  }
+
+  return {
+    scanned: (sources ?? []).length,
+    normalize_queued: normalizeQueued,
+    fetch_queued: fetchQueued,
+    already_normalized: alreadyNormalized,
   };
 }
 

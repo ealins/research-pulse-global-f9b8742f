@@ -10,7 +10,8 @@ type Body = {
     | "backfill-providers"
     | "drain-providers"
     | "sync-pulse"
-    | "reseed-high-value";
+    | "reseed-high-value"
+    | "recover-detail-sources";
   limit?: number;
   trigger?: string;
 };
@@ -120,6 +121,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           const { enqueueHighValueReseed } = await import("@/lib/ingest.server");
           const result = await enqueueHighValueReseed(
             Math.min(300, Math.max(10, body.limit ?? 150)),
+          );
+          return json({ action, ...result });
+        }
+
+        if (action === "recover-detail-sources") {
+          const { enqueueExistingDetailRecovery } = await import("@/lib/ingest.server");
+          const result = await enqueueExistingDetailRecovery(
+            Math.min(1000, Math.max(10, body.limit ?? 300)),
           );
           return json({ action, ...result });
         }

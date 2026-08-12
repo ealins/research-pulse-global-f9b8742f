@@ -73,6 +73,24 @@ async function syncPulse() {
   return payload;
 }
 
+async function recoverExistingDetails() {
+  const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: API_KEY,
+    },
+    body: JSON.stringify({
+      action: "recover-detail-sources",
+      limit: 500,
+      trigger: "continuous-worker",
+    }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`detail recovery HTTP ${response.status}`);
+  return payload;
+}
+
 async function reseedHighValue() {
   const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
     method: "POST",
@@ -99,6 +117,15 @@ try {
   console.log(`${new Date().toISOString()} PULSE checked=${pulse.checked ?? 0} projected=${pulse.projected ?? 0}`);
 } catch (error) {
   console.error(`${new Date().toISOString()} pulse sync warning:`, error instanceof Error ? error.message : String(error));
+}
+
+try {
+  const recovery = await recoverExistingDetails();
+  console.log(
+    `${new Date().toISOString()} DETAIL_RECOVERY scanned=${recovery.scanned ?? 0} normalize_queued=${recovery.normalize_queued ?? 0} fetch_queued=${recovery.fetch_queued ?? 0} already_normalized=${recovery.already_normalized ?? 0}`,
+  );
+} catch (error) {
+  console.error(`${new Date().toISOString()} detail recovery warning:`, error instanceof Error ? error.message : String(error));
 }
 
 let loops = 0;
