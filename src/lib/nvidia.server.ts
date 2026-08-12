@@ -129,6 +129,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
     let errorMessage: string | null = null;
     let finishReason: string | null = null;
     let outputTokens: number | null = null;
+    let retryAfterMs: number | null = null;
 
     try {
       const controller = new AbortController();
@@ -158,6 +159,15 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       });
       clearTimeout(timer);
       httpStatus = response.status;
+      const retryAfter = response.headers.get("retry-after");
+      if (retryAfter) {
+        const seconds = Number(retryAfter);
+        if (Number.isFinite(seconds) && seconds >= 0) retryAfterMs = seconds * 1000;
+        else {
+          const at = Date.parse(retryAfter);
+          if (Number.isFinite(at)) retryAfterMs = Math.max(0, at - Date.now());
+        }
+      }
       const bodyText = await response.text();
 
       if (!response.ok) {
@@ -233,7 +243,15 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       httpStatus === 429 ||
       (httpStatus !== null && httpStatus >= 500);
     if (!retriable || attempt === NVIDIA_RETRY_LIMIT) return lastResult;
-    await sleep(1000 * 2 ** (attempt - 1));
+
+    // Capacity/rate-limit failures benefit from a slightly longer cool-down.
+    // Honour Retry-After when NVIDIA provides it; otherwise use bounded
+    // exponential backoff with a little jitter so concurrent workers do not
+    // retry at exactly the same millisecond.
+    const providerBaseMs = httpStatus === 503 ? 4_000 : httpStatus === 429 ? 3_000 : 1_000;
+    const exponentialMs = providerBaseMs * 2 ** (attempt - 1);
+    const jitterMs = Math.floor(Math.random() * 500);
+    await sleep(Math.max(retryAfterMs ?? 0, exponentialMs) + jitterMs);
   }
 
   return lastResult!;

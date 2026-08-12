@@ -313,11 +313,37 @@ export async function enqueue(
   });
 }
 
+const NORMALIZE_CLASS_PRIORITY: Record<string, number> = {
+  PROJECT: 0,
+  RESEARCHER: 1,
+  EVENT: 2,
+  VACANCY: 3,
+  PROGRAMME: 4,
+  COURSE: 5,
+  PUBLICATION: 6,
+  RESEARCH_GROUP: 7,
+  DEPARTMENT: 8,
+  RESEARCH_NEWS: 9,
+  GENERAL: 10,
+  UNKNOWN: 11,
+};
+
+function queuedClassification(task: { payload?: unknown }): string {
+  if (!task.payload || typeof task.payload !== "object" || Array.isArray(task.payload)) return "UNKNOWN";
+  const value = (task.payload as Record<string, unknown>)["classification"];
+  return typeof value === "string" ? value.toUpperCase() : "UNKNOWN";
+}
+
 /**
  * Runs a small batch of queued work. Exponential backoff, DEAD after max attempts.
  * NORMALIZE callers can opt into concurrency 2; fetch/provider work stays
  * sequential by default. Tasks are conditionally claimed before processing so
  * overlapping manual/cron runs cannot process the same queue row twice.
+ *
+ * NORMALIZE work is selected from a wider due-task window and sorted by
+ * user-value classification before age. This drains PROJECT/RESEARCHER/EVENT
+ * candidates before generic research/news pages without changing canonical
+ * validation rules.
  */
 export async function runQueueBatch(
   limit = 8,
@@ -330,11 +356,28 @@ export async function runQueueBatch(
     .in("status", ["QUEUED", "RETRY"])
     .lte("run_after", new Date().toISOString());
   if (taskTypes && taskTypes.length > 0) query = query.in("task_type", taskTypes);
-  const { data: tasks, error } = await query.order("run_after").limit(limit);
+
+  const normalizeOnly = taskTypes?.length === 1 && taskTypes[0] === "NORMALIZE";
+  // Pull a wider candidate window for NORMALIZE so high-value academic pages
+  // are not buried behind hundreds of generic pages with older run_after values.
+  const candidateLimit = normalizeOnly ? Math.min(200, Math.max(limit * 6, 48)) : limit;
+  const { data: candidates, error } = await query.order("run_after").limit(candidateLimit);
   if (error) throw error;
 
+  let selected = [...(candidates ?? [])];
+  if (normalizeOnly) {
+    selected.sort((a, b) => {
+      const fallbackPriority = NORMALIZE_CLASS_PRIORITY["UNKNOWN"] ?? 99;
+      const ap = NORMALIZE_CLASS_PRIORITY[queuedClassification(a)] ?? fallbackPriority;
+      const bp = NORMALIZE_CLASS_PRIORITY[queuedClassification(b)] ?? fallbackPriority;
+      if (ap !== bp) return ap - bp;
+      return new Date(a.run_after).getTime() - new Date(b.run_after).getTime();
+    });
+    selected = selected.slice(0, limit);
+  }
+
   const out = { processed: 0, ok: 0, failed: 0, dead: 0, details: [] as string[] };
-  const queue = [...(tasks ?? [])];
+  const queue = selected;
   const workers = Math.max(1, Math.min(Math.floor(concurrency), queue.length || 1));
   let cursor = 0;
 
@@ -558,7 +601,13 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
     .eq("id", source.id);
   await recordRun(true, changed, null);
   // Unchanged content stops here: no extraction, no model call, no canonical write.
-  if (changed) await enqueue("NORMALIZE", { source_id: source.id, institution_id: source.institution_id ?? undefined });
+  if (changed) {
+    await enqueue("NORMALIZE", {
+      source_id: source.id,
+      institution_id: source.institution_id ?? undefined,
+      payload: { classification },
+    });
+  }
 
 
   // A vacancy listing page is an index, not a record: register each individual

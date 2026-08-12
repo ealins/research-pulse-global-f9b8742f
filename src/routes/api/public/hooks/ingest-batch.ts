@@ -177,15 +177,42 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
 
         try {
-          // Semantic extraction must not be starved by crawl work. In backlog
-          // mode, process up to 8 NORMALIZE tasks per tick, two at a time.
-          // Steady state remains deliberately small.
-          const normalizeBatch = queueState.mode === "BACKLOG" ? Math.min(8, batch) : Math.min(2, batch);
+          // Backlog draining is adaptive: process NORMALIZE in small waves with
+          // NVIDIA concurrency fixed at 2, but keep draining cheap deterministic
+          // rejects within the same cron invocation. A wall-clock budget prevents
+          // one model-heavy tick from running indefinitely or hammering a busy API.
+          const normalizeTarget = queueState.mode === "BACKLOG" ? 40 : Math.min(2, batch);
+          const normalizeWave = queueState.mode === "BACKLOG" ? 8 : Math.min(2, batch);
+          const normalizeBudgetMs = queueState.mode === "BACKLOG" ? 70_000 : 30_000;
+          const emptyResult = () => ({ processed: 0, ok: 0, failed: 0, dead: 0, details: [] as string[] });
+          const result = emptyResult();
+          let normalizeWaves = 0;
           let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
-          let result = await runQueueBatch(normalizeBatch, ["NORMALIZE"], 2);
+
+          while (result.processed < normalizeTarget && Date.now() - startedAt.getTime() < normalizeBudgetMs) {
+            const remaining = normalizeTarget - result.processed;
+            const wave = await runQueueBatch(Math.min(normalizeWave, remaining), ["NORMALIZE"], 2);
+            normalizeWaves += 1;
+            result.processed += wave.processed;
+            result.ok += wave.ok;
+            result.failed += wave.failed;
+            result.dead += wave.dead;
+            result.details.push(...wave.details);
+
+            if (wave.processed === 0) break;
+            // If a wave ends with multiple hard failures, stop this tick and let
+            // exponential retry/backoff cool the provider down before the next wake.
+            if (wave.failed + wave.dead >= 2) break;
+          }
+
           if (result.processed === 0) {
             taskGroup = "FETCH_DISCOVER";
-            result = await runQueueBatch(batch, ["FETCH", "DISCOVER"]);
+            const collection = await runQueueBatch(batch, ["FETCH", "DISCOVER"]);
+            result.processed = collection.processed;
+            result.ok = collection.ok;
+            result.failed = collection.failed;
+            result.dead = collection.dead;
+            result.details.push(...collection.details);
           }
           const { data: llm } = await supabaseAdmin
             .from("llm_processing_runs")
@@ -207,8 +234,11 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
                 errors: result.failed + result.dead,
                 details: {
                   mode: queueState.mode,
-                  batch_size: taskGroup === "NORMALIZE" ? normalizeBatch : batch,
+                  batch_size: taskGroup === "NORMALIZE" ? normalizeTarget : batch,
                   task_group: taskGroup,
+                  normalize_waves: taskGroup === "NORMALIZE" ? normalizeWaves : 0,
+                  normalize_target: taskGroup === "NORMALIZE" ? normalizeTarget : 0,
+                  normalize_budget_ms: taskGroup === "NORMALIZE" ? normalizeBudgetMs : 0,
                   sample: result.details.slice(0, 20),
                 } as never,
               })
