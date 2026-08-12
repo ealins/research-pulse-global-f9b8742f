@@ -4,9 +4,15 @@
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { NVIDIA_MODEL } from "../llm-config.server";
 import { eventGate, programmeGate, projectGate, researcherGate } from "../llm-gating.server";
-import { extractEvent, extractProgramme, extractProject, extractResearcher } from "./entities.server";
+import {
+  extractEvent,
+  extractProgramme,
+  extractProject,
+  extractResearcher,
+} from "./entities.server";
 import { classifyTopics, topicIdsFor } from "./topics.server";
 import type { ExtractionInput } from "./engine.server";
+import { normalizeStructuredNonVacancy } from "./structured.server";
 
 export type CanonicalResult = {
   status: "NORMALIZED" | "SKIPPED" | "FAILED";
@@ -23,6 +29,7 @@ export type RawRecord = {
   institution_id: string | null;
   source_id: string | null;
   content_hash: string | null;
+  payload?: unknown;
 };
 
 function slugify(s: string): string {
@@ -43,7 +50,12 @@ async function sha6(input: string): Promise<string> {
 }
 
 /** Keep slugs unique without ever merging two distinct records. */
-async function uniqueSlug(table: "projects" | "courses" | "researchers" | "events", base: string, url: string, keepId?: string) {
+async function uniqueSlug(
+  table: "projects" | "courses" | "researchers" | "events",
+  base: string,
+  url: string,
+  keepId?: string,
+) {
   const slug = base || (await sha6(url));
   const { data } = await supabaseAdmin.from(table).select("id").eq("slug", slug).maybeSingle();
   if (!data || data.id === keepId) return slug;
@@ -59,8 +71,12 @@ async function linkTopics(
 ): Promise<number> {
   const ids = await topicIdsFor(topicNames);
   if (ids.length === 0) return 0;
-  const rows = ids.map((topic_id) => (weighted ? { [column]: entityId, topic_id, weight: 1 } : { [column]: entityId, topic_id }));
-  await supabaseAdmin.from(table).upsert(rows as never, { onConflict: `${column},topic_id`, ignoreDuplicates: true });
+  const rows = ids.map((topic_id) =>
+    weighted ? { [column]: entityId, topic_id, weight: 1 } : { [column]: entityId, topic_id },
+  );
+  await supabaseAdmin
+    .from(table)
+    .upsert(rows as never, { onConflict: `${column},topic_id`, ignoreDuplicates: true });
   return ids.length;
 }
 
@@ -135,7 +151,10 @@ const DEGREE_TYPE: Record<string, string> = {
  * Extract and persist one canonical record for a non-vacancy raw page.
  * Returns SKIPPED (never FAILED) whenever the page simply is not a record.
  */
-export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): Promise<CanonicalResult> {
+export async function normalizeNonVacancy(
+  raw: RawRecord,
+  cleanTitle: string,
+): Promise<CanonicalResult> {
   const url = raw.final_url ?? "";
   const text = raw.text_content ?? "";
   const input: ExtractionInput = {
@@ -147,19 +166,37 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
     contentHash: raw.content_hash,
   };
 
+  // Structured metadata is the cheapest trustworthy path. Accept only strict,
+  // single-entity schema.org records; ambiguous or absent metadata falls through
+  // to the existing deterministic gate + Nemotron + validation pipeline.
+  const structured = await normalizeStructuredNonVacancy(raw, cleanTitle);
+  if (structured) return structured;
+
   switch (raw.classification) {
     case "PROJECT": {
       const gate = projectGate(url, cleanTitle, text);
       if (!gate.ok) return { status: "SKIPPED", reason: `project gate: ${gate.reason}` };
       const out = await extractProject(input);
-      if (!out.value) return { status: "SKIPPED", reason: `project extraction unusable: ${out.errorCode ?? "no result"}` };
+      if (!out.value)
+        return {
+          status: "SKIPPED",
+          reason: `project extraction unusable: ${out.errorCode ?? "no result"}`,
+        };
       const ex = out.value;
       if (!ex.is_single_real_project || !ex.title) {
-        return { status: "SKIPPED", reason: `engine rejected project: ${ex.rejection_reason ?? "not a single project"}` };
+        return {
+          status: "SKIPPED",
+          reason: `engine rejected project: ${ex.rejection_reason ?? "not a single project"}`,
+        };
       }
-      if (!raw.institution_id) return { status: "SKIPPED", reason: "missing institution for project" };
+      if (!raw.institution_id)
+        return { status: "SKIPPED", reason: "missing institution for project" };
 
-      const { data: existing } = await supabaseAdmin.from("projects").select("id").eq("website", url).maybeSingle();
+      const { data: existing } = await supabaseAdmin
+        .from("projects")
+        .select("id")
+        .eq("website", url)
+        .maybeSingle();
       const slug = await uniqueSlug("projects", slugify(ex.title), url, existing?.id);
       const payload = {
         name: ex.title.slice(0, 300),
@@ -180,7 +217,14 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       };
       const entityId = await upsert("projects", existing?.id, payload);
       if (!entityId) return { status: "FAILED", reason: "could not write project" };
-      if (!existing?.id) await logChange({ changeType: "NEW_PROJECT", entityType: "project", entityId, raw, title: payload.name });
+      if (!existing?.id)
+        await logChange({
+          changeType: "NEW_PROJECT",
+          entityType: "project",
+          entityId,
+          raw,
+          title: payload.name,
+        });
       await recordEvidence({
         entityType: "project",
         entityId,
@@ -188,7 +232,14 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
         claim: "Project page published on the institution's own website",
         sourceType: "project",
       });
-      await applyTopics({ input, fallback: ex.topics, table: "project_topics", column: "project_id", entityId, weighted: false });
+      await applyTopics({
+        input,
+        fallback: ex.topics,
+        table: "project_topics",
+        column: "project_id",
+        entityId,
+        weighted: false,
+      });
       return { status: "NORMALIZED", entity_id: entityId };
     }
 
@@ -197,14 +248,26 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       const gate = programmeGate(url, cleanTitle, text);
       if (!gate.ok) return { status: "SKIPPED", reason: `programme gate: ${gate.reason}` };
       const out = await extractProgramme(input);
-      if (!out.value) return { status: "SKIPPED", reason: `programme extraction unusable: ${out.errorCode ?? "no result"}` };
+      if (!out.value)
+        return {
+          status: "SKIPPED",
+          reason: `programme extraction unusable: ${out.errorCode ?? "no result"}`,
+        };
       const ex = out.value;
       if (!ex.is_single_real_programme || !ex.name) {
-        return { status: "SKIPPED", reason: `engine rejected programme: ${ex.rejection_reason ?? "not a single programme"}` };
+        return {
+          status: "SKIPPED",
+          reason: `engine rejected programme: ${ex.rejection_reason ?? "not a single programme"}`,
+        };
       }
-      if (!raw.institution_id) return { status: "SKIPPED", reason: "missing institution for programme" };
+      if (!raw.institution_id)
+        return { status: "SKIPPED", reason: "missing institution for programme" };
 
-      const { data: existing } = await supabaseAdmin.from("courses").select("id").eq("website", url).maybeSingle();
+      const { data: existing } = await supabaseAdmin
+        .from("courses")
+        .select("id")
+        .eq("website", url)
+        .maybeSingle();
       const slug = await uniqueSlug("courses", slugify(ex.name), url, existing?.id);
       const payload = {
         title: ex.name.slice(0, 300),
@@ -220,7 +283,14 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       };
       const entityId = await upsert("courses", existing?.id, payload);
       if (!entityId) return { status: "FAILED", reason: "could not write programme" };
-      if (!existing?.id) await logChange({ changeType: "NEW_PROGRAMME", entityType: "course", entityId, raw, title: payload.title });
+      if (!existing?.id)
+        await logChange({
+          changeType: "NEW_PROGRAMME",
+          entityType: "course",
+          entityId,
+          raw,
+          title: payload.title,
+        });
       await recordEvidence({
         entityType: "course",
         entityId,
@@ -228,7 +298,14 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
         claim: "Degree programme page published on the institution's own website",
         sourceType: "institution",
       });
-      await applyTopics({ input, fallback: ex.topics, table: "course_topics", column: "course_id", entityId, weighted: false });
+      await applyTopics({
+        input,
+        fallback: ex.topics,
+        table: "course_topics",
+        column: "course_id",
+        entityId,
+        weighted: false,
+      });
       return { status: "NORMALIZED", entity_id: entityId };
     }
 
@@ -236,21 +313,37 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       const gate = researcherGate(url, cleanTitle, text);
       if (!gate.ok) return { status: "SKIPPED", reason: `researcher gate: ${gate.reason}` };
       const out = await extractResearcher(input);
-      if (!out.value) return { status: "SKIPPED", reason: `researcher extraction unusable: ${out.errorCode ?? "no result"}` };
+      if (!out.value)
+        return {
+          status: "SKIPPED",
+          reason: `researcher extraction unusable: ${out.errorCode ?? "no result"}`,
+        };
       const ex = out.value;
       if (!ex.is_single_real_profile || !ex.full_name) {
-        return { status: "SKIPPED", reason: `engine rejected profile: ${ex.rejection_reason ?? "not a single profile"}` };
+        return {
+          status: "SKIPPED",
+          reason: `engine rejected profile: ${ex.rejection_reason ?? "not a single profile"}`,
+        };
       }
-      if (!raw.institution_id) return { status: "SKIPPED", reason: "missing institution for researcher" };
+      if (!raw.institution_id)
+        return { status: "SKIPPED", reason: "missing institution for researcher" };
 
       // ORCID is the strongest identity key; fall back to the profile URL.
       let existingId: string | undefined;
       if (ex.orcid) {
-        const { data } = await supabaseAdmin.from("researchers").select("id").eq("orcid", ex.orcid).maybeSingle();
+        const { data } = await supabaseAdmin
+          .from("researchers")
+          .select("id")
+          .eq("orcid", ex.orcid)
+          .maybeSingle();
         existingId = data?.id;
       }
       if (!existingId) {
-        const { data } = await supabaseAdmin.from("researchers").select("id").eq("official_profile_url", url).maybeSingle();
+        const { data } = await supabaseAdmin
+          .from("researchers")
+          .select("id")
+          .eq("official_profile_url", url)
+          .maybeSingle();
         existingId = data?.id;
       }
       const slug = await uniqueSlug("researchers", slugify(ex.full_name), url, existingId);
@@ -270,7 +363,14 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       };
       const entityId = await upsert("researchers", existingId, payload);
       if (!entityId) return { status: "FAILED", reason: "could not write researcher" };
-      if (!existingId) await logChange({ changeType: "NEW_RESEARCHER", entityType: "researcher", entityId, raw, title: payload.full_name });
+      if (!existingId)
+        await logChange({
+          changeType: "NEW_RESEARCHER",
+          entityType: "researcher",
+          entityId,
+          raw,
+          title: payload.full_name,
+        });
       await recordEvidence({
         entityType: "researcher",
         entityId,
@@ -293,13 +393,24 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       const gate = eventGate(url, cleanTitle, text);
       if (!gate.ok) return { status: "SKIPPED", reason: `event gate: ${gate.reason}` };
       const out = await extractEvent(input);
-      if (!out.value) return { status: "SKIPPED", reason: `event extraction unusable: ${out.errorCode ?? "no result"}` };
+      if (!out.value)
+        return {
+          status: "SKIPPED",
+          reason: `event extraction unusable: ${out.errorCode ?? "no result"}`,
+        };
       const ex = out.value;
       if (!ex.is_single_real_event || !ex.title) {
-        return { status: "SKIPPED", reason: `engine rejected event: ${ex.rejection_reason ?? "not a single event"}` };
+        return {
+          status: "SKIPPED",
+          reason: `engine rejected event: ${ex.rejection_reason ?? "not a single event"}`,
+        };
       }
 
-      const { data: existing } = await supabaseAdmin.from("events").select("id").eq("website", url).maybeSingle();
+      const { data: existing } = await supabaseAdmin
+        .from("events")
+        .select("id")
+        .eq("website", url)
+        .maybeSingle();
       const slug = await uniqueSlug("events", slugify(ex.title), url, existing?.id);
       const payload = {
         title: ex.title.slice(0, 300),
@@ -322,7 +433,14 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
       };
       const entityId = await upsert("events", existing?.id, payload);
       if (!entityId) return { status: "FAILED", reason: "could not write event" };
-      if (!existing?.id) await logChange({ changeType: "NEW_EVENT", entityType: "event", entityId, raw, title: payload.title });
+      if (!existing?.id)
+        await logChange({
+          changeType: "NEW_EVENT",
+          entityType: "event",
+          entityId,
+          raw,
+          title: payload.title,
+        });
       await recordEvidence({
         entityType: "event",
         entityId,
@@ -338,12 +456,22 @@ export async function normalizeNonVacancy(raw: RawRecord, cleanTitle: string): P
             ignoreDuplicates: true,
           });
       }
-      await applyTopics({ input, fallback: ex.topics, table: "event_topics", column: "event_id", entityId, weighted: false });
+      await applyTopics({
+        input,
+        fallback: ex.topics,
+        table: "event_topics",
+        column: "event_id",
+        entityId,
+        weighted: false,
+      });
       return { status: "NORMALIZED", entity_id: entityId };
     }
 
     default:
-      return { status: "SKIPPED", reason: `no extractor for classification ${raw.classification ?? "UNKNOWN"}` };
+      return {
+        status: "SKIPPED",
+        reason: `no extractor for classification ${raw.classification ?? "UNKNOWN"}`,
+      };
   }
 }
 
@@ -353,11 +481,18 @@ async function upsert(
   payload: Record<string, unknown>,
 ): Promise<string | undefined> {
   if (existingId) {
-    const { error } = await supabaseAdmin.from(table).update(payload as never).eq("id", existingId);
+    const { error } = await supabaseAdmin
+      .from(table)
+      .update(payload as never)
+      .eq("id", existingId);
     if (error) return undefined;
     return existingId;
   }
-  const { data } = await supabaseAdmin.from(table).insert(payload as never).select("id").maybeSingle();
+  const { data } = await supabaseAdmin
+    .from(table)
+    .insert(payload as never)
+    .select("id")
+    .maybeSingle();
   return (data as { id?: string } | null)?.id;
 }
 

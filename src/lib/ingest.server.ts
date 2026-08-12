@@ -1,27 +1,131 @@
 // Server-only ingestion engine. Never imported by client code.
 // Pipeline: DISCOVER -> FETCH -> RAW STORAGE -> CLASSIFY -> EXTRACT/NORMALIZE -> CANONICAL -> PROVENANCE
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import {
+  extractStructuredSnapshot,
+  structuredVacancyFromPayload,
+} from "./extraction/structured.server";
 
 const UA = "GeoAcademicRadarBot/1.0 (+https://geoacademic.app; academic source indexing)";
 const FETCH_TIMEOUT_MS = 20_000;
 
 /** Keyword vocabulary (English + German) used for discovery scoring and classification. */
 const CATEGORY_RULES: { category: string; kind: string; words: string[] }[] = [
-  { category: "vacancies", kind: "VACANCY", words: ["vacanc", "job", "stellenangebot", "stellen", "career", "offene-stellen", "open-position", "promotion", "doktorand", "phd-position", "recruit"] },
-  { category: "people", kind: "RESEARCHER", words: ["people", "staff", "team", "mitarbeiter", "personen", "professor", "faculty", "members"] },
-  { category: "projects", kind: "PROJECT", words: ["project", "projekte", "forschungsprojekt", "research-project"] },
-  { category: "publications", kind: "PUBLICATION", words: ["publication", "publikation", "veroeffentlichung", "veröffentlichung", "papers", "bibliograph"] },
-  { category: "events", kind: "EVENT", words: ["event", "veranstaltung", "conference", "tagung", "photogrammetric-week", "photogrammetrische-woche", "workshop", "colloqui", "kolloqui", "summer-school"] },
-  { category: "courses", kind: "COURSE", words: ["course", "lehre", "lehrveranstaltung", "teaching", "module", "vorlesung"] },
-  { category: "programmes", kind: "PROGRAMME", words: ["study", "studium", "studiengang", "degree", "master", "bachelor", "programme", "program"] },
-  { category: "research_groups", kind: "RESEARCH_GROUP", words: ["research-group", "arbeitsgruppe", "group", "abteilung", "chair", "lehrstuhl"] },
-  { category: "research", kind: "RESEARCH_NEWS", words: ["research", "forschung", "news", "aktuelles", "topics", "forschungsschwerpunkt"] },
-  { category: "department", kind: "DEPARTMENT", words: ["institute", "institut", "department", "fakult"] },
+  {
+    category: "vacancies",
+    kind: "VACANCY",
+    words: [
+      "vacanc",
+      "job",
+      "stellenangebot",
+      "stellen",
+      "career",
+      "offene-stellen",
+      "open-position",
+      "promotion",
+      "doktorand",
+      "phd-position",
+      "recruit",
+    ],
+  },
+  {
+    category: "people",
+    kind: "RESEARCHER",
+    words: [
+      "people",
+      "staff",
+      "team",
+      "mitarbeiter",
+      "personen",
+      "professor",
+      "faculty",
+      "members",
+    ],
+  },
+  {
+    category: "projects",
+    kind: "PROJECT",
+    words: ["project", "projekte", "forschungsprojekt", "research-project"],
+  },
+  {
+    category: "publications",
+    kind: "PUBLICATION",
+    words: [
+      "publication",
+      "publikation",
+      "veroeffentlichung",
+      "veröffentlichung",
+      "papers",
+      "bibliograph",
+    ],
+  },
+  {
+    category: "events",
+    kind: "EVENT",
+    words: [
+      "event",
+      "veranstaltung",
+      "conference",
+      "tagung",
+      "photogrammetric-week",
+      "photogrammetrische-woche",
+      "workshop",
+      "colloqui",
+      "kolloqui",
+      "summer-school",
+    ],
+  },
+  {
+    category: "courses",
+    kind: "COURSE",
+    words: ["course", "lehre", "lehrveranstaltung", "teaching", "module", "vorlesung"],
+  },
+  {
+    category: "programmes",
+    kind: "PROGRAMME",
+    words: [
+      "study",
+      "studium",
+      "studiengang",
+      "degree",
+      "master",
+      "bachelor",
+      "programme",
+      "program",
+    ],
+  },
+  {
+    category: "research_groups",
+    kind: "RESEARCH_GROUP",
+    words: ["research-group", "arbeitsgruppe", "group", "abteilung", "chair", "lehrstuhl"],
+  },
+  {
+    category: "research",
+    kind: "RESEARCH_NEWS",
+    words: ["research", "forschung", "news", "aktuelles", "topics", "forschungsschwerpunkt"],
+  },
+  {
+    category: "department",
+    kind: "DEPARTMENT",
+    words: ["institute", "institut", "department", "fakult"],
+  },
 ];
 
 const DOMAIN_WORDS = [
-  "photogrammet", "remote-sensing", "fernerkundung", "geoinformat", "geodes", "geomatic",
-  "computer-vision", "point-cloud", "punktwolke", "lidar", "sar", "earth-observation", "geoai", "mapping",
+  "photogrammet",
+  "remote-sensing",
+  "fernerkundung",
+  "geoinformat",
+  "geodes",
+  "geomatic",
+  "computer-vision",
+  "point-cloud",
+  "punktwolke",
+  "lidar",
+  "sar",
+  "earth-observation",
+  "geoai",
+  "mapping",
 ];
 
 export type Classification = { classification: string; confidence: number };
@@ -50,7 +154,8 @@ export function classifyUrlAndText(url: string, title: string, text: string): Cl
       if (heading.includes(w)) score += 0.15;
       if (body.includes(w.replace(/-/g, " "))) score += 0.08;
     }
-    if (score > best.confidence) best = { classification: rule.kind, confidence: Math.min(0.95, score) };
+    if (score > best.confidence)
+      best = { classification: rule.kind, confidence: Math.min(0.95, score) };
   }
   if (best.confidence < 0.2) return { classification: "GENERAL", confidence: 0.1 };
   return best;
@@ -77,7 +182,11 @@ async function timedFetch(url: string, init?: RequestInit): Promise<Response> {
       ...init,
       redirect: "follow",
       signal: controller.signal,
-      headers: { "user-agent": UA, accept: "text/html,application/xhtml+xml", ...(init?.headers ?? {}) },
+      headers: {
+        "user-agent": UA,
+        accept: "text/html,application/xhtml+xml",
+        ...(init?.headers ?? {}),
+      },
     });
   } finally {
     clearTimeout(t);
@@ -101,7 +210,8 @@ export async function robotsDisallows(origin: string): Promise<string[]> {
         const [keyRaw, ...rest] = line.split(":");
         const key = (keyRaw ?? "").trim().toLowerCase();
         const value = rest.join(":").trim();
-        if (key === "user-agent") applies = value === "*" || value.toLowerCase().includes("geoacademic");
+        if (key === "user-agent")
+          applies = value === "*" || value.toLowerCase().includes("geoacademic");
         else if (key === "disallow" && applies && value) rules.push(value);
       }
     }
@@ -164,12 +274,25 @@ export function extractLinks(html: string, baseUrl: string): { url: string; labe
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
     const href = m[1];
-    if (!href || href.startsWith("mailto:") || href.startsWith("tel:") || href.startsWith("javascript:")) continue;
+    if (
+      !href ||
+      href.startsWith("mailto:") ||
+      href.startsWith("tel:") ||
+      href.startsWith("javascript:")
+    )
+      continue;
     try {
       const abs = new URL(href, baseUrl);
       abs.hash = "";
       if (!abs.protocol.startsWith("http")) continue;
-      out.push({ url: abs.toString(), label: decodeEntities(m[2] ?? "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200) });
+      out.push({
+        url: abs.toString(),
+        label: decodeEntities(m[2] ?? "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 200),
+      });
     } catch {
       /* ignore malformed href */
     }
@@ -194,7 +317,10 @@ export type DiscoveryResult = {
  * Discovers academically relevant sources for one institution, scoped to the
  * institute host/path only — never the whole university domain.
  */
-export async function discoverInstitutionSources(institutionId: string, maxSources = 150): Promise<DiscoveryResult> {
+export async function discoverInstitutionSources(
+  institutionId: string,
+  maxSources = 150,
+): Promise<DiscoveryResult> {
   const { data: inst, error } = await supabaseAdmin
     .from("institutions")
     .select("id, name, slug, official_url, research_url, careers_url")
@@ -206,7 +332,14 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
   const seeds = [inst.research_url, inst.careers_url].filter((u): u is string => Boolean(u));
   if (seeds.length === 0 && inst.official_url) seeds.push(inst.official_url);
 
-  const result: DiscoveryResult = { institution: inst.name, seeds, discovered: 0, inserted: 0, skipped: 0, errors: [] };
+  const result: DiscoveryResult = {
+    institution: inst.name,
+    seeds,
+    discovered: 0,
+    inserted: 0,
+    skipped: 0,
+    errors: [],
+  };
   const scopes = seeds.map((s) => new URL(s));
   const candidates = new Map<string, { label: string; from: string }>();
 
@@ -223,14 +356,18 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
       }
       const html = await res.text();
       const finalUrl = res.url || seed;
-      candidates.set(new URL(finalUrl).toString(), { label: extractTitle(html) ?? inst.name, from: "seed" });
+      candidates.set(new URL(finalUrl).toString(), {
+        label: extractTitle(html) ?? inst.name,
+        from: "seed",
+      });
       for (const link of extractLinks(html, finalUrl)) {
         const u = new URL(link.url);
         const inScope = scopes.some((s) => u.host === s.host);
         if (!inScope) continue;
         if (/\.(pdf|jpg|jpeg|png|gif|zip|docx?|pptx?|xlsx?)$/i.test(u.pathname)) continue;
         if (!isDomainRelevant(u.toString(), link.label)) continue;
-        if (!candidates.has(u.toString())) candidates.set(u.toString(), { label: link.label, from: finalUrl });
+        if (!candidates.has(u.toString()))
+          candidates.set(u.toString(), { label: link.label, from: finalUrl });
       }
     } catch (e) {
       result.errors.push({ url: seed, error: e instanceof Error ? e.message : String(e) });
@@ -239,7 +376,16 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
 
   result.discovered = candidates.size;
 
-  const CATEGORY_ORDER = ["vacancies", "people", "projects", "publications", "events", "programmes", "courses", "research_groups"];
+  const CATEGORY_ORDER = [
+    "vacancies",
+    "people",
+    "projects",
+    "publications",
+    "events",
+    "programmes",
+    "courses",
+    "research_groups",
+  ];
   const ranked = Array.from(candidates.entries()).sort((a, b) => {
     const rank = (u: string) => {
       const idx = CATEGORY_ORDER.indexOf(categoryForUrl(u) ?? "");
@@ -251,8 +397,16 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
   for (const [url, meta] of ranked.slice(0, maxSources)) {
     const category = categoryForUrl(url) ?? "research";
     const sourceType =
-      category === "vacancies" ? "careers_page" : category === "research_groups" ? "research_group" : "institution";
-    const { data: existing } = await supabaseAdmin.from("sources").select("id").eq("url", url).maybeSingle();
+      category === "vacancies"
+        ? "careers_page"
+        : category === "research_groups"
+          ? "research_group"
+          : "institution";
+    const { data: existing } = await supabaseAdmin
+      .from("sources")
+      .select("id")
+      .eq("url", url)
+      .maybeSingle();
     if (existing) {
       result.skipped += 1;
       continue;
@@ -268,7 +422,8 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
         adapter_key: "html-generic",
         institution_id: inst.id,
         category,
-        priority: category === "vacancies" ? 1 : category === "people" || category === "projects" ? 2 : 4,
+        priority:
+          category === "vacancies" ? 1 : category === "people" || category === "projects" ? 2 : 4,
         status: "PENDING",
         discovered_from: meta.from,
         trust_level: 5,
@@ -292,8 +447,20 @@ export async function discoverInstitutionSources(institutionId: string, maxSourc
 /* ------------------------------------------------------------------ */
 
 export async function enqueue(
-  taskType: "DISCOVER" | "FETCH" | "CLASSIFY" | "EXTRACT" | "NORMALIZE" | "VERIFY" | "PROMOTE_INSTITUTION" | "IMPORT_PUBLICATIONS",
-  opts: { source_id?: string | undefined; institution_id?: string | undefined; payload?: Record<string, unknown> | undefined },
+  taskType:
+    | "DISCOVER"
+    | "FETCH"
+    | "CLASSIFY"
+    | "EXTRACT"
+    | "NORMALIZE"
+    | "VERIFY"
+    | "PROMOTE_INSTITUTION"
+    | "IMPORT_PUBLICATIONS",
+  opts: {
+    source_id?: string | undefined;
+    institution_id?: string | undefined;
+    payload?: Record<string, unknown> | undefined;
+  },
 ): Promise<void> {
   if (opts.source_id) {
     const { data: dup } = await supabaseAdmin
@@ -313,6 +480,15 @@ export async function enqueue(
   });
 }
 
+const NORMALIZABLE_CLASSES = new Set([
+  "PROJECT",
+  "RESEARCHER",
+  "EVENT",
+  "VACANCY",
+  "PROGRAMME",
+  "COURSE",
+]);
+
 const NORMALIZE_CLASS_PRIORITY: Record<string, number> = {
   PROJECT: 0,
   RESEARCHER: 1,
@@ -329,7 +505,8 @@ const NORMALIZE_CLASS_PRIORITY: Record<string, number> = {
 };
 
 function queuedClassification(task: { payload?: unknown }): string {
-  if (!task.payload || typeof task.payload !== "object" || Array.isArray(task.payload)) return "UNKNOWN";
+  if (!task.payload || typeof task.payload !== "object" || Array.isArray(task.payload))
+    return "UNKNOWN";
   const value = (task.payload as Record<string, unknown>)["classification"];
   return typeof value === "string" ? value.toUpperCase() : "UNKNOWN";
 }
@@ -384,7 +561,12 @@ export async function runQueueBatch(
   const processTask = async (task: (typeof queue)[number]) => {
     const { data: claimed, error: claimError } = await supabaseAdmin
       .from("ingestion_tasks")
-      .update({ status: "PROCESSING", attempts: task.attempts + 1, started_at: new Date().toISOString(), last_error: null })
+      .update({
+        status: "PROCESSING",
+        attempts: task.attempts + 1,
+        started_at: new Date().toISOString(),
+        last_error: null,
+      })
       .eq("id", task.id)
       .in("status", ["QUEUED", "RETRY"])
       .select("id")
@@ -409,7 +591,8 @@ export async function runQueueBatch(
         const r = await promoteInstitution(task.institution_id);
         detail = `PROMOTE ${r.institution}: ${r.matched ? `matched ${r.openalex_id}${r.promoted ? " (promoted)" : ""}` : `no match (${r.reason})`}`;
       } else if (task.task_type === "IMPORT_PUBLICATIONS" && task.institution_id) {
-        const { importInstitutionPublications, promoteInstitution } = await import("./openalex.server");
+        const { importInstitutionPublications, promoteInstitution } =
+          await import("./openalex.server");
         const { data: inst } = await supabaseAdmin
           .from("institutions")
           .select("openalex_id")
@@ -501,7 +684,11 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   if (!(await isAllowed(source.url))) {
     await supabaseAdmin
       .from("sources")
-      .update({ status: "BLOCKED", last_failure_at: new Date().toISOString(), last_error: "Disallowed by robots.txt" })
+      .update({
+        status: "BLOCKED",
+        last_failure_at: new Date().toISOString(),
+        last_error: "Disallowed by robots.txt",
+      })
       .eq("id", source.id);
     await recordRun(false, false, "Disallowed by robots.txt");
     throw new Error("Disallowed by robots.txt");
@@ -514,7 +701,11 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
     const message = e instanceof Error ? e.message : String(e);
     await supabaseAdmin
       .from("sources")
-      .update({ status: "FAILED", last_failure_at: new Date().toISOString(), last_error: message.slice(0, 500) })
+      .update({
+        status: "FAILED",
+        last_failure_at: new Date().toISOString(),
+        last_error: message.slice(0, 500),
+      })
       .eq("id", source.id);
     await recordRun(false, false, message);
     throw e;
@@ -539,6 +730,7 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const html = await res.text();
   const finalUrl = res.url || source.url;
   const title = extractTitle(html);
+  const structured = extractStructuredSnapshot(html, finalUrl);
   const text = extractText(html);
   const hash = await sha256(text);
   const { classification, confidence } = classifyUrlAndText(finalUrl, title ?? "", text);
@@ -561,7 +753,12 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
         source_id: source.id,
         adapter_key: source.adapter_key ?? "html-generic",
         external_id: finalUrl,
-        payload: { title, length: text.length, category: source.category } as never,
+        payload: {
+          title,
+          length: text.length,
+          category: source.category,
+          ...(structured ? { structured } : {}),
+        } as never,
         source_url: source.url,
         final_url: finalUrl,
         http_status: status,
@@ -586,7 +783,10 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const baseHours = refreshHoursFor(schedule, source.category);
   const nextHours = changed
     ? baseHours
-    : Math.min(Math.round((source.refresh_frequency_hours ?? baseHours) * 1.5), baseHours * schedule.adaptive_backoff_max);
+    : Math.min(
+        Math.round((source.refresh_frequency_hours ?? baseHours) * 1.5),
+        baseHours * schedule.adaptive_backoff_max,
+      );
 
   await supabaseAdmin
     .from("sources")
@@ -600,15 +800,25 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
     })
     .eq("id", source.id);
   await recordRun(true, changed, null);
-  // Unchanged content stops here: no extraction, no model call, no canonical write.
-  if (changed) {
+  // Unchanged content stops here. Changed pages only enter semantic/canonical
+  // normalization when a canonical writer actually exists for the class.
+  // Generic research/news/department/publication-index pages are useful raw
+  // evidence but should not occupy the extraction queue.
+  if (changed && NORMALIZABLE_CLASSES.has(classification)) {
     await enqueue("NORMALIZE", {
       source_id: source.id,
       institution_id: source.institution_id ?? undefined,
       payload: { classification },
     });
+  } else if (changed && rawId) {
+    await supabaseAdmin
+      .from("raw_records")
+      .update({
+        normalization_status: "SKIPPED",
+        normalization_error: `no canonical extractor for ${classification}`,
+      })
+      .eq("id", rawId);
   }
-
 
   // A vacancy listing page is an index, not a record: register each individual
   // posting it links to as its own source so every position keeps its own URL.
@@ -626,7 +836,11 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
     for (const posting of postings.slice(0, 60)) {
       if (seen.has(posting.url)) continue;
       seen.add(posting.url);
-      const { data: dup } = await supabaseAdmin.from("sources").select("id").eq("url", posting.url).maybeSingle();
+      const { data: dup } = await supabaseAdmin
+        .from("sources")
+        .select("id")
+        .eq("url", posting.url)
+        .maybeSingle();
       if (dup) continue;
       const { data: child } = await supabaseAdmin
         .from("sources")
@@ -647,12 +861,22 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
         })
         .select("id")
         .maybeSingle();
-      if (child) await enqueue("FETCH", { source_id: child.id, institution_id: source.institution_id ?? undefined });
+      if (child)
+        await enqueue("FETCH", {
+          source_id: child.id,
+          institution_id: source.institution_id ?? undefined,
+        });
     }
   }
 
-  return { url: source.url, final_url: finalUrl, http_status: status, changed, classification, raw_record_id: rawId };
-
+  return {
+    url: source.url,
+    final_url: finalUrl,
+    http_status: status,
+    changed,
+    classification,
+    raw_record_id: rawId,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -664,7 +888,10 @@ const DATE_RE =
 
 function parseDeadline(text: string): string | null {
   const windowText = text.slice(0, 8000);
-  const cue = /(deadline|bewerbungsfrist|application by|apply by|closing date|bewerbungsschluss)/i.exec(windowText);
+  const cue =
+    /(deadline|bewerbungsfrist|application by|apply by|closing date|bewerbungsschluss)/i.exec(
+      windowText,
+    );
   const scope = cue ? windowText.slice(cue.index, cue.index + 200) : "";
   const m = DATE_RE.exec(scope);
   if (!m) return null;
@@ -692,26 +919,38 @@ function deriveStatus(deadline: string | null, rolling: boolean): string {
   return "open";
 }
 
-export type NormalizeResult = { status: "NORMALIZED" | "SKIPPED" | "FAILED"; reason?: string | undefined; entity_id?: string | undefined };
+export type NormalizeResult = {
+  status: "NORMALIZED" | "SKIPPED" | "FAILED";
+  reason?: string | undefined;
+  entity_id?: string | undefined;
+};
 
 /* ------------------------------------------------------------------ */
 /* SINGLE-POSTING GATE                                                 */
 /* ------------------------------------------------------------------ */
 
 /** Words that mark a page as a careers *landing/listing* page, not one posting. */
-const LISTING_TITLE = /^(careers?|jobs?|vacancies|open (job )?positions?|positions?|recruitment|stellenangebote|stellen|job ?board|work (with|for) us|join (our team|us)|life at|our people|talent|employment)\b/i;
-const NON_POSTING = /(meet [a-z]|faces|blog|news|resources?|contact|use ?cases?|products?|solutions?|api\b|webinar|podcast|events?|privacy|imprint|impressum|cookie|newsletter|about us|our story|benefits|culture|diversity|internship programme overview)/i;
+const LISTING_TITLE =
+  /^(careers?|jobs?|vacancies|open (job )?positions?|positions?|recruitment|stellenangebote|stellen|job ?board|work (with|for) us|join (our team|us)|life at|our people|talent|employment)\b/i;
+const NON_POSTING =
+  /(meet [a-z]|faces|blog|news|resources?|contact|use ?cases?|products?|solutions?|api\b|webinar|podcast|events?|privacy|imprint|impressum|cookie|newsletter|about us|our story|benefits|culture|diversity|internship programme overview)/i;
 /** A real posting names a role in its title. */
-const ROLE_TITLE = /(phd|ph\.d|doctoral|doktorand|promotionsstelle|post ?doc|postdoctoral|professor|professur|juniorprofessur|lecturer|research(er)?|scientist|engineer|ingenieur|developer|analyst|technician|techniker|specialist|consultant|surveyor|geomatics|remote sensing|photogrammetr|gis\b|wissenschaftliche[rn]? mitarbeiter|w\/?m\/?d|m\/?w\/?d|f\/?m\/?d|assistant|associate|fellow|intern(ship)?|trainee|manager|lead|head of)/i;
+const ROLE_TITLE =
+  /(phd|ph\.d|doctoral|doktorand|promotionsstelle|post ?doc|postdoctoral|professor|professur|juniorprofessur|lecturer|research(er)?|scientist|engineer|ingenieur|developer|analyst|technician|techniker|specialist|consultant|surveyor|geomatics|remote sensing|photogrammetr|gis\b|wissenschaftliche[rn]? mitarbeiter|w\/?m\/?d|m\/?w\/?d|f\/?m\/?d|assistant|associate|fellow|intern(ship)?|trainee|manager|lead|head of)/i;
 /** A real posting reads like a job ad. */
-const POSTING_BODY = /(application deadline|apply by|closing date|deadline for applications|bewerbungsfrist|bewerbungen? bis|reference number|kennziffer|ref\.? no|job id|requisition|full[- ]time|part[- ]time|vollzeit|teilzeit|fixed[- ]term|befristet|salary|remuneration|entgeltgruppe|verg[uü]tung|tv-?l|tv-?[oö]d|e ?13|start(ing)? date|eintrittstermin|your (tasks|profile|responsibilities)|ihre aufgaben|ihr profil|we offer|wir bieten|required qualifications|qualification[s]? required|how to apply|submit your application|bewerbungsunterlagen)/i;
+const POSTING_BODY =
+  /(application deadline|apply by|closing date|deadline for applications|bewerbungsfrist|bewerbungen? bis|reference number|kennziffer|ref\.? no|job id|requisition|full[- ]time|part[- ]time|vollzeit|teilzeit|fixed[- ]term|befristet|salary|remuneration|entgeltgruppe|verg[uü]tung|tv-?l|tv-?[oö]d|e ?13|start(ing)? date|eintrittstermin|your (tasks|profile|responsibilities)|ihre aufgaben|ihr profil|we offer|wir bieten|required qualifications|qualification[s]? required|how to apply|submit your application|bewerbungsunterlagen)/i;
 
 /**
  * True only when a fetched page really is ONE vacancy posting.
  * Careers hubs, marketing and resource pages under a /careers/ path must never
  * become an opportunity row — that is how the domain loses credibility.
  */
-export function looksLikeSinglePosting(url: string, title: string, text: string): { ok: boolean; reason?: string } {
+export function looksLikeSinglePosting(
+  url: string,
+  title: string,
+  text: string,
+): { ok: boolean; reason?: string } {
   const t = (title || "").trim();
   const body = text || "";
   const path = pathOf(url);
@@ -723,14 +962,17 @@ export function looksLikeSinglePosting(url: string, title: string, text: string)
   }
   if (body.length < 600) return { ok: false, reason: "page too thin to be a posting" };
   if (!ROLE_TITLE.test(t)) return { ok: false, reason: "title does not name a role" };
-  if (!POSTING_BODY.test(body)) return { ok: false, reason: "no job-ad signals (deadline, contract, tasks, salary)" };
+  if (!POSTING_BODY.test(body))
+    return { ok: false, reason: "no job-ad signals (deadline, contract, tasks, salary)" };
   return { ok: true };
 }
 
 export async function normalizeSource(sourceId: string): Promise<NormalizeResult> {
   const { data: raw } = await supabaseAdmin
     .from("raw_records")
-    .select("id, final_url, page_title, text_content, classification, institution_id, source_id, content_hash")
+    .select(
+      "id, final_url, page_title, text_content, classification, classification_confidence, institution_id, source_id, content_hash, payload",
+    )
     .eq("source_id", sourceId)
     .order("fetched_at", { ascending: false })
     .limit(1)
@@ -739,7 +981,10 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   if (!raw) return { status: "SKIPPED", reason: "no raw record for source" };
 
   const mark = async (status: string, error: string | null) => {
-    await supabaseAdmin.from("raw_records").update({ normalization_status: status, normalization_error: error }).eq("id", raw.id);
+    await supabaseAdmin
+      .from("raw_records")
+      .update({ normalization_status: status, normalization_error: error })
+      .eq("id", raw.id);
   };
 
   const rawTitle = (raw.page_title ?? "").trim();
@@ -751,7 +996,10 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       return { status: "SKIPPED", reason: "no page title" };
     }
     const { normalizeNonVacancy } = await import("./extraction/canonical.server");
-    const outcome = await normalizeNonVacancy(raw, rawTitle.split(/\s*[|·–—]\s*/)[0]?.trim() || rawTitle);
+    const outcome = await normalizeNonVacancy(
+      raw,
+      rawTitle.split(/\s*[|·–—]\s*/)[0]?.trim() || rawTitle,
+    );
     await mark(outcome.status, outcome.status === "NORMALIZED" ? null : (outcome.reason ?? null));
     return outcome;
   }
@@ -762,7 +1010,10 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   }
   const title = (raw.page_title ?? "")
     // Strip site chrome that job portals append to <title>.
-    .replace(/\s*[|·–—-]\s*[^|·–—-]*(university|universit\u00e4t|hochschule|institut\w*|careers?|karriere)[^|·–—-]*$/gi, "")
+    .replace(
+      /\s*[|·–—-]\s*[^|·–—-]*(university|universit\u00e4t|hochschule|institut\w*|careers?|karriere)[^|·–—-]*$/gi,
+      "",
+    )
     .replace(/\s*(job\s*details?|stellendetails|stellenanzeige|job\s*description)\s*$/i, "")
     .trim();
   if (!title) {
@@ -783,27 +1034,45 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   const isPhd = /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
   const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
 
-  // Semantic enrichment runs AFTER the deterministic gate and can only add
-  // validated detail. If the model rejects the page as not a real single
-  // posting, we skip it — but it can never promote a page the gate refused.
-  const { enrichVacancy } = await import("./extraction/enrich.server");
-  const enriched = await enrichVacancy({
-    url: raw.final_url ?? "",
-    title,
-    text,
-    sourceId: raw.source_id,
-    rawRecordId: raw.id,
-    contentHash: raw.content_hash,
-  });
-  const ex = enriched.extraction;
-  if (ex && !ex.is_single_real_position) {
-    await mark("SKIPPED", `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`);
-    return { status: "SKIPPED", reason: `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}` };
+  // Fast path: an official single-posting page with an explicit deadline or
+  // schema.org JobPosting metadata does not need an LLM just to prove that it
+  // exists. Nemotron is reserved for ambiguous postings that need semantic
+  // interpretation. This keeps verification source-backed and dramatically
+  // reduces model calls.
+  const structuredJob = structuredVacancyFromPayload(raw.payload, raw.final_url ?? "");
+  const structuredDeadline = structuredJob?.application_deadline ?? null;
+  const deterministicEnough = Boolean(structuredJob || deterministicDeadline || rolling);
+
+  let ex: Awaited<
+    ReturnType<(typeof import("./extraction/enrich.server"))["enrichVacancy"]>
+  >["extraction"] = null;
+  if (!deterministicEnough) {
+    const { enrichVacancy } = await import("./extraction/enrich.server");
+    const enriched = await enrichVacancy({
+      url: raw.final_url ?? "",
+      title,
+      text,
+      sourceId: raw.source_id,
+      rawRecordId: raw.id,
+      contentHash: raw.content_hash,
+    });
+    ex = enriched.extraction;
+    if (ex && !ex.is_single_real_position) {
+      await mark(
+        "SKIPPED",
+        `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`,
+      );
+      return {
+        status: "SKIPPED",
+        reason: `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`,
+      };
+    }
   }
 
-  const deadline = deterministicDeadline ?? ex?.application_deadline ?? null;
+  const deadline = deterministicDeadline ?? structuredDeadline ?? ex?.application_deadline ?? null;
   const status = deriveStatus(deadline, rolling);
   const usedModel = Boolean(ex);
+  const usedStructured = Boolean(structuredJob);
 
   const { data: existing } = await supabaseAdmin
     .from("opportunities")
@@ -814,7 +1083,11 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   // Two postings can share a title (e.g. the same role advertised per language),
   // so keep slugs unique by appending a stable suffix from the source URL.
   let uniqueSlug = slug;
-  const { data: slugOwner } = await supabaseAdmin.from("opportunities").select("id").eq("slug", slug).maybeSingle();
+  const { data: slugOwner } = await supabaseAdmin
+    .from("opportunities")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
   if (slugOwner && slugOwner.id !== existing?.id) {
     const suffix = (await sha256(raw.final_url ?? raw.id)).slice(0, 6);
     uniqueSlug = `${slug.slice(0, 70)}-${suffix}`;
@@ -825,17 +1098,17 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     slug: uniqueSlug,
     normalized_title: title.toLowerCase().slice(0, 300),
     institution_id: raw.institution_id,
-    opportunity_type: ((ex?.opportunity_type ?? (isPhd ? "phd" : "other")) as string) as never,
+    opportunity_type: (ex?.opportunity_type ?? (isPhd ? "phd" : "other")) as string as never,
     sector: ex?.sector ?? "academic",
-    description: (ex?.summary ?? text).slice(0, 2000),
+    description: (ex?.summary ?? structuredJob?.description ?? text).slice(0, 2000),
     requirements: ex?.requirements ?? null,
     funding_type: ex?.funding_type ?? null,
     salary_text: ex?.salary_text ?? null,
     supervisor_name: ex?.supervisor_name ?? null,
-    city: ex?.city ?? null,
-    country: ex?.country ?? null,
-    start_date: ex?.start_date ?? null,
-    application_url: ex?.application_url ?? raw.final_url,
+    city: ex?.city ?? structuredJob?.city ?? null,
+    country: ex?.country ?? structuredJob?.country ?? null,
+    start_date: ex?.start_date ?? structuredJob?.start_date ?? null,
+    application_url: ex?.application_url ?? structuredJob?.application_url ?? raw.final_url,
     official_source_url: raw.final_url,
     status: status as never,
     confidence: (deadline ? "medium" : "low") as never,
@@ -843,12 +1116,15 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     last_checked_at: new Date().toISOString(),
     application_deadline: deadline,
     is_demo: false,
-    extracted_by: usedModel ? "NVIDIA_NEMOTRON" : "DETERMINISTIC",
+    extracted_by: usedModel
+      ? "NVIDIA_NEMOTRON"
+      : usedStructured
+        ? "STRUCTURED_METADATA"
+        : "DETERMINISTIC",
     extraction_model: usedModel ? "nvidia/nemotron-3-ultra-550b-a55b" : null,
     extraction_confidence: ex?.confidence ?? null,
     extraction_timestamp: usedModel ? new Date().toISOString() : null,
   };
-
 
   let entityId = existing?.id;
   if (entityId) {
@@ -858,7 +1134,11 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       return { status: "FAILED", reason: error.message };
     }
   } else {
-    const { data: ins, error } = await supabaseAdmin.from("opportunities").insert(payload).select("id").maybeSingle();
+    const { data: ins, error } = await supabaseAdmin
+      .from("opportunities")
+      .insert(payload)
+      .select("id")
+      .maybeSingle();
     if (error) {
       await mark("FAILED", error.message);
       return { status: "FAILED", reason: error.message };
@@ -910,7 +1190,10 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       .eq("institution_id", raw.institution_id)
       .neq("id", entityId)
       .limit(50);
-    const twin = (twins ?? []).find((t) => t.normalized_title && payload.normalized_title.startsWith(t.normalized_title.slice(0, 25)));
+    const twin = (twins ?? []).find(
+      (t) =>
+        t.normalized_title && payload.normalized_title.startsWith(t.normalized_title.slice(0, 25)),
+    );
     if (twin) {
       const { data: known } = await supabaseAdmin
         .from("duplicate_candidates")
@@ -924,7 +1207,8 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
           entity_type: "opportunity",
           primary_id: twin.id,
           duplicate_id: entityId,
-          match_reason: "Near-identical title at the same institution (likely language variant of one posting)",
+          match_reason:
+            "Near-identical title at the same institution (likely language variant of one posting)",
           score: 0.8,
         });
       }
