@@ -17,14 +17,16 @@ const hubGlobeQuery = queryOptions({
   queryKey: ["hub-globe"],
   queryFn: async () => {
     const [institutions, opportunities, edges] = await Promise.all([
-      supabase.from("institutions").select("id, name, slug, country, latitude, longitude"),
+      supabase.from("institutions").select("id, name, slug, country, latitude, longitude").eq("is_demo", false),
       supabase
         .from("opportunities")
         .select("institution_id")
-        .in("status", ["open", "closing_soon", "rolling", "possibly_open"]),
+        .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
+        .eq("is_demo", false),
       supabase
         .from("collaboration_edges")
         .select("source_entity_id, target_entity_id, weight")
+        .eq("is_demo", false)
         .order("weight", { ascending: false })
         .limit(80),
     ]);

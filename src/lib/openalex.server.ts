@@ -378,6 +378,9 @@ export async function importInstitutionPublications(
       }
       if (!pubId) continue;
 
+      const { ensurePulseForEntity } = await import("./pulse.server");
+      await ensurePulseForEntity("publication", pubId);
+
       await supabaseAdmin
         .from("publication_institutions")
         .upsert({ publication_id: pubId, institution_id: inst.id } as never, {

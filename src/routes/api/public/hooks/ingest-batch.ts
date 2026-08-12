@@ -8,7 +8,8 @@ type Body = {
     | "deadline-sweep"
     | "backfill-raw"
     | "backfill-providers"
-    | "drain-providers";
+    | "drain-providers"
+    | "sync-pulse";
   limit?: number;
   trigger?: string;
 };
@@ -108,6 +109,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           return json({ action, ...result });
         }
 
+        if (action === "sync-pulse") {
+          const { backfillPulseEvents } = await import("@/lib/pulse.server");
+          const result = await backfillPulseEvents(Math.min(250, Math.max(10, body.limit ?? 120)));
+          return json({ action, ...result });
+        }
+
         // Structured-provider drain (OpenAlex/Crossref only). Never calls a model,
         // so it is safe to run on its own cheap cadence.
         if (action === "drain-providers") {
@@ -184,7 +191,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           const normalizeTarget = queueState.mode === "BACKLOG" ? 40 : Math.min(2, batch);
           const normalizeWave = queueState.mode === "BACKLOG" ? 8 : Math.min(2, batch);
           const normalizeBudgetMs = queueState.mode === "BACKLOG" ? 70_000 : 30_000;
-          const emptyResult = () => ({ processed: 0, ok: 0, failed: 0, dead: 0, details: [] as string[] });
+          const emptyResult = () => ({ processed: 0, ok: 0, failed: 0, dead: 0, normalized: 0, skipped: 0, details: [] as string[] });
           const result = emptyResult();
           let normalizeWaves = 0;
           let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
@@ -197,6 +204,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             result.ok += wave.ok;
             result.failed += wave.failed;
             result.dead += wave.dead;
+            result.normalized += wave.normalized;
+            result.skipped += wave.skipped;
             result.details.push(...wave.details);
 
             if (wave.processed === 0) break;
@@ -212,6 +221,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             result.ok = collection.ok;
             result.failed = collection.failed;
             result.dead = collection.dead;
+            result.normalized = collection.normalized;
+            result.skipped = collection.skipped;
             result.details.push(...collection.details);
           }
           const { data: llm } = await supabaseAdmin
@@ -239,6 +250,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
                   normalize_waves: taskGroup === "NORMALIZE" ? normalizeWaves : 0,
                   normalize_target: taskGroup === "NORMALIZE" ? normalizeTarget : 0,
                   normalize_budget_ms: taskGroup === "NORMALIZE" ? normalizeBudgetMs : 0,
+                  normalized: result.normalized,
+                  skipped: result.skipped,
                   sample: result.details.slice(0, 20),
                 } as never,
               })

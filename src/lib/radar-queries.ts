@@ -43,6 +43,7 @@ export const opportunitiesQuery = queryOptions({
          institutions ( name, slug, abbreviation ),
          opportunity_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("application_deadline", { ascending: true, nullsFirst: false })
       .limit(200);
@@ -59,6 +60,7 @@ export const pulseQuery = queryOptions({
       .select(
         "id, category, title, summary, event_date, importance, link_url, source_url, verification_status, confidence, is_demo, country",
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("importance", { ascending: false })
       .order("event_date", { ascending: false })
@@ -84,7 +86,7 @@ export const countsQuery = queryOptions({
         const { count, error } = await supabase.from(t).select("id", {
           count: "exact",
           head: true,
-        });
+        }).eq("is_demo", false);
         if (error) throw error;
         return [t, count ?? 0] as const;
       }),
@@ -99,7 +101,8 @@ export const openJobCountQuery = queryOptions({
     const { count, error } = await supabase
       .from("opportunities")
       .select("id", { count: "exact", head: true })
-      .in("status", ["open", "closing_soon", "rolling"]);
+      .in("status", ["open", "closing_soon", "rolling"])
+      .eq("is_demo", false);
     if (error) throw error;
     return count ?? 0;
   },
@@ -115,6 +118,7 @@ export const institutionsQuery = queryOptions({
          research_url, description, verification_status, is_demo,
          institution_topics ( weight, research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("name");
     if (error) throw error;
@@ -133,6 +137,7 @@ export const researchersQuery = queryOptions({
          institutions ( name, slug, country ),
          researcher_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("full_name");
     if (error) throw error;
@@ -167,6 +172,7 @@ export const eventsQuery = queryOptions({
          verification_status, is_demo,
          event_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
@@ -186,6 +192,7 @@ export const publicationsQuery = queryOptions({
          institutions!publications_institution_id_fkey ( name, slug ),
          publication_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("year", { ascending: false, nullsFirst: false })
       .order("citation_count", { ascending: false, nullsFirst: false })
@@ -207,6 +214,7 @@ export const projectsQuery = queryOptions({
          institutions!projects_institution_id_fkey ( name, slug, country ),
          project_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
@@ -225,6 +233,7 @@ export const coursesQuery = queryOptions({
          institutions ( name, slug, country ),
          course_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
@@ -241,9 +250,10 @@ export const collaborationQuery = queryOptions({
         .select(
           "id, source_entity_id, target_entity_id, edge_type, weight, evidence_url, verification_status, is_demo",
         )
+        .eq("is_demo", false)
         .order("weight", { ascending: false })
         .limit(400),
-      supabase.from("institutions").select("id, name, slug, abbreviation, country"),
+      supabase.from("institutions").select("id, name, slug, abbreviation, country").eq("is_demo", false),
     ]);
     if (edges.error) throw edges.error;
     if (institutions.error) throw institutions.error;

@@ -90,15 +90,17 @@ async function fetchLandscape() {
   const [inst, opps, courses, projects, pubs, researchers, events] = await Promise.all([
     supabase
       .from("institutions")
-      .select("id, name, slug, country, continent, city, institution_type"),
+      .select("id, name, slug, country, continent, city, institution_type")
+      .eq("is_demo", false),
     supabase
       .from("opportunities")
-      .select("id, institution_id, country, status, application_deadline"),
-    supabase.from("courses").select("id, institution_id, degree_type"),
-    supabase.from("projects").select("id, institution_id, status"),
-    supabase.from("publications").select("id, institution_id, publication_date, year"),
-    supabase.from("researchers").select("id, institution_id"),
-    supabase.from("events").select("id, country, start_date"),
+      .select("id, institution_id, country, status, application_deadline")
+      .eq("is_demo", false),
+    supabase.from("courses").select("id, institution_id, degree_type").eq("is_demo", false),
+    supabase.from("projects").select("id, institution_id, status").eq("is_demo", false),
+    supabase.from("publications").select("id, institution_id, publication_date, year").eq("is_demo", false),
+    supabase.from("researchers").select("id, institution_id").eq("is_demo", false),
+    supabase.from("events").select("id, country, start_date").eq("is_demo", false),
   ]);
   const err =
     inst.error ||
@@ -242,6 +244,7 @@ export function countryDetailQuery(slug: string) {
              verification_status, is_demo, institutions ( name, slug )`,
           )
           .or(`institution_id.in.(${ids.join(",")}),country.eq.${country}`)
+          .eq("is_demo", false)
           .order("is_demo", { ascending: true })
           .order("application_deadline", { ascending: true, nullsFirst: false })
           .limit(60),
@@ -252,23 +255,27 @@ export function countryDetailQuery(slug: string) {
              institutions ( name, slug )`,
           )
           .in("institution_id", ids)
+          .eq("is_demo", false)
           .order("is_demo", { ascending: true })
           .order("title"),
         supabase
           .from("events")
           .select("id, title, slug, start_date, location, organization, website")
           .eq("country", country)
+          .eq("is_demo", false)
           .order("is_demo", { ascending: true })
           .order("start_date"),
         supabase
           .from("researchers")
           .select("id, full_name, slug, academic_title, current_position, institutions ( name, slug )")
           .in("institution_id", ids)
+          .eq("is_demo", false)
           .limit(40),
         supabase
           .from("projects")
           .select("id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug )")
           .in("institution_id", ids)
+          .eq("is_demo", false)
           .order("is_demo", { ascending: true })
           .order("start_date", { ascending: false, nullsFirst: false })
           .limit(30),
@@ -327,6 +334,7 @@ export const programmeCatalogueQuery = queryOptions({
          institutions ( name, slug, country, city, continent ),
          course_topics ( research_topics ( name, slug ) )`,
       )
+      .eq("is_demo", false)
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;

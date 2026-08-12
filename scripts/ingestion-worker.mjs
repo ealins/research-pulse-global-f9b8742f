@@ -32,7 +32,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function drainOnce() {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 95000);
+  const timeout = setTimeout(() => controller.abort(), 300000);
   try {
     const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
       method: "POST",
@@ -58,9 +58,31 @@ async function drainOnce() {
   }
 }
 
+async function syncPulse() {
+  const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      apikey: API_KEY,
+    },
+    body: JSON.stringify({ action: "sync-pulse", limit: 120, trigger: "continuous-worker" }),
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`pulse sync HTTP ${response.status}`);
+  return payload;
+}
+
 console.log(`GeoAcademic continuous worker -> ${BASE_URL}`);
 console.log("Press Ctrl+C to stop. NVIDIA concurrency remains controlled by the server.");
 
+try {
+  const pulse = await syncPulse();
+  console.log(`${new Date().toISOString()} PULSE checked=${pulse.checked ?? 0} projected=${pulse.projected ?? 0}`);
+} catch (error) {
+  console.error(`${new Date().toISOString()} pulse sync warning:`, error instanceof Error ? error.message : String(error));
+}
+
+let loops = 0;
 while (!stopping) {
   try {
     const result = await drainOnce();
@@ -68,8 +90,17 @@ while (!stopping) {
     const group = result.task_group || (result.skipped ? "IDLE" : "UNKNOWN");
     const failures = Number(result.failed || 0) + Number(result.dead || 0);
     console.log(
-      `${new Date().toISOString()} ${group} processed=${processed} ok=${result.ok ?? 0} failed=${result.failed ?? 0}`,
+      `${new Date().toISOString()} ${group} processed=${processed} normalized=${result.normalized ?? 0} skipped=${result.skipped ?? 0} ok=${result.ok ?? 0} failed=${result.failed ?? 0}`,
     );
+    loops += 1;
+    if (loops % 20 === 0) {
+      try {
+        const pulse = await syncPulse();
+        console.log(`${new Date().toISOString()} PULSE checked=${pulse.checked ?? 0} projected=${pulse.projected ?? 0}`);
+      } catch (error) {
+        console.error(`${new Date().toISOString()} pulse sync warning:`, error instanceof Error ? error.message : String(error));
+      }
+    }
     await sleep(failures > 0 ? ERROR_DELAY_MS : processed > 0 ? ACTIVE_DELAY_MS : IDLE_DELAY_MS);
   } catch (error) {
     console.error(

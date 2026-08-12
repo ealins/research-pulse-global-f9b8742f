@@ -300,6 +300,109 @@ export function extractLinks(html: string, baseUrl: string): { url: string; labe
   return out;
 }
 
+
+
+const DETAIL_KIND_BY_CATEGORY: Record<string, string> = {
+  vacancies: "VACANCY",
+  people: "RESEARCHER",
+  projects: "PROJECT",
+  events: "EVENT",
+  programmes: "PROGRAMME",
+  courses: "COURSE",
+};
+
+function detailKindFromAdapter(adapterKey: string | null): string | null {
+  if (!adapterKey) return null;
+  const m = /^html-(vacancies|people|projects|events|programmes|courses)-detail$/.exec(adapterKey);
+  return m?.[1] ? (DETAIL_KIND_BY_CATEGORY[m[1]] ?? null) : adapterKey === "html-vacancy" ? "VACANCY" : null;
+}
+
+function likelyDetailLink(category: string, url: string, label: string, parentUrl: string): boolean {
+  let child: URL;
+  let parent: URL;
+  try {
+    child = new URL(url);
+    parent = new URL(parentUrl);
+  } catch {
+    return false;
+  }
+  if (child.host !== parent.host || child.toString() === parent.toString()) return false;
+  if (/\.(pdf|jpg|jpeg|png|gif|zip|docx?|pptx?|xlsx?)$/i.test(child.pathname)) return false;
+
+  const text = `${child.pathname} ${label}`.toLowerCase();
+  const generic = /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?)$/i;
+  if (generic.test(label.trim())) return false;
+
+  const depth = child.pathname.split("/").filter(Boolean).length;
+  const parentDepth = parent.pathname.split("/").filter(Boolean).length;
+  if (depth < Math.max(2, parentDepth)) return false;
+
+  switch (category) {
+    case "people":
+      return /(people|staff|team|faculty|profile|person|member|researcher|professor|mitarbeiter)/i.test(text) && depth >= 2;
+    case "projects":
+      return /(project|projekt|research[-_/ ]?project)/i.test(text) && depth >= 2;
+    case "events":
+      return /(event|conference|workshop|seminar|colloqui|symposium|tagung|veranstaltung|summer[-_/ ]?school)/i.test(text) && depth >= 2;
+    case "programmes":
+      return /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(text) && depth >= 2;
+    case "courses":
+      return /(course|module|lecture|class|teaching|lehre|vorlesung)/i.test(text) && depth >= 2;
+    default:
+      return false;
+  }
+}
+
+/**
+ * Expands high-value listing pages into individual detail sources. Detail
+ * sources do not recurse, so one directory cannot explode into a site crawl.
+ */
+async function registerDetailSources(input: {
+  html: string;
+  finalUrl: string;
+  category: string | null;
+  institutionId: string | null;
+  adapterKey: string | null;
+}): Promise<number> {
+  const category = input.category ?? "";
+  if (!DETAIL_KIND_BY_CATEGORY[category] || input.adapterKey?.endsWith("-detail")) return 0;
+  if (category === "vacancies") return 0; // vacancy expansion has stricter legacy logic below
+
+  const links = extractLinks(input.html, input.finalUrl).filter((l) =>
+    likelyDetailLink(category, l.url, l.label, input.finalUrl),
+  );
+  let insertedCount = 0;
+  const seen = new Set<string>();
+  for (const link of links.slice(0, 80)) {
+    if (seen.has(link.url)) continue;
+    seen.add(link.url);
+    const { data: existing } = await supabaseAdmin.from("sources").select("id").eq("url", link.url).maybeSingle();
+    if (existing) continue;
+    const { data: child, error } = await supabaseAdmin
+      .from("sources")
+      .insert({
+        url: link.url,
+        canonical_url: link.url,
+        name: (link.label || link.url).slice(0, 200),
+        source_type: category === "projects" ? ("project" as never) : ("institution" as never),
+        adapter_key: `html-${category}-detail`,
+        institution_id: input.institutionId,
+        category,
+        priority: category === "people" || category === "projects" || category === "events" ? 1 : 2,
+        status: "PENDING",
+        discovered_from: input.finalUrl,
+        trust_level: 5,
+        active: true,
+        notes: `Individual ${category} detail page expanded from an institutional listing`,
+      })
+      .select("id")
+      .maybeSingle();
+    if (error || !child) continue;
+    insertedCount += 1;
+    await enqueue("FETCH", { source_id: child.id, institution_id: input.institutionId ?? undefined });
+  }
+  return insertedCount;
+}
 /* ------------------------------------------------------------------ */
 /* DISCOVERY                                                           */
 /* ------------------------------------------------------------------ */
@@ -526,7 +629,7 @@ export async function runQueueBatch(
   limit = 8,
   taskTypes?: string[],
   concurrency = 1,
-): Promise<{ processed: number; ok: number; failed: number; dead: number; details: string[] }> {
+): Promise<{ processed: number; ok: number; failed: number; dead: number; normalized: number; skipped: number; details: string[] }> {
   let query = supabaseAdmin
     .from("ingestion_tasks")
     .select("*")
@@ -553,7 +656,7 @@ export async function runQueueBatch(
     selected = selected.slice(0, limit);
   }
 
-  const out = { processed: 0, ok: 0, failed: 0, dead: 0, details: [] as string[] };
+  const out = { processed: 0, ok: 0, failed: 0, dead: 0, normalized: 0, skipped: 0, details: [] as string[] };
   const queue = selected;
   const workers = Math.max(1, Math.min(Math.floor(concurrency), queue.length || 1));
   let cursor = 0;
@@ -585,6 +688,8 @@ export async function runQueueBatch(
         detail = `FETCH ${r.http_status} ${r.classification ?? "-"} ${r.url}`;
       } else if (task.task_type === "NORMALIZE" && task.source_id) {
         const r = await normalizeSource(task.source_id);
+        if (r.status === "NORMALIZED") out.normalized += 1;
+        if (r.status === "SKIPPED") out.skipped += 1;
         detail = `NORMALIZE ${r.status}${r.reason ? `: ${r.reason}` : ""}`;
       } else if (task.task_type === "PROMOTE_INSTITUTION" && task.institution_id) {
         const { promoteInstitution } = await import("./openalex.server");
@@ -733,7 +838,12 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const structured = extractStructuredSnapshot(html, finalUrl);
   const text = extractText(html);
   const hash = await sha256(text);
-  const { classification, confidence } = classifyUrlAndText(finalUrl, title ?? "", text);
+  let { classification, confidence } = classifyUrlAndText(finalUrl, title ?? "", text);
+  const detailKind = detailKindFromAdapter(source.adapter_key);
+  if (detailKind && (classification === "GENERAL" || classification === "UNKNOWN" || confidence < 0.5)) {
+    classification = detailKind;
+    confidence = Math.max(confidence, 0.72);
+  }
 
   const { data: prior } = await supabaseAdmin
     .from("raw_records")
@@ -819,6 +929,16 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
       })
       .eq("id", rawId);
   }
+
+  // Expand high-value institutional indexes into individual detail pages.
+  // This is bounded and non-recursive: detail adapters never expand again.
+  await registerDetailSources({
+    html,
+    finalUrl,
+    category: source.category,
+    institutionId: source.institution_id,
+    adapterKey: source.adapter_key,
+  });
 
   // A vacancy listing page is an index, not a record: register each individual
   // posting it links to as its own source so every position keeps its own URL.
@@ -1001,6 +1121,18 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       rawTitle.split(/\s*[|·–—]\s*/)[0]?.trim() || rawTitle,
     );
     await mark(outcome.status, outcome.status === "NORMALIZED" ? null : (outcome.reason ?? null));
+    if (outcome.status === "NORMALIZED" && outcome.entity_id) {
+      const typeByClass: Record<string, "project" | "researcher" | "event"> = {
+        PROJECT: "project",
+        RESEARCHER: "researcher",
+        EVENT: "event",
+      };
+      const pulseType = typeByClass[raw.classification ?? ""];
+      if (pulseType) {
+        const { ensurePulseForEntity } = await import("./pulse.server");
+        await ensurePulseForEntity(pulseType, outcome.entity_id);
+      }
+    }
     return outcome;
   }
 
@@ -1213,6 +1345,11 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
         });
       }
     }
+  }
+
+  if (entityId) {
+    const { ensurePulseForEntity } = await import("./pulse.server");
+    await ensurePulseForEntity("opportunity", entityId);
   }
 
   await mark("NORMALIZED", null);
