@@ -224,7 +224,11 @@ export const runQueue = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { runQueueBatch } = await import("./ingest.server");
-    return await runQueueBatch(Math.min(20, Math.max(1, data.limit ?? 8)));
+    const limit = Math.min(20, Math.max(1, data.limit ?? 8));
+    const normalize = await runQueueBatch(Math.min(8, limit), ["NORMALIZE"], 2);
+    if (normalize.processed > 0) return { ...normalize, task_group: "NORMALIZE" as const };
+    const collection = await runQueueBatch(limit, ["FETCH", "DISCOVER"]);
+    return { ...collection, task_group: "FETCH_DISCOVER" as const };
   });
 
 export const requeueDeadTasks = createServerFn({ method: "POST" })

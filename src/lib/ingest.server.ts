@@ -313,10 +313,16 @@ export async function enqueue(
   });
 }
 
-/** Runs a small batch of queued work. Exponential backoff, DEAD after max attempts. */
+/**
+ * Runs a small batch of queued work. Exponential backoff, DEAD after max attempts.
+ * NORMALIZE callers can opt into concurrency 2; fetch/provider work stays
+ * sequential by default. Tasks are conditionally claimed before processing so
+ * overlapping manual/cron runs cannot process the same queue row twice.
+ */
 export async function runQueueBatch(
   limit = 8,
   taskTypes?: string[],
+  concurrency = 1,
 ): Promise<{ processed: number; ok: number; failed: number; dead: number; details: string[] }> {
   let query = supabaseAdmin
     .from("ingestion_tasks")
@@ -328,12 +334,22 @@ export async function runQueueBatch(
   if (error) throw error;
 
   const out = { processed: 0, ok: 0, failed: 0, dead: 0, details: [] as string[] };
-  for (const task of tasks ?? []) {
-    out.processed += 1;
-    await supabaseAdmin
+  const queue = [...(tasks ?? [])];
+  const workers = Math.max(1, Math.min(Math.floor(concurrency), queue.length || 1));
+  let cursor = 0;
+
+  const processTask = async (task: (typeof queue)[number]) => {
+    const { data: claimed, error: claimError } = await supabaseAdmin
       .from("ingestion_tasks")
       .update({ status: "PROCESSING", attempts: task.attempts + 1, started_at: new Date().toISOString(), last_error: null })
-      .eq("id", task.id);
+      .eq("id", task.id)
+      .in("status", ["QUEUED", "RETRY"])
+      .select("id")
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (!claimed) return;
+
+    out.processed += 1;
     try {
       let detail = "";
       if (task.task_type === "DISCOVER" && task.institution_id) {
@@ -385,7 +401,19 @@ export async function runQueueBatch(
       else out.failed += 1;
       out.details.push(`FAILED ${task.task_type}: ${message.slice(0, 160)}`);
     }
-  }
+  };
+
+  await Promise.all(
+    Array.from({ length: workers }, async () => {
+      while (true) {
+        const index = cursor;
+        cursor += 1;
+        const task = queue[index];
+        if (!task) return;
+        await processTask(task);
+      }
+    }),
+  );
   return out;
 }
 

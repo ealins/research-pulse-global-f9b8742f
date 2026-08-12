@@ -144,6 +144,11 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
           model,
           temperature: call.temperature ?? LLM_DEFAULT_TEMPERATURE,
           max_tokens: call.maxTokens ?? LLM_DEFAULT_MAX_TOKENS,
+          // GeoAcademic Radar uses Nemotron for terse structured extraction,
+          // not open-ended reasoning. Nemotron 3 enables thinking by default;
+          // disabling it avoids spending most of the time/token budget before
+          // the JSON payload is produced.
+          chat_template_kwargs: { enable_thinking: false },
           messages: [
             { role: "system", content: call.system },
             { role: "user", content: call.user },

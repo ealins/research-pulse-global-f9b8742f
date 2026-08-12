@@ -177,12 +177,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
 
         try {
-          // Semantic extraction must not be starved by crawl work: NORMALIZE
-          // goes first (capped, because each task may invoke the engine and
-          // take 10-25s), and collection work only runs when nothing is due.
-          const normalizeBatch = Math.min(2, batch);
+          // Semantic extraction must not be starved by crawl work. In backlog
+          // mode, process up to 8 NORMALIZE tasks per tick, two at a time.
+          // Steady state remains deliberately small.
+          const normalizeBatch = queueState.mode === "BACKLOG" ? Math.min(8, batch) : Math.min(2, batch);
           let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
-          let result = await runQueueBatch(normalizeBatch, ["NORMALIZE"]);
+          let result = await runQueueBatch(normalizeBatch, ["NORMALIZE"], 2);
           if (result.processed === 0) {
             taskGroup = "FETCH_DISCOVER";
             result = await runQueueBatch(batch, ["FETCH", "DISCOVER"]);
