@@ -30,6 +30,7 @@ export function eventDetailQuery(slug: string) {
            event_topics ( research_topics ( name, slug, category ) )`,
         )
         .eq("slug", slug)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
       if (!event) return null;
@@ -43,6 +44,7 @@ export function eventDetailQuery(slug: string) {
           .from("events")
           .select("id, title, slug, start_date, location, event_kind")
           .neq("slug", slug)
+          .eq("is_demo", false)
           .order("start_date", { ascending: true, nullsFirst: false })
           .limit(8),
         event.country
@@ -50,7 +52,13 @@ export function eventDetailQuery(slug: string) {
               .from("opportunities")
               .select("id, title, slug, sector, status, application_deadline, employer_name")
               .eq("country", event.country)
-              .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
+              .eq("is_demo", false)
+              .in(
+                "status",
+                LIVE_STATUSES as unknown as (
+                  "open" | "closing_soon" | "rolling" | "possibly_open"
+                )[],
+              )
               .order("application_deadline", { ascending: true, nullsFirst: false })
               .limit(6)
           : Promise.resolve({ data: [], error: null }),
@@ -88,7 +96,11 @@ export const topPicksQuery = queryOptions({
            application_deadline, institutions ( name, slug )`,
         )
         .eq("sector", "academic")
-        .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
+        .eq("is_demo", false)
+        .in(
+          "status",
+          LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
+        )
         .order("application_deadline", { ascending: true, nullsFirst: false })
         .limit(8),
       supabase
@@ -98,7 +110,11 @@ export const topPicksQuery = queryOptions({
            application_deadline, institutions ( name, slug )`,
         )
         .eq("sector", "industry")
-        .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
+        .eq("is_demo", false)
+        .in(
+          "status",
+          LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
+        )
         .order("application_deadline", { ascending: true, nullsFirst: false })
         .limit(8),
       supabase
@@ -116,17 +132,20 @@ export const topPicksQuery = queryOptions({
            institutions ( name, slug, country )`,
         )
         .in("degree_type", ["MSc", "MEng", "PhD"])
+        .eq("is_demo", false)
         .order("title")
         .limit(400),
       supabase
         .from("institutions")
         .select("id, name, slug, country, city, institution_type")
         .eq("active", true)
+        .eq("is_demo", false)
         .limit(400),
       supabase
         .from("events")
         .select("id, title, slug, start_date, location, country, event_kind, abstract_deadline")
         .gte("start_date", new Date().toISOString().slice(0, 10))
+        .eq("is_demo", false)
         .order("start_date")
         .limit(6),
     ]);
@@ -144,7 +163,11 @@ export const topPicksQuery = queryOptions({
     const { data: liveCalls } = await supabase
       .from("opportunities")
       .select("institution_id")
-      .in("status", LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[])
+      .in(
+        "status",
+        LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
+      )
+      .eq("is_demo", false)
       .limit(1000);
     const callCount = new Map<string, number>();
     for (const c of liveCalls ?? []) {
@@ -152,9 +175,7 @@ export const topPicksQuery = queryOptions({
       callCount.set(c.institution_id, (callCount.get(c.institution_id) ?? 0) + 1);
     }
 
-    const topCourses = (courses.data ?? [])
-      .map((c) => ({ ...c, hostCalls: 0 }))
-      .slice(0, 400);
+    const topCourses = (courses.data ?? []).map((c) => ({ ...c, hostCalls: 0 })).slice(0, 400);
 
     const instByName = new Map((institutions.data ?? []).map((i) => [i.name, i]));
     for (const c of topCourses) {

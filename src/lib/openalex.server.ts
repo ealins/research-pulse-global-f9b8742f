@@ -1,14 +1,16 @@
-// Structured-provider ingestion (OpenAlex / Crossref-backed metadata).
-// Server-only. No language model is used to invent records here: every field
-// comes from the provider payload. Nemotron is only ever used downstream for
-// topic classification of already-real records.
+// Structured-provider ingestion for GeoAcademic Radar.
+// Primary sources: ROR for institution identity, OpenAIRE Graph for funded projects
+// and publications, Crossref as a DOI/bibliographic fallback.
+// Kept under the historical filename to avoid a disruptive import rename.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { topicIdsFor } from "./extraction/topics.server";
 
-const UA = "GeoAcademicRadarBot/1.0 (mailto:hello@geoacademic.app)";
-const API = "https://api.openalex.org";
+const UA = "GeoAcademicRadarBot/1.1 (mailto:hello@geoacademic.app)";
+const ROR_API = "https://api.ror.org/v2/organizations";
+const OPENAIRE_API = "https://api.openaire.eu/graph/v3";
+const CROSSREF_API = "https://api.crossref.org/works";
+const CONTACT = "hello@geoacademic.app";
 
-/** Domain queries used to keep imported works inside the platform's scope. */
 export const DOMAIN_QUERIES = [
   "photogrammetry",
   "remote sensing",
@@ -18,80 +20,43 @@ export const DOMAIN_QUERIES = [
   "lidar point cloud",
 ];
 
-/** Signals that OpenAlex refused the call for quota reasons, so the task should retry later. */
+/** Provider capacity/rate-limit signal. Deferrals must not consume retry attempts. */
 export class ProviderBudgetError extends Error {
-  constructor() {
-    super("OPENALEX_BUDGET_EXHAUSTED");
+  retryAfterMinutes: number;
+  provider: string;
+
+  constructor(provider: string, retryAfterMinutes = 30) {
+    super(`${provider.toUpperCase()}_DEFERRED`);
+    this.provider = provider;
+    this.retryAfterMinutes = retryAfterMinutes;
   }
 }
 
-async function getJson<T>(url: string): Promise<T | null> {
-  const res = await fetch(url, { headers: { "user-agent": UA, accept: "application/json" } });
-  if (res.status === 429) throw new ProviderBudgetError();
-  if (!res.ok) return null;
+function retryMinutes(res: Response, fallback = 30): number {
+  const raw = res.headers.get("retry-after");
+  if (!raw) return fallback;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(1, Math.ceil(seconds / 60));
+  const when = new Date(raw).getTime();
+  return Number.isFinite(when) ? Math.max(1, Math.ceil((when - Date.now()) / 60_000)) : fallback;
+}
+
+async function getJson<T>(
+  url: string,
+  provider: string,
+  extraHeaders: Record<string, string> = {},
+): Promise<T | null> {
+  const res = await fetch(url, {
+    headers: { "user-agent": UA, accept: "application/json", ...extraHeaders },
+  });
+  if (res.status === 429 || res.status === 503) {
+    throw new ProviderBudgetError(provider, retryMinutes(res));
+  }
+  if (!res.ok) throw new Error(`${provider.toUpperCase()}_HTTP_${res.status}`);
   return (await res.json()) as T;
 }
 
-type CrossrefItem = {
-  DOI?: string;
-  title?: string[];
-  issued?: { "date-parts"?: number[][] };
-  published?: { "date-parts"?: number[][] };
-  "container-title"?: string[];
-  author?: { given?: string; family?: string; name?: string }[];
-  "is-referenced-by-count"?: number;
-  URL?: string;
-  subject?: string[];
-};
-
-/**
- * Crossref fallback for bibliographic records — free, no quota — used when
- * OpenAlex is unavailable. Same provenance rules: only provider-supplied fields.
- */
-async function crossrefWorks(
-  affiliation: string,
-  query: string,
-  sinceYear: number,
-  rows: number,
-): Promise<OaWork[]> {
-  const url =
-    `https://api.crossref.org/works?query.affiliation=${encodeURIComponent(affiliation)}` +
-    `&query.bibliographic=${encodeURIComponent(query)}&filter=from-pub-date:${sinceYear}-01-01,type:journal-article` +
-    `&rows=${rows}&sort=is-referenced-by-count&order=desc&select=DOI,title,issued,published,container-title,author,is-referenced-by-count,URL,subject`;
-  const res = await fetch(url, { headers: { "user-agent": UA, accept: "application/json" } });
-  if (!res.ok) return [];
-  const body = (await res.json()) as { message?: { items?: CrossrefItem[] } };
-  return (body.message?.items ?? []).flatMap((it) => {
-    const doi = it.DOI?.toLowerCase();
-    const title = it.title?.[0]?.trim();
-    if (!doi || !title) return [];
-    const parts = it.published?.["date-parts"]?.[0] ?? it.issued?.["date-parts"]?.[0] ?? [];
-    const [y, m, d] = parts;
-    const date = y ? `${y}-${String(m ?? 1).padStart(2, "0")}-${String(d ?? 1).padStart(2, "0")}` : null;
-    return [
-      {
-        id: `https://api.crossref.org/works/${doi}`,
-        doi: `https://doi.org/${doi}`,
-        title,
-        display_name: title,
-        publication_date: date,
-        publication_year: y ?? null,
-        cited_by_count: it["is-referenced-by-count"] ?? null,
-        open_access: null,
-        primary_location: {
-          landing_page_url: it.URL ?? `https://doi.org/${doi}`,
-          source: { display_name: it["container-title"]?.[0] ?? null },
-        },
-        authorships: (it.author ?? []).map((a) => ({
-          author: { display_name: a.name ?? ([a.given, a.family].filter(Boolean).join(" ") || null) },
-        })),
-        topics: (it.subject ?? []).map((sub) => ({ display_name: sub })),
-      } satisfies OaWork,
-    ];
-  });
-}
-
-function hostOf(url: string | null): string | null {
+function hostOf(url: string | null | undefined): string | null {
   if (!url) return null;
   try {
     return new URL(url).hostname.replace(/^www\./, "").toLowerCase();
@@ -109,108 +74,97 @@ function normalizeName(s: string): string {
     .trim();
 }
 
-type OaInstitution = {
-  id: string;
-  ror: string | null;
-  display_name: string;
-  country_code: string | null;
-  homepage_url: string | null;
-  works_count?: number;
+function slugify(s: string): string {
+  return (
+    s
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "")
+      .slice(0, 90) || "record"
+  );
+}
+
+function rorUrl(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const id = value.replace(/^https?:\/\/ror\.org\//, "").trim();
+  return /^0[a-z0-9]{8}$/i.test(id) ? `https://ror.org/${id}` : null;
+}
+
+function text(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function arr(v: unknown): unknown[] {
+  return Array.isArray(v) ? v : [];
+}
+
+function obj(v: unknown): Record<string, unknown> {
+  return v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
+}
+
+/* ----------------------- ROR institution identity ----------------------- */
+
+type RorOrganization = {
+  id?: string;
+  names?: { value?: string; types?: string[] }[];
+  domains?: string[];
+  links?: { value?: string; type?: string }[];
+  locations?: {
+    geonames_details?: {
+      country_code?: string;
+      country_name?: string;
+      name?: string;
+    };
+  }[];
+};
+
+type RorAffiliationItem = {
+  chosen?: boolean;
+  score?: number;
+  organization?: RorOrganization;
 };
 
 export type PromotionResult = {
   institution: string;
   matched: boolean;
   promoted: boolean;
-  openalex_id?: string | null;
+  provider_id?: string | null;
   ror?: string | null;
   reason?: string;
 };
 
-/**
- * Reconciles an EXISTING institution row against its authoritative OpenAlex /
- * ROR identity. Never creates a second institution: the same row id is kept so
- * all relationships survive. Identity requires a domain match OR a strong
- * normalized-name + country match.
- */
-export async function promoteInstitution(institutionId: string): Promise<PromotionResult> {
-  const { data: inst } = await supabaseAdmin
-    .from("institutions")
-    .select("id, name, abbreviation, country, country_code, official_url, openalex_id, institution_identifier, is_demo, verification_status")
-    .eq("id", institutionId)
-    .maybeSingle();
-  if (!inst) return { institution: institutionId, matched: false, promoted: false, reason: "institution not found" };
-
-  const search = encodeURIComponent(inst.name);
-  const payload = await getJson<{ results: OaInstitution[] }>(`${API}/institutions?search=${search}&per_page=5`);
-  const candidates = payload?.results ?? [];
-  if (candidates.length === 0) return { institution: inst.name, matched: false, promoted: false, reason: "no OpenAlex candidate" };
-
-  const ourHost = hostOf(inst.official_url);
-  const ourName = normalizeName(inst.name);
-  const ourCountry = (inst.country_code ?? "").toUpperCase();
-
-  let match: OaInstitution | null = null;
-  let evidence = "";
-  for (const c of candidates) {
-    const cHost = hostOf(c.homepage_url);
-    if (ourHost && cHost && (ourHost === cHost || ourHost.endsWith(`.${cHost}`) || cHost.endsWith(`.${ourHost}`))) {
-      match = c;
-      evidence = `official domain match (${cHost})`;
-      break;
-    }
-  }
-  if (!match) {
-    for (const c of candidates) {
-      const sameCountry = !ourCountry || !c.country_code || c.country_code.toUpperCase() === ourCountry;
-      if (sameCountry && normalizeName(c.display_name) === ourName) {
-        match = c;
-        evidence = "normalized name + country match";
-        break;
-      }
-    }
-  }
-  if (!match) return { institution: inst.name, matched: false, promoted: false, reason: "no confident identity match" };
-
-  const openalexId = match.id.replace(`${API}/`, "").replace("https://openalex.org/", "");
-  const ror = match.ror ? match.ror.replace("https://ror.org/", "") : null;
-
-  const update: Record<string, unknown> = {
-    openalex_id: openalexId,
-    verification_status: "verified",
-    last_verified_at: new Date().toISOString(),
-    is_demo: false,
-  };
-  if (ror && !inst.institution_identifier) update["institution_identifier"] = ror;
-  if (!inst.country_code && match.country_code) update["country_code"] = match.country_code;
-  if (!inst.official_url && match.homepage_url) update["official_url"] = match.homepage_url;
-
-  await supabaseAdmin.from("institutions").update(update as never).eq("id", inst.id);
-
-  const sourceUrl = `https://openalex.org/${openalexId}`;
+async function ensureRorEvidence(
+  inst: { id: string; name: string; is_demo: boolean },
+  ror: string,
+): Promise<void> {
+  const now = new Date().toISOString();
   const { data: existingEvidence } = await supabaseAdmin
     .from("record_sources")
     .select("id")
     .eq("entity_type", "institution")
     .eq("entity_id", inst.id)
-    .eq("source_url", sourceUrl)
+    .eq("source_url", ror)
     .maybeSingle();
+
   if (!existingEvidence) {
     await supabaseAdmin.from("record_sources").insert({
       entity_type: "institution",
       entity_id: inst.id,
-      source_url: sourceUrl,
-      source_organization: "OpenAlex",
+      source_url: ror,
+      source_organization: "ROR",
       source_type: "api" as never,
-      original_title: match.display_name,
-      claim: `Institution identity confirmed via ${evidence}${ror ? `; ROR ${ror}` : ""}`,
+      original_title: inst.name,
+      claim: "Institution identity matched by the ROR affiliation service",
       verification_status: "verified" as never,
       confidence: "high" as never,
       is_primary: false,
-      last_checked_at: new Date().toISOString(),
-      last_verified_at: new Date().toISOString(),
+      last_checked_at: now,
+      last_verified_at: now,
     });
   }
+
   if (inst.is_demo) {
     await supabaseAdmin.from("entity_history").insert({
       entity_type: "institution",
@@ -218,36 +172,340 @@ export async function promoteInstitution(institutionId: string): Promise<Promoti
       field: "is_demo",
       old_value: "true",
       new_value: "false",
-      change_reason: `Promoted to source-backed record via OpenAlex (${evidence})`,
-      source_url: sourceUrl,
+      change_reason: "Promoted to source-backed record via ROR",
+      source_url: ror,
     });
     await supabaseAdmin.from("academic_changes").insert({
       change_type: "INSTITUTION_PROMOTED",
       entity_type: "institution",
       entity_id: inst.id,
       title: inst.name,
-      summary: `Seed record promoted to verified using OpenAlex identity (${evidence})`,
-      details: { openalex_id: openalexId, ror, evidence } as never,
+      summary: "Seed record promoted to verified using ROR identity",
+      details: { ror } as never,
     });
   }
-
-  return { institution: inst.name, matched: true, promoted: inst.is_demo, openalex_id: openalexId, ror };
 }
 
-type OaWork = {
+export async function promoteInstitution(institutionId: string): Promise<PromotionResult> {
+  const { data: inst } = await supabaseAdmin
+    .from("institutions")
+    .select(
+      "id, name, city, country, country_code, official_url, institution_identifier, verification_status, is_demo",
+    )
+    .eq("id", institutionId)
+    .maybeSingle();
+
+  if (!inst) {
+    return {
+      institution: institutionId,
+      matched: false,
+      promoted: false,
+      reason: "institution not found",
+    };
+  }
+
+  const existingRor = rorUrl(inst.institution_identifier);
+  if (existingRor) {
+    const now = new Date().toISOString();
+    await supabaseAdmin
+      .from("institutions")
+      .update({
+        institution_identifier: existingRor.replace("https://ror.org/", ""),
+        verification_status: "verified",
+        last_verified_at: now,
+        is_demo: false,
+      } as never)
+      .eq("id", inst.id);
+    await ensureRorEvidence(inst, existingRor);
+    return {
+      institution: inst.name,
+      matched: true,
+      promoted: inst.is_demo,
+      provider_id: existingRor,
+      ror: existingRor,
+    };
+  }
+
+  const clientId = process.env["ROR_CLIENT_ID"];
+  const headers = clientId ? { "Client-Id": clientId } : {};
+  const affiliation = [inst.name, inst.city, inst.country].filter(Boolean).join(", ");
+  const payload = await getJson<{ items?: RorAffiliationItem[] }>(
+    `${ROR_API}?affiliation=${encodeURIComponent(affiliation)}`,
+    "ror",
+    headers,
+  );
+  const chosen = (payload?.items ?? []).find(
+    (item) => item.chosen && item.organization,
+  )?.organization;
+
+  if (!chosen?.id) {
+    return {
+      institution: inst.name,
+      matched: false,
+      promoted: false,
+      reason: "no confident ROR affiliation match",
+    };
+  }
+
+  const ror = rorUrl(chosen.id);
+  if (!ror) {
+    return {
+      institution: inst.name,
+      matched: false,
+      promoted: false,
+      reason: "ROR returned an invalid identifier",
+    };
+  }
+
+  const domain = chosen.domains?.[0] ?? null;
+  const website =
+    chosen.links?.find((link) => link.type === "website")?.value ??
+    chosen.links?.[0]?.value ??
+    null;
+  const location = chosen.locations?.[0]?.geonames_details;
+  const officialHost = hostOf(inst.official_url);
+  const domainEvidence =
+    !officialHost ||
+    !domain ||
+    officialHost === domain ||
+    officialHost.endsWith(`.${domain}`) ||
+    domain.endsWith(`.${officialHost}`);
+
+  // ROR's chosen=true is the primary identity signal. If both sides expose a
+  // domain and they directly conflict, require manual review instead of promoting.
+  if (!domainEvidence) {
+    return {
+      institution: inst.name,
+      matched: false,
+      promoted: false,
+      reason: "ROR match conflicts with the stored official domain",
+    };
+  }
+
+  const now = new Date().toISOString();
+  const bareRor = ror.replace("https://ror.org/", "");
+  await supabaseAdmin
+    .from("institutions")
+    .update({
+      institution_identifier: bareRor,
+      verification_status: "verified",
+      last_verified_at: now,
+      is_demo: false,
+      ...(!inst.country_code && location?.country_code
+        ? { country_code: location.country_code }
+        : {}),
+      ...(!inst.country && location?.country_name ? { country: location.country_name } : {}),
+      ...(!inst.official_url && website ? { official_url: website } : {}),
+    } as never)
+    .eq("id", inst.id);
+
+  await ensureRorEvidence(inst, ror);
+
+  return {
+    institution: inst.name,
+    matched: true,
+    promoted: inst.is_demo,
+    provider_id: ror,
+    ror,
+  };
+}
+
+/* -------------------- OpenAIRE + Crossref publications -------------------- */
+
+type OpenAireProduct = Record<string, unknown> & {
+  id?: string;
+  mainTitle?: string;
+  publicationDate?: string;
+  authors?: { fullName?: string; rank?: number }[];
+  pids?: { scheme?: string; value?: string }[];
+  publisher?: string;
+  descriptions?: unknown[];
+  subjects?: unknown[];
+  bestAccessRight?: { label?: string };
+  indicators?: Record<string, unknown>;
+  instances?: unknown[];
+};
+
+type CrossrefItem = {
+  DOI?: string;
+  title?: string[];
+  issued?: { "date-parts"?: number[][] };
+  published?: { "date-parts"?: number[][] };
+  "container-title"?: string[];
+  author?: { given?: string; family?: string; name?: string }[];
+  "is-referenced-by-count"?: number;
+  URL?: string;
+  subject?: string[];
+};
+
+type ProviderWork = {
   id: string;
+  provider: "openaire" | "crossref";
   doi: string | null;
-  title: string | null;
-  display_name: string | null;
+  title: string;
   publication_date: string | null;
   publication_year: number | null;
   cited_by_count: number | null;
-  language?: string | null;
-  open_access?: { is_oa: boolean | null } | null;
-  primary_location?: { landing_page_url: string | null; source: { display_name: string | null } | null } | null;
-  authorships?: { author: { display_name: string | null } | null }[];
-  topics?: { display_name: string | null }[];
+  is_oa: boolean | null;
+  landing_url: string | null;
+  venue: string | null;
+  authors: string[];
+  topics: string[];
+  abstract: string | null;
 };
+
+function oaDescription(work: OpenAireProduct): string | null {
+  for (const description of arr(work.descriptions)) {
+    if (typeof description === "string" && description.trim()) return description.trim();
+    const record = obj(description);
+    const value = text(record["value"]) ?? text(record["description"]);
+    if (value) return value;
+  }
+  return null;
+}
+
+function oaSubjects(work: OpenAireProduct): string[] {
+  return arr(work.subjects)
+    .flatMap((subject) => {
+      if (typeof subject === "string") return [subject];
+      const record = obj(subject);
+      const value = text(record["subject"]) ?? text(record["value"]) ?? text(record["label"]);
+      return value ? [value] : [];
+    })
+    .slice(0, 30);
+}
+
+function oaDoi(work: OpenAireProduct): string | null {
+  const value = (work.pids ?? []).find((pid) => (pid.scheme ?? "").toLowerCase() === "doi")?.value;
+  return value ? value.replace(/^https?:\/\/doi\.org\//, "").toLowerCase() : null;
+}
+
+function oaCitationCount(work: OpenAireProduct): number | null {
+  const indicators = obj(work.indicators);
+  for (const value of [
+    indicators["citationCount"],
+    indicators["citationsCount"],
+    indicators["citation_count"],
+    work["citationCount"],
+  ]) {
+    if (typeof value === "number" && Number.isFinite(value)) return Math.round(value);
+  }
+  return null;
+}
+
+function oaLanding(work: OpenAireProduct, doi: string | null): string | null {
+  if (doi) return `https://doi.org/${doi}`;
+  for (const instance of arr(work.instances)) {
+    const record = obj(instance);
+    for (const key of ["url", "landingPage", "webresourceUrl"]) {
+      const value = text(record[key]);
+      if (value) return value;
+    }
+  }
+  return work.id ? `${OPENAIRE_API}/research-products/${encodeURIComponent(work.id)}` : null;
+}
+
+async function openAireWorks(
+  ror: string,
+  query: string,
+  since: number,
+  pageSize: number,
+): Promise<ProviderWork[]> {
+  const url =
+    `${OPENAIRE_API}/research-products?rorId=${encodeURIComponent(ror)}` +
+    `&type=publication&fromPublicationYear=${since}` +
+    `&search=${encodeURIComponent(query)}&pageSize=${pageSize}` +
+    `&sortBy=${encodeURIComponent("publicationDate DESC")}`;
+  const payload = await getJson<{ results?: OpenAireProduct[] }>(url, "openaire");
+
+  return (payload?.results ?? []).flatMap((work) => {
+    const title = text(work.mainTitle);
+    if (!title || !work.id) return [];
+    const doi = oaDoi(work);
+    const date = text(work.publicationDate);
+    const year = date ? Number(date.slice(0, 4)) || null : null;
+    const access = text(obj(work.bestAccessRight)["label"]);
+    const authors = (work.authors ?? [])
+      .slice()
+      .sort((a, b) => (a.rank ?? 999) - (b.rank ?? 999))
+      .map((author) => author.fullName)
+      .filter((name): name is string => Boolean(name))
+      .slice(0, 25);
+
+    return [
+      {
+        id: work.id,
+        provider: "openaire" as const,
+        doi,
+        title,
+        publication_date: date,
+        publication_year: year,
+        cited_by_count: oaCitationCount(work),
+        is_oa: access ? /open/i.test(access) : null,
+        landing_url: oaLanding(work, doi),
+        venue: text(work.publisher),
+        authors,
+        topics: oaSubjects(work),
+        abstract: oaDescription(work),
+      },
+    ];
+  });
+}
+
+async function crossrefWorks(
+  ror: string,
+  query: string,
+  since: number,
+  rows: number,
+): Promise<ProviderWork[]> {
+  // ror-id is an exact Crossref works filter and avoids fuzzy affiliation leakage.
+  const filter = `from-pub-date:${since}-01-01,ror-id:${ror}`;
+  const url =
+    `${CROSSREF_API}?query.bibliographic=${encodeURIComponent(query)}` +
+    `&filter=${encodeURIComponent(filter)}&rows=${rows}` +
+    `&sort=is-referenced-by-count&order=desc&mailto=${encodeURIComponent(CONTACT)}`;
+  const res = await fetch(url, {
+    headers: { "user-agent": UA, accept: "application/json" },
+  });
+  if (res.status === 429 || res.status === 503) {
+    throw new ProviderBudgetError("crossref", retryMinutes(res));
+  }
+  if (!res.ok) throw new Error(`CROSSREF_HTTP_${res.status}`);
+
+  const body = (await res.json()) as { message?: { items?: CrossrefItem[] } };
+  return (body.message?.items ?? []).flatMap((item) => {
+    const doi = item.DOI?.toLowerCase();
+    const title = item.title?.[0]?.trim();
+    if (!doi || !title) return [];
+    const parts = item.published?.["date-parts"]?.[0] ?? item.issued?.["date-parts"]?.[0] ?? [];
+    const [year, month, day] = parts;
+    const date = year
+      ? `${year}-${String(month ?? 1).padStart(2, "0")}-${String(day ?? 1).padStart(2, "0")}`
+      : null;
+    const authors = (item.author ?? [])
+      .map((author) => author.name ?? [author.given, author.family].filter(Boolean).join(" "))
+      .filter(Boolean)
+      .slice(0, 25);
+
+    return [
+      {
+        id: doi,
+        provider: "crossref" as const,
+        doi,
+        title,
+        publication_date: date,
+        publication_year: year ?? null,
+        cited_by_count: item["is-referenced-by-count"] ?? null,
+        is_oa: null,
+        landing_url: item.URL ?? `https://doi.org/${doi}`,
+        venue: item["container-title"]?.[0] ?? null,
+        authors,
+        topics: item.subject ?? [],
+        abstract: null,
+      },
+    ];
+  });
+}
 
 export type PublicationImportResult = {
   institution: string;
@@ -256,90 +514,104 @@ export type PublicationImportResult = {
   inserted: number;
   updated: number;
   skipped: number;
+  provider: string;
 };
 
-/**
- * Imports real, provider-backed publications for one institution that already
- * carries an OpenAlex identity. Deduplicated on DOI first, then OpenAlex id.
- */
 export async function importInstitutionPublications(
   institutionId: string,
   opts: { queries?: number; perQuery?: number; sinceYear?: number } = {},
 ): Promise<PublicationImportResult> {
   const { data: inst } = await supabaseAdmin
     .from("institutions")
-    .select("id, name, openalex_id")
+    .select("id, name, institution_identifier, is_demo")
     .eq("id", institutionId)
     .maybeSingle();
   if (!inst) {
-    return { institution: institutionId, queries: 0, seen: 0, inserted: 0, updated: 0, skipped: 0 };
+    return {
+      institution: institutionId,
+      queries: 0,
+      seen: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      provider: "none",
+    };
+  }
+
+  const ror = rorUrl(inst.institution_identifier);
+  if (!ror || inst.is_demo) {
+    return {
+      institution: inst.name,
+      queries: 0,
+      seen: 0,
+      inserted: 0,
+      updated: 0,
+      skipped: 0,
+      provider: "waiting-for-ROR",
+    };
   }
 
   const perQuery = Math.min(50, opts.perQuery ?? 25);
   const since = opts.sinceYear ?? new Date().getUTCFullYear() - 4;
-  const queries = DOMAIN_QUERIES.slice(0, Math.max(1, Math.min(DOMAIN_QUERIES.length, opts.queries ?? 3)));
-  const out: PublicationImportResult = { institution: inst.name, queries: queries.length, seen: 0, inserted: 0, updated: 0, skipped: 0 };
+  const queries = DOMAIN_QUERIES.slice(
+    0,
+    Math.max(1, Math.min(DOMAIN_QUERIES.length, opts.queries ?? 3)),
+  );
+  const out: PublicationImportResult = {
+    institution: inst.name,
+    queries: queries.length,
+    seen: 0,
+    inserted: 0,
+    updated: 0,
+    skipped: 0,
+    provider: "OpenAIRE → Crossref",
+  };
 
-  for (const q of queries) {
-    const url =
-      `${API}/works?filter=institutions.lineage:${inst.openalex_id},from_publication_date:${since}-01-01` +
-      `&search=${encodeURIComponent(q)}&per_page=${perQuery}&sort=cited_by_count:desc`;
-    let works: OaWork[] = [];
-    if (inst.openalex_id) {
-      try {
-        works = (await getJson<{ results: OaWork[] }>(url))?.results ?? [];
-      } catch {
-        works = [];
-      }
-    }
-    if (works.length === 0) works = await crossrefWorks(inst.name, q, since, perQuery);
-    for (const w of works) {
+  for (const query of queries) {
+    let works = await openAireWorks(ror, query, since, perQuery);
+    if (works.length === 0) works = await crossrefWorks(ror, query, since, perQuery);
+
+    for (const work of works) {
       out.seen += 1;
-      const title = (w.title ?? w.display_name ?? "").trim();
-      if (!title) {
+      if (!work.title) {
         out.skipped += 1;
         continue;
       }
-      const fromOpenAlex = w.id.startsWith("https://openalex.org/");
-      const provider = fromOpenAlex ? "openalex" : "crossref";
-      const providerLabel = fromOpenAlex ? "OpenAlex" : "Crossref";
-      const externalId = w.id.replace("https://openalex.org/", "");
-      const doi = w.doi ? w.doi.replace("https://doi.org/", "") : null;
-      const evidenceUrl = fromOpenAlex ? `https://openalex.org/${externalId}` : `https://doi.org/${doi}`;
 
       let existingId: string | null = null;
-      if (doi) {
-        const { data } = await supabaseAdmin.from("publications").select("id").eq("doi", doi).maybeSingle();
+      if (work.doi) {
+        const { data } = await supabaseAdmin
+          .from("publications")
+          .select("id")
+          .ilike("doi", work.doi)
+          .maybeSingle();
         existingId = data?.id ?? null;
       }
       if (!existingId) {
         const { data } = await supabaseAdmin
           .from("publications")
           .select("id")
-          .eq("source", provider)
-          .eq("external_id", externalId)
+          .eq("source", work.provider)
+          .eq("external_id", work.id)
           .maybeSingle();
         existingId = data?.id ?? null;
       }
 
-      const authors = (w.authorships ?? [])
-        .map((a) => a.author?.display_name)
-        .filter((n): n is string => Boolean(n))
-        .slice(0, 25);
-      const payloadRow = {
-        doi,
-        title: title.slice(0, 500),
-        normalized_title: normalizeName(title).slice(0, 300),
-        publication_date: w.publication_date,
-        year: w.publication_year,
-        venue: w.primary_location?.source?.display_name ?? null,
-        authors_text: authors.join(", ") || null,
-        citation_count: w.cited_by_count ?? null,
-        citation_source: provider,
-        is_open_access: w.open_access?.is_oa ?? null,
-        source: provider,
-        external_id: externalId,
-        landing_url: w.primary_location?.landing_page_url ?? (doi ? `https://doi.org/${doi}` : null),
+      const row = {
+        doi: work.doi,
+        title: work.title.slice(0, 500),
+        normalized_title: normalizeName(work.title).slice(0, 300),
+        publication_date: work.publication_date,
+        year: work.publication_year,
+        venue: work.venue,
+        authors_text: work.authors.join(", ") || null,
+        citation_count: work.cited_by_count,
+        citation_source: work.provider,
+        is_open_access: work.is_oa,
+        abstract: work.abstract?.slice(0, 5000) ?? null,
+        source: work.provider,
+        external_id: work.id,
+        landing_url: work.landing_url,
         institution_id: inst.id,
         verification_status: "verified" as never,
         confidence: "high" as never,
@@ -347,63 +619,70 @@ export async function importInstitutionPublications(
         is_demo: false,
       };
 
-      let pubId = existingId;
+      let publicationId = existingId;
       if (existingId) {
-        // Never re-point an existing publication at the importing institution —
-        // co-authored works keep their first canonical owner; the extra
-        // affiliation is recorded through publication_institutions instead.
-        const { institution_id: _ignored, ...updateRow } = payloadRow;
-        await supabaseAdmin.from("publications").update(updateRow as never).eq("id", existingId);
+        // Do not overwrite the primary institution of a publication already owned
+        // by another institution; the many-to-many table records this affiliation.
+        const { institution_id: _ignored, ...update } = row;
+        await supabaseAdmin
+          .from("publications")
+          .update(update as never)
+          .eq("id", existingId);
         out.updated += 1;
       } else {
         const { data, error } = await supabaseAdmin
           .from("publications")
-          .insert(payloadRow as never)
+          .insert(row as never)
           .select("id")
           .maybeSingle();
         if (error || !data) {
           out.skipped += 1;
           continue;
         }
-        pubId = data.id;
+        publicationId = data.id;
         out.inserted += 1;
         await supabaseAdmin.from("academic_changes").insert({
           change_type: "NEW_PUBLICATION",
           entity_type: "publication",
-          entity_id: pubId,
-          title: payloadRow.title,
-          summary: `Imported from ${providerLabel} for ${inst.name}`,
-          details: { external_id: externalId, doi, provider } as never,
+          entity_id: publicationId,
+          title: row.title,
+          summary: `Imported from ${work.provider === "openaire" ? "OpenAIRE" : "Crossref"} for ${inst.name}`,
+          details: {
+            external_id: work.id,
+            doi: work.doi,
+            provider: work.provider,
+          } as never,
         });
       }
-      if (!pubId) continue;
 
-      const { ensurePulseForEntity } = await import("./pulse.server");
-      await ensurePulseForEntity("publication", pubId);
-
+      if (!publicationId) continue;
       await supabaseAdmin
         .from("publication_institutions")
-        .upsert({ publication_id: pubId, institution_id: inst.id } as never, {
+        .upsert({ publication_id: publicationId, institution_id: inst.id } as never, {
           onConflict: "publication_id,institution_id",
           ignoreDuplicates: true,
         });
 
-      const { data: haveEvidence } = await supabaseAdmin
+      const evidenceUrl =
+        work.provider === "openaire"
+          ? `${OPENAIRE_API}/research-products/${encodeURIComponent(work.id)}`
+          : `https://doi.org/${work.doi}`;
+      const { data: existingEvidence } = await supabaseAdmin
         .from("record_sources")
         .select("id")
         .eq("entity_type", "publication")
-        .eq("entity_id", pubId)
+        .eq("entity_id", publicationId)
         .eq("source_url", evidenceUrl)
         .maybeSingle();
-      if (!haveEvidence) {
+      if (!existingEvidence) {
         await supabaseAdmin.from("record_sources").insert({
           entity_type: "publication",
-          entity_id: pubId,
+          entity_id: publicationId,
           source_url: evidenceUrl,
-          source_organization: providerLabel,
+          source_organization: work.provider === "openaire" ? "OpenAIRE Graph" : "Crossref",
           source_type: "publication_database" as never,
-          original_title: payloadRow.title,
-          claim: `Bibliographic metadata supplied by ${providerLabel}`,
+          original_title: row.title,
+          claim: `Bibliographic metadata supplied by ${work.provider === "openaire" ? "OpenAIRE Graph" : "Crossref"}`,
           verification_status: "verified" as never,
           confidence: "high" as never,
           is_primary: true,
@@ -412,17 +691,227 @@ export async function importInstitutionPublications(
         });
       }
 
-      // Topic linkage uses the provider's own topic labels mapped onto the
-      // curated GeoAcademic taxonomy — no invention, no model call.
-      const labels = [q, ...(w.topics ?? []).map((t) => t.display_name ?? "").filter(Boolean)];
-      const topicIds = await topicIdsFor(labels);
-      if (topicIds.length > 0) {
-        await supabaseAdmin.from("publication_topics").upsert(
-          topicIds.map((topic_id) => ({ publication_id: pubId, topic_id })) as never,
-          { onConflict: "publication_id,topic_id", ignoreDuplicates: true },
-        );
+      const topicIds = await topicIdsFor([query, ...work.topics]);
+      if (topicIds.length) {
+        await supabaseAdmin
+          .from("publication_topics")
+          .upsert(
+            topicIds.map((topic_id) => ({ publication_id: publicationId!, topic_id })) as never,
+            { onConflict: "publication_id,topic_id", ignoreDuplicates: true },
+          );
       }
+      const { ensurePulseForEntity } = await import("./pulse.server");
+      await ensurePulseForEntity("publication", publicationId);
     }
   }
+
+  return out;
+}
+
+/* ---------------------------- OpenAIRE projects --------------------------- */
+
+type OpenAireOrganization = { id?: string };
+type OpenAireProject = Record<string, unknown> & {
+  id?: string;
+  code?: string;
+  acronym?: string;
+  title?: string;
+  websiteUrl?: string;
+  startDate?: string;
+  endDate?: string;
+  keywords?: string;
+  subjects?: unknown[];
+  summary?: string;
+  fundings?: { name?: string; shortName?: string }[];
+  granted?: { fundedAmount?: number; currency?: string };
+};
+
+const openAireOrgCache = new Map<string, string | null>();
+
+async function openAireOrganizationId(ror: string): Promise<string | null> {
+  if (openAireOrgCache.has(ror)) return openAireOrgCache.get(ror) ?? null;
+  const payload = await getJson<{ results?: OpenAireOrganization[] }>(
+    `${OPENAIRE_API}/organizations?pid=${encodeURIComponent(ror)}&pageSize=5`,
+    "openaire",
+  );
+  const id = payload?.results?.find((organization) => Boolean(organization.id))?.id ?? null;
+  openAireOrgCache.set(ror, id);
+  return id;
+}
+
+export type ProjectImportResult = {
+  institution: string;
+  seen: number;
+  inserted: number;
+  updated: number;
+  skipped: number;
+};
+
+export async function importInstitutionProjects(
+  institutionId: string,
+  opts: { perQuery?: number; queries?: number } = {},
+): Promise<ProjectImportResult> {
+  const { data: inst } = await supabaseAdmin
+    .from("institutions")
+    .select("id, name, institution_identifier, is_demo")
+    .eq("id", institutionId)
+    .maybeSingle();
+  if (!inst) {
+    return { institution: institutionId, seen: 0, inserted: 0, updated: 0, skipped: 0 };
+  }
+
+  const ror = rorUrl(inst.institution_identifier);
+  if (!ror || inst.is_demo) {
+    return { institution: inst.name, seen: 0, inserted: 0, updated: 0, skipped: 0 };
+  }
+
+  const openAireOrgId = await openAireOrganizationId(ror);
+  if (!openAireOrgId) {
+    return { institution: inst.name, seen: 0, inserted: 0, updated: 0, skipped: 0 };
+  }
+
+  const out: ProjectImportResult = {
+    institution: inst.name,
+    seen: 0,
+    inserted: 0,
+    updated: 0,
+    skipped: 0,
+  };
+  const queries = DOMAIN_QUERIES.slice(0, Math.max(1, Math.min(3, opts.queries ?? 2)));
+  const pageSize = Math.min(50, opts.perQuery ?? 25);
+
+  for (const query of queries) {
+    const url =
+      `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}` +
+      `&search=${encodeURIComponent(query)}&pageSize=${pageSize}` +
+      `&sortBy=${encodeURIComponent("startDate DESC")}`;
+    const payload = await getJson<{ results?: OpenAireProject[] }>(url, "openaire");
+
+    for (const project of payload?.results ?? []) {
+      out.seen += 1;
+      const name = text(project.title);
+      if (!name || !project.id) {
+        out.skipped += 1;
+        continue;
+      }
+
+      const { data: candidates } = await supabaseAdmin
+        .from("projects")
+        .select("id, name")
+        .eq("institution_id", inst.id)
+        .ilike("name", name)
+        .limit(2);
+      const existing = candidates?.find(
+        (candidate) => normalizeName(candidate.name) === normalizeName(name),
+      );
+
+      const today = new Date().toISOString().slice(0, 10);
+      const start = text(project.startDate);
+      const end = text(project.endDate);
+      const status =
+        start && start > today ? "planned" : end && end < today ? "completed" : "active";
+      const funder = project.fundings?.[0]?.name ?? project.fundings?.[0]?.shortName ?? null;
+      const granted = obj(project.granted);
+      const row = {
+        name: name.slice(0, 500),
+        slug: `${slugify(name)}-${slugify(project.id).slice(-10)}`,
+        acronym: text(project.acronym),
+        institution_id: inst.id,
+        start_date: start,
+        end_date: end,
+        status: status as "planned" | "active" | "completed",
+        funding_organization: funder,
+        funding_amount:
+          typeof granted["fundedAmount"] === "number" ? granted["fundedAmount"] : null,
+        funding_currency: text(granted["currency"]),
+        website:
+          text(project.websiteUrl) ?? `${OPENAIRE_API}/projects/${encodeURIComponent(project.id)}`,
+        summary: text(project.summary)?.slice(0, 6000) ?? null,
+        verification_status: "verified" as never,
+        confidence: "high" as never,
+        last_verified_at: new Date().toISOString(),
+        is_demo: false,
+      };
+
+      let projectId = existing?.id ?? null;
+      if (projectId) {
+        const { slug: _slug, ...update } = row;
+        await supabaseAdmin
+          .from("projects")
+          .update(update as never)
+          .eq("id", projectId);
+        out.updated += 1;
+      } else {
+        const { data, error } = await supabaseAdmin
+          .from("projects")
+          .insert(row as never)
+          .select("id")
+          .maybeSingle();
+        if (error || !data) {
+          out.skipped += 1;
+          continue;
+        }
+        projectId = data.id;
+        out.inserted += 1;
+        await supabaseAdmin.from("academic_changes").insert({
+          change_type: "NEW_PROJECT",
+          entity_type: "project",
+          entity_id: projectId,
+          title: name,
+          summary: `Imported from OpenAIRE Graph for ${inst.name}`,
+          details: { openaire_id: project.id, ror } as never,
+        });
+      }
+
+      if (!projectId) continue;
+      const evidenceUrl = `${OPENAIRE_API}/projects/${encodeURIComponent(project.id)}`;
+      const { data: existingEvidence } = await supabaseAdmin
+        .from("record_sources")
+        .select("id")
+        .eq("entity_type", "project")
+        .eq("entity_id", projectId)
+        .eq("source_url", evidenceUrl)
+        .maybeSingle();
+      if (!existingEvidence) {
+        await supabaseAdmin.from("record_sources").insert({
+          entity_type: "project",
+          entity_id: projectId,
+          source_url: evidenceUrl,
+          source_organization: "OpenAIRE Graph",
+          source_type: "api" as never,
+          original_title: name,
+          claim: "Funded-project metadata supplied by OpenAIRE Graph",
+          verification_status: "verified" as never,
+          confidence: "high" as never,
+          is_primary: true,
+          last_checked_at: new Date().toISOString(),
+          last_verified_at: new Date().toISOString(),
+        });
+      }
+
+      const labels = [
+        query,
+        text(project.keywords) ?? "",
+        ...arr(project.subjects).map((subject) =>
+          typeof subject === "string"
+            ? subject
+            : (text(obj(subject)["label"]) ?? text(obj(subject)["value"]) ?? ""),
+        ),
+      ].filter(Boolean);
+      const topicIds = await topicIdsFor(labels);
+      if (topicIds.length) {
+        await supabaseAdmin
+          .from("project_topics")
+          .upsert(topicIds.map((topic_id) => ({ project_id: projectId!, topic_id })) as never, {
+            onConflict: "project_id,topic_id",
+            ignoreDuplicates: true,
+          });
+      }
+
+      const { ensurePulseForEntity } = await import("./pulse.server");
+      await ensurePulseForEntity("project", projectId);
+    }
+  }
+
   return out;
 }

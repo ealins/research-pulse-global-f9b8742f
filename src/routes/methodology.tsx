@@ -31,13 +31,22 @@ export const Route = createFileRoute("/methodology")({
 });
 
 const STATUSES: [string, string][] = [
-  ["verified", "A human or automated check confirmed the claim against the official source within the recorded verification window."],
-  ["auto_discovered", "Captured by a connector from a registered source, not yet re-checked by hand."],
+  [
+    "verified",
+    "A human or automated check confirmed the claim against the official source within the recorded verification window.",
+  ],
+  [
+    "auto_discovered",
+    "Captured by a connector from a registered source, not yet re-checked by hand.",
+  ],
   ["needs_review", "Conflicting or incomplete source evidence. Displayed, but flagged."],
   ["possibly_outdated", "The source page changed or stopped responding since last check."],
   ["closed", "The source states the call or role has ended."],
   ["archived", "Kept for the historical record; not part of live counts."],
-  ["unverified", "Present in our database with no confirming source row. Treat as a lead, not a fact."],
+  [
+    "unverified",
+    "Present in our database with no confirming source row. Treat as a lead, not a fact.",
+  ],
 ];
 
 function MethodologyPage() {
@@ -99,7 +108,10 @@ function MethodologyPage() {
           <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
             <li>Publications are keyed on DOI first, then on normalised title plus year.</li>
             <li>Researchers are keyed on ORCID first, then normalised name plus institution.</li>
-            <li>Institutions are keyed on ROR/OpenAlex identifier, then normalised name plus country.</li>
+            <li>
+              Institutions are matched to a verified ROR identifier, then normalised name plus
+              country. Legacy OpenAlex identifiers may remain only for backward compatibility.
+            </li>
             <li>
               Positions use a deterministic dedupe key of institution, normalised title and
               deadline, so the same call syndicated across three job boards stays one record with
@@ -145,7 +157,7 @@ function MethodologyPage() {
             <Skeleton className="mt-3 h-40 w-full" />
           ) : (
             <div className="mt-3 space-y-2">
-              {(sources ?? []).map((s: any) => (
+              {(sources ?? []).map((s) => (
                 <div key={s.id} className="panel flex flex-wrap items-center gap-3 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-foreground">
@@ -179,8 +191,8 @@ function MethodologyPage() {
           <p className="text-xs leading-relaxed text-muted-foreground">
             Found something wrong? Records marked “demo data” exist to demonstrate structure while
             connectors are being wired and are labelled everywhere they appear. Anything else that
-            looks incorrect can be traced through its Evidence drawer to the exact page it came
-            from — start there, then tell us which claim and which source disagree.{" "}
+            looks incorrect can be traced through its Evidence drawer to the exact page it came from
+            — start there, then tell us which claim and which source disagree.{" "}
             <Link to="/" className="text-primary hover:underline">
               Back to the pulse
             </Link>

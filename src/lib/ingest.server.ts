@@ -319,7 +319,11 @@ function junkDiscoveryReason(url: string, label = ""): string | null {
     return "document-or-asset";
   if (/(?:\/|^)(?:feedback|print|login|logout|privacy|impressum|sitemap)(?:\/|$)/i.test(path))
     return "utility-page";
-  if (/(?:faq|frequently[-_ ]asked|application[-_ ]?form|sollicitatieformulier|salary[-_ ]?scale|salarisschaal)/i.test(haystack))
+  if (
+    /(?:faq|frequently[-_ ]asked|application[-_ ]?form|sollicitatieformulier|salary[-_ ]?scale|salarisschaal)/i.test(
+      haystack,
+    )
+  )
     return "support-or-form";
   if (/[?&](?:download|attachment|format|output)=(?:1|true|pdf|doc|docx)/i.test(u.search))
     return "download-link";
@@ -331,8 +335,6 @@ function junkDiscoveryReason(url: string, label = ""): string | null {
 function isJunkDiscoveryUrl(url: string, label = ""): boolean {
   return junkDiscoveryReason(url, label) !== null;
 }
-
-
 
 const DETAIL_KIND_BY_CATEGORY: Record<string, string> = {
   vacancies: "VACANCY",
@@ -346,10 +348,19 @@ const DETAIL_KIND_BY_CATEGORY: Record<string, string> = {
 function detailKindFromAdapter(adapterKey: string | null): string | null {
   if (!adapterKey) return null;
   const m = /^html-(vacancies|people|projects|events|programmes|courses)-detail$/.exec(adapterKey);
-  return m?.[1] ? (DETAIL_KIND_BY_CATEGORY[m[1]] ?? null) : adapterKey === "html-vacancy" ? "VACANCY" : null;
+  return m?.[1]
+    ? (DETAIL_KIND_BY_CATEGORY[m[1]] ?? null)
+    : adapterKey === "html-vacancy"
+      ? "VACANCY"
+      : null;
 }
 
-function likelyDetailLink(category: string, url: string, label: string, parentUrl: string): boolean {
+function likelyDetailLink(
+  category: string,
+  url: string,
+  label: string,
+  parentUrl: string,
+): boolean {
   let child: URL;
   let parent: URL;
   try {
@@ -363,16 +374,23 @@ function likelyDetailLink(category: string, url: string, label: string, parentUr
 
   const cleanLabel = label.replace(/\s+/g, " ").trim();
   const text = `${child.pathname} ${child.search} ${cleanLabel}`.toLowerCase();
-  const generic = /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?|research|news|contact)$/i;
+  const generic =
+    /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?|research|news|contact)$/i;
   if (!cleanLabel || generic.test(cleanLabel)) return false;
 
   const depth = child.pathname.split("/").filter(Boolean).length;
   const parentDepth = parent.pathname.split("/").filter(Boolean).length;
   const deeper = depth > parentDepth;
-  const detailQuery = /[?&](?:id|uid|pid|event(?:id)?|project(?:id)?|person(?:id)?|profile(?:id)?|detail|view|article|bbsidx|tx_[^=]*\[(?:uid|id)\])=/i.test(child.search);
+  const detailQuery =
+    /[?&](?:id|uid|pid|event(?:id)?|project(?:id)?|person(?:id)?|profile(?:id)?|detail|view|article|bbsidx|tx_[^=]*\[(?:uid|id)\])=/i.test(
+      child.search,
+    );
   const wordCount = cleanLabel.split(/\s+/).filter(Boolean).length;
   const informative = cleanLabel.length >= 8 && wordCount >= 2;
-  const personLike = /^(?:(?:prof(?:essor)?\.?|dr\.?|ph\.?d\.?|pd)\s+)*(?:[\p{L}][\p{L}'’.-]+\s+){1,5}[\p{L}][\p{L}'’.-]+$/iu.test(cleanLabel);
+  const personLike =
+    /^(?:(?:prof(?:essor)?\.?|dr\.?|ph\.?d\.?|pd)\s+)*(?:[\p{L}][\p{L}'’.-]+\s+){1,5}[\p{L}][\p{L}'’.-]+$/iu.test(
+      cleanLabel,
+    );
 
   // Parent listings are already category-scoped. Requiring the category word
   // again in every child URL dropped many legitimate records such as /john-doe,
@@ -381,15 +399,39 @@ function likelyDetailLink(category: string, url: string, label: string, parentUr
   // decides whether the fetched page is a real record before any model call.
   switch (category) {
     case "people":
-      return /(people|staff|team|faculty|profile|person|member|researcher|professor|mitarbeiter)/i.test(text) || personLike;
+      return (
+        /(people|staff|team|faculty|profile|person|member|researcher|professor|mitarbeiter)/i.test(
+          text,
+        ) || personLike
+      );
     case "projects":
-      return /(project|projekt|research[-_/ ]?project)/i.test(text) || detailQuery || (deeper && informative) || (depth === parentDepth && wordCount >= 3);
+      return (
+        /(project|projekt|research[-_/ ]?project)/i.test(text) ||
+        detailQuery ||
+        (deeper && informative) ||
+        (depth === parentDepth && wordCount >= 3)
+      );
     case "events":
-      return /(event|conference|workshop|seminar|colloqui|symposium|tagung|veranstaltung|summer[-_/ ]?school)/i.test(text) || detailQuery || (deeper && informative) || (depth === parentDepth && wordCount >= 3);
+      return (
+        /(event|conference|workshop|seminar|colloqui|symposium|tagung|veranstaltung|summer[-_/ ]?school)/i.test(
+          text,
+        ) ||
+        detailQuery ||
+        (deeper && informative) ||
+        (depth === parentDepth && wordCount >= 3)
+      );
     case "programmes":
-      return /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(text) || detailQuery || (deeper && informative);
+      return (
+        /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(text) ||
+        detailQuery ||
+        (deeper && informative)
+      );
     case "courses":
-      return /(course|module|lecture|class|teaching|lehre|vorlesung)/i.test(text) || detailQuery || (deeper && informative);
+      return (
+        /(course|module|lecture|class|teaching|lehre|vorlesung)/i.test(text) ||
+        detailQuery ||
+        (deeper && informative)
+      );
     default:
       return false;
   }
@@ -481,7 +523,10 @@ async function registerDetailSources(input: {
           .from("raw_records")
           .update({
             classification: targetClassification,
-            classification_confidence: Math.max(Number(latestRaw.classification_confidence ?? 0), 0.72),
+            classification_confidence: Math.max(
+              Number(latestRaw.classification_confidence ?? 0),
+              0.72,
+            ),
             normalization_status: "PENDING",
             normalization_error: null,
           } as never)
@@ -489,7 +534,10 @@ async function registerDetailSources(input: {
         await enqueue("NORMALIZE", {
           source_id: existing.id,
           institution_id: existing.institution_id ?? input.institutionId ?? undefined,
-          payload: { classification: targetClassification, reason: "deep-discovery-v6.1-existing-detail" },
+          payload: {
+            classification: targetClassification,
+            reason: "deep-discovery-v6.1-existing-detail",
+          },
         });
       } else if (!latestRaw && existing.status !== "BLOCKED" && existing.active !== false) {
         await enqueue("FETCH", {
@@ -525,7 +573,10 @@ async function registerDetailSources(input: {
       .maybeSingle();
     if (error || !child) continue;
     insertedCount += 1;
-    await enqueue("FETCH", { source_id: child.id, institution_id: input.institutionId ?? undefined });
+    await enqueue("FETCH", {
+      source_id: child.id,
+      institution_id: input.institutionId ?? undefined,
+    });
   }
   return insertedCount;
 }
@@ -672,7 +723,6 @@ export async function discoverInstitutionSources(
   return result;
 }
 
-
 const HIGH_VALUE_RESEED_CATEGORIES = new Set([
   "people",
   "projects",
@@ -699,13 +749,18 @@ const RESEED_PRIORITY: Record<string, number> = {
  * Each source is marked in notes after being queued so an idle worker does not
  * continuously refetch the same directory.
  */
-export async function enqueueHighValueReseed(
-  limit = 150,
-): Promise<{ scanned: number; eligible: number; queued: number; by_category: Record<string, number> }> {
+export async function enqueueHighValueReseed(limit = 150): Promise<{
+  scanned: number;
+  eligible: number;
+  queued: number;
+  by_category: Record<string, number>;
+}> {
   const marker = "deep-discovery-v6.1";
   const { data: sources, error } = await supabaseAdmin
     .from("sources")
-    .select("id, url, category, adapter_key, institution_id, notes, status, active, last_success_at")
+    .select(
+      "id, url, category, adapter_key, institution_id, notes, status, active, last_success_at",
+    )
     .eq("active", true)
     .limit(5000);
   if (error) throw error;
@@ -714,7 +769,8 @@ export async function enqueueHighValueReseed(
     .filter((source) => {
       const category = source.category ?? "";
       if (!HIGH_VALUE_RESEED_CATEGORIES.has(category)) return false;
-      if (source.adapter_key?.endsWith("-detail") || source.adapter_key === "html-vacancy") return false;
+      if (source.adapter_key?.endsWith("-detail") || source.adapter_key === "html-vacancy")
+        return false;
       if (source.status === "BLOCKED") return false;
       if (isJunkDiscoveryUrl(source.url)) return false;
       if ((source.notes ?? "").includes(marker)) return false;
@@ -738,7 +794,11 @@ export async function enqueueHighValueReseed(
       institution_id: source.institution_id ?? undefined,
       payload: { reason: marker, category: source.category ?? null },
     });
-    const nextNotes = `${source.notes ?? ""}${source.notes ? "\n" : ""}${marker}: queued ${new Date().toISOString()}`.slice(0, 4000);
+    const nextNotes =
+      `${source.notes ?? ""}${source.notes ? "\n" : ""}${marker}: queued ${new Date().toISOString()}`.slice(
+        0,
+        4000,
+      );
     await supabaseAdmin.from("sources").update({ notes: nextNotes }).eq("id", source.id);
     queued += 1;
     const category = source.category ?? "unknown";
@@ -759,9 +819,12 @@ export async function enqueueHighValueReseed(
  * This is database-only when raw HTML/text is already present: no refetch and
  * no model call until the deterministic entity gate accepts the page.
  */
-export async function enqueueExistingDetailRecovery(
-  limit = 300,
-): Promise<{ scanned: number; normalize_queued: number; fetch_queued: number; already_normalized: number }> {
+export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
+  scanned: number;
+  normalize_queued: number;
+  fetch_queued: number;
+  already_normalized: number;
+}> {
   const { data: sources, error } = await supabaseAdmin
     .from("sources")
     .select("id, adapter_key, institution_id, status, active")
@@ -840,7 +903,8 @@ export async function enqueue(
     | "NORMALIZE"
     | "VERIFY"
     | "PROMOTE_INSTITUTION"
-    | "IMPORT_PUBLICATIONS",
+    | "IMPORT_PUBLICATIONS"
+    | "IMPORT_PROJECTS",
   opts: {
     source_id?: string | undefined;
     institution_id?: string | undefined;
@@ -853,6 +917,18 @@ export async function enqueue(
       .select("id")
       .eq("task_type", taskType)
       .eq("source_id", opts.source_id)
+      .in("status", ["QUEUED", "PROCESSING", "RETRY"])
+      .maybeSingle();
+    if (dup) return;
+  } else if (
+    opts.institution_id &&
+    ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"].includes(taskType)
+  ) {
+    const { data: dup } = await supabaseAdmin
+      .from("ingestion_tasks")
+      .select("id")
+      .eq("task_type", taskType)
+      .eq("institution_id", opts.institution_id)
       .in("status", ["QUEUED", "PROCESSING", "RETRY"])
       .maybeSingle();
     if (dup) return;
@@ -911,7 +987,15 @@ export async function runQueueBatch(
   limit = 8,
   taskTypes?: string[],
   concurrency = 1,
-): Promise<{ processed: number; ok: number; failed: number; dead: number; normalized: number; skipped: number; details: string[] }> {
+): Promise<{
+  processed: number;
+  ok: number;
+  failed: number;
+  dead: number;
+  normalized: number;
+  skipped: number;
+  details: string[];
+}> {
   let query = supabaseAdmin
     .from("ingestion_tasks")
     .select("*")
@@ -938,7 +1022,15 @@ export async function runQueueBatch(
     selected = selected.slice(0, limit);
   }
 
-  const out = { processed: 0, ok: 0, failed: 0, dead: 0, normalized: 0, skipped: 0, details: [] as string[] };
+  const out = {
+    processed: 0,
+    ok: 0,
+    failed: 0,
+    dead: 0,
+    normalized: 0,
+    skipped: 0,
+    details: [] as string[],
+  };
   const queue = selected;
   const workers = Math.max(1, Math.min(Math.floor(concurrency), queue.length || 1));
   let cursor = 0;
@@ -976,18 +1068,62 @@ export async function runQueueBatch(
       } else if (task.task_type === "PROMOTE_INSTITUTION" && task.institution_id) {
         const { promoteInstitution } = await import("./openalex.server");
         const r = await promoteInstitution(task.institution_id);
-        detail = `PROMOTE ${r.institution}: ${r.matched ? `matched ${r.openalex_id}${r.promoted ? " (promoted)" : ""}` : `no match (${r.reason})`}`;
+        if (r.matched) {
+          await enqueue("IMPORT_PUBLICATIONS", {
+            institution_id: task.institution_id,
+            payload: { after_ror: true },
+          });
+          await enqueue("IMPORT_PROJECTS", {
+            institution_id: task.institution_id,
+            payload: { after_ror: true },
+          });
+        }
+        detail = `PROMOTE ${r.institution}: ${r.matched ? `matched ${r.ror ?? r.provider_id ?? "ROR"}${r.promoted ? " (promoted)" : ""}` : `no match (${r.reason})`}`;
       } else if (task.task_type === "IMPORT_PUBLICATIONS" && task.institution_id) {
         const { importInstitutionPublications, promoteInstitution } =
           await import("./openalex.server");
         const { data: inst } = await supabaseAdmin
           .from("institutions")
-          .select("openalex_id")
+          .select("institution_identifier, is_demo")
           .eq("id", task.institution_id)
           .maybeSingle();
-        if (!inst?.openalex_id) await promoteInstitution(task.institution_id);
-        const r = await importInstitutionPublications(task.institution_id);
-        detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen`;
+        const hasRor = /^(?:https?:\/\/ror\.org\/)?0[a-z0-9]{8}$/i.test(
+          (inst?.institution_identifier ?? "").trim(),
+        );
+        if (!hasRor || inst?.is_demo) {
+          const promoted = await promoteInstitution(task.institution_id);
+          if (!promoted.matched) {
+            detail = `PUBLICATIONS ${promoted.institution}: waiting for verified ROR (${promoted.reason ?? "no match"})`;
+          } else {
+            const r = await importInstitutionPublications(task.institution_id);
+            detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via ${r.provider}`;
+          }
+        } else {
+          const r = await importInstitutionPublications(task.institution_id);
+          detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via ${r.provider}`;
+        }
+      } else if (task.task_type === "IMPORT_PROJECTS" && task.institution_id) {
+        const { importInstitutionProjects, promoteInstitution } = await import("./openalex.server");
+        const { data: inst } = await supabaseAdmin
+          .from("institutions")
+          .select("institution_identifier, is_demo")
+          .eq("id", task.institution_id)
+          .maybeSingle();
+        const hasRor = /^(?:https?:\/\/ror\.org\/)?0[a-z0-9]{8}$/i.test(
+          (inst?.institution_identifier ?? "").trim(),
+        );
+        if (!hasRor || inst?.is_demo) {
+          const promoted = await promoteInstitution(task.institution_id);
+          if (!promoted.matched) {
+            detail = `PROJECTS ${promoted.institution}: waiting for verified ROR (${promoted.reason ?? "no match"})`;
+          } else {
+            const r = await importInstitutionProjects(task.institution_id);
+            detail = `PROJECTS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via OpenAIRE`;
+          }
+        } else {
+          const r = await importInstitutionProjects(task.institution_id);
+          detail = `PROJECTS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via OpenAIRE`;
+        }
       } else {
         throw new Error(`Unsupported task ${task.task_type} (missing source/institution)`);
       }
@@ -998,7 +1134,35 @@ export async function runQueueBatch(
       out.ok += 1;
       out.details.push(detail);
     } catch (e) {
-      const message = e instanceof Error ? e.message : String(e);
+      const message =
+        e instanceof Error
+          ? e.message
+          : (() => {
+              try {
+                return JSON.stringify(e);
+              } catch {
+                return String(e);
+              }
+            })();
+      // Provider rate/capacity deferrals are not data failures and must not burn retry attempts.
+      if (e && typeof e === "object" && "retryAfterMinutes" in e) {
+        const minutes = Math.max(
+          1,
+          Number((e as { retryAfterMinutes?: number }).retryAfterMinutes ?? 30),
+        );
+        await supabaseAdmin
+          .from("ingestion_tasks")
+          .update({
+            status: "RETRY",
+            attempts: task.attempts,
+            last_error: message.slice(0, 1000),
+            run_after: new Date(Date.now() + minutes * 60_000).toISOString(),
+          })
+          .eq("id", task.id);
+        out.failed += 1;
+        out.details.push(`DEFERRED ${task.task_type}: ${message.slice(0, 160)} (${minutes}m)`);
+        return;
+      }
       const attempts = task.attempts + 1;
       const dead = attempts >= task.max_attempts;
       const backoffMinutes = Math.min(60 * 12, 2 ** attempts);
@@ -1122,7 +1286,10 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const hash = await sha256(text);
   let { classification, confidence } = classifyUrlAndText(finalUrl, title ?? "", text);
   const detailKind = detailKindFromAdapter(source.adapter_key);
-  if (detailKind && (classification === "GENERAL" || classification === "UNKNOWN" || confidence < 0.5)) {
+  if (
+    detailKind &&
+    (classification === "GENERAL" || classification === "UNKNOWN" || confidence < 0.5)
+  ) {
     classification = detailKind;
     confidence = Math.max(confidence, 0.72);
   }
@@ -1286,7 +1453,7 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
 /* ------------------------------------------------------------------ */
 
 const DATE_RE =
-  /(\d{1,2})[.\/](\d{1,2})[.\/](\d{4})|(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i;
+  /(\d{1,2})[./](\d{1,2})[./](\d{4})|(\d{4})-(\d{2})-(\d{2})|(\d{1,2})\s+(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i;
 
 function parseDeadline(text: string): string | null {
   const windowText = text.slice(0, 8000);

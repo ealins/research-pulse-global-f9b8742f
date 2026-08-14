@@ -9,7 +9,14 @@ const LEGACY_SKIP = "unsupported record type for canonical extraction";
 const LEGACY_SKIP_ALT = "no extractor for classification";
 
 /** Classifications that now have a gate + extractor + canonical writer. */
-export const BACKFILL_CLASSIFICATIONS = ["PROJECT", "RESEARCHER", "EVENT", "PROGRAMME", "COURSE", "VACANCY"] as const;
+export const BACKFILL_CLASSIFICATIONS = [
+  "PROJECT",
+  "RESEARCHER",
+  "EVENT",
+  "PROGRAMME",
+  "COURSE",
+  "VACANCY",
+] as const;
 
 export type BackfillPlan = {
   raw_candidates: number;
@@ -23,7 +30,12 @@ export type BackfillPlan = {
  * successfully by the current extraction pipeline.
  */
 export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
-  const plan: BackfillPlan = { raw_candidates: 0, queued: 0, already_queued: 0, by_classification: {} };
+  const plan: BackfillPlan = {
+    raw_candidates: 0,
+    queued: 0,
+    already_queued: 0,
+    by_classification: {},
+  };
 
   const { data: raws } = await supabaseAdmin
     .from("raw_records")
@@ -46,7 +58,8 @@ export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
   // One task per source: normalizeSource() always works on the newest raw page.
   const bySource = new Map<string, string>();
   for (const r of candidates) {
-    if (!bySource.has(r.source_id as string)) bySource.set(r.source_id as string, r.classification ?? "UNKNOWN");
+    if (!bySource.has(r.source_id as string))
+      bySource.set(r.source_id as string, r.classification ?? "UNKNOWN");
   }
   plan.raw_candidates = bySource.size;
 
@@ -65,7 +78,11 @@ export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
       continue;
     }
     if (rows.length >= limit) continue;
-    rows.push({ task_type: "NORMALIZE", source_id: sourceId, payload: { backfill: true, classification } });
+    rows.push({
+      task_type: "NORMALIZE",
+      source_id: sourceId,
+      payload: { backfill: true, classification },
+    });
   }
 
   for (let i = 0; i < rows.length; i += 100) {
@@ -76,38 +93,71 @@ export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
   return plan;
 }
 
-export type ProviderPlan = { promote_queued: number; publications_queued: number };
+export type ProviderPlan = {
+  promote_queued: number;
+  publications_queued: number;
+  projects_queued: number;
+};
 
 /**
- * Enqueues structured-provider work: institution identity reconciliation
- * (promotion of seed rows, never duplication) and OpenAlex publication import.
+ * Enqueues structured-provider work: institution identity reconciliation via ROR, OpenAIRE project/publication import,
+ * and Crossref publication fallback.
  */
 export async function enqueueProviderBackfill(limit = 120): Promise<ProviderPlan> {
-  const out: ProviderPlan = { promote_queued: 0, publications_queued: 0 };
+  const out: ProviderPlan = { promote_queued: 0, publications_queued: 0, projects_queued: 0 };
 
   const { data: openTasks } = await supabaseAdmin
     .from("ingestion_tasks")
     .select("task_type, institution_id")
-    .in("task_type", ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS"])
+    .in("task_type", ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"])
     .in("status", ["QUEUED", "PROCESSING", "RETRY"]);
   const openKey = new Set((openTasks ?? []).map((t) => `${t.task_type}:${t.institution_id}`));
 
   const { data: institutions } = await supabaseAdmin
     .from("institutions")
-    .select("id, name, openalex_id, is_demo")
+    .select("id, name, institution_identifier, is_demo")
     .order("is_demo", { ascending: false })
     .limit(500);
 
-  const rows: { task_type: string; institution_id: string; payload: Record<string, unknown> }[] = [];
+  const rows: { task_type: string; institution_id: string; payload: Record<string, unknown> }[] =
+    [];
+  const hasRor = (value: string | null) =>
+    /^(?:https?:\/\/ror\.org\/)?0[a-z0-9]{8}$/i.test((value ?? "").trim());
+
   for (const inst of institutions ?? []) {
     if (rows.length >= limit) break;
-    if (!inst.openalex_id && !openKey.has(`PROMOTE_INSTITUTION:${inst.id}`)) {
-      rows.push({ task_type: "PROMOTE_INSTITUTION", institution_id: inst.id, payload: { backfill: true } });
-      out.promote_queued += 1;
+
+    // Provider imports are only allowed after the institution has a verified ROR
+    // identity and is no longer a demo row. Promotion is the gate that establishes
+    // that identity. Successful promotion queues the downstream imports itself.
+    const providerReady = hasRor(inst.institution_identifier) && !inst.is_demo;
+    if (!providerReady) {
+      if (!openKey.has(`PROMOTE_INSTITUTION:${inst.id}`)) {
+        rows.push({
+          task_type: "PROMOTE_INSTITUTION",
+          institution_id: inst.id,
+          payload: { backfill: true },
+        });
+        out.promote_queued += 1;
+      }
+      continue;
     }
-    if (!openKey.has(`IMPORT_PUBLICATIONS:${inst.id}`)) {
-      rows.push({ task_type: "IMPORT_PUBLICATIONS", institution_id: inst.id, payload: { backfill: true } });
+
+    if (!openKey.has(`IMPORT_PUBLICATIONS:${inst.id}`) && rows.length < limit) {
+      rows.push({
+        task_type: "IMPORT_PUBLICATIONS",
+        institution_id: inst.id,
+        payload: { backfill: true },
+      });
       out.publications_queued += 1;
+    }
+    if (!openKey.has(`IMPORT_PROJECTS:${inst.id}`) && rows.length < limit) {
+      rows.push({
+        task_type: "IMPORT_PROJECTS",
+        institution_id: inst.id,
+        payload: { backfill: true },
+      });
+      out.projects_queued += 1;
     }
   }
 

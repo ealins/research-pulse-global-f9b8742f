@@ -98,7 +98,10 @@ async function fetchLandscape() {
       .eq("is_demo", false),
     supabase.from("courses").select("id, institution_id, degree_type").eq("is_demo", false),
     supabase.from("projects").select("id, institution_id, status").eq("is_demo", false),
-    supabase.from("publications").select("id, institution_id, publication_date, year").eq("is_demo", false),
+    supabase
+      .from("publications")
+      .select("id, institution_id, publication_date, year")
+      .eq("is_demo", false),
     supabase.from("researchers").select("id, institution_id").eq("is_demo", false),
     supabase.from("events").select("id, country, start_date").eq("is_demo", false),
   ]);
@@ -166,8 +169,7 @@ function scoreInstitutions(l: Awaited<ReturnType<typeof fetchLandscape>>): Insti
         projects,
         publications,
         researchers,
-        pulse:
-          openCalls * 4 + projects * 2 + publications * 1.5 + researchers + programmes * 0.5,
+        pulse: openCalls * 4 + projects * 2 + publications * 1.5 + researchers + programmes * 0.5,
       };
     })
     .sort((a, b) => b.pulse - a.pulse || a.name.localeCompare(b.name));
@@ -267,13 +269,17 @@ export function countryDetailQuery(slug: string) {
           .order("start_date"),
         supabase
           .from("researchers")
-          .select("id, full_name, slug, academic_title, current_position, institutions ( name, slug )")
+          .select(
+            "id, full_name, slug, academic_title, current_position, institutions ( name, slug )",
+          )
           .in("institution_id", ids)
           .eq("is_demo", false)
           .limit(40),
         supabase
           .from("projects")
-          .select("id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug )")
+          .select(
+            "id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug )",
+          )
           .in("institution_id", ids)
           .eq("is_demo", false)
           .order("is_demo", { ascending: true })
@@ -285,7 +291,12 @@ export function countryDetailQuery(slug: string) {
           .in("institution_id", ids),
       ]);
       const err =
-        opps.error || courses.error || events.error || researchers.error || projects.error || topics.error;
+        opps.error ||
+        courses.error ||
+        events.error ||
+        researchers.error ||
+        projects.error ||
+        topics.error;
       if (err) throw err;
 
       const topicCount = new Map<string, { name: string; slug: string; count: number }>();
@@ -356,15 +367,16 @@ export function programmeDetailQuery(slug: string) {
         .select(
           `id, title, slug, degree_type, language, duration, website, summary,
            verification_status, last_verified_at, is_demo, institution_id,
-           institutions ( id, name, slug, country, city, continent, official_url, research_url, description ),
+           institutions ( id, name, slug, country, city, continent, official_url, research_url, description, is_demo ),
            departments ( name, slug, website ),
            course_topics ( research_topics ( name, slug, category, description ) ),
-           course_researchers ( researchers ( full_name, slug, academic_title, current_position ) )`,
+           course_researchers ( researchers ( full_name, slug, academic_title, current_position, is_demo ) )`,
         )
         .eq("slug", slug)
+        .eq("is_demo", false)
         .maybeSingle();
       if (error) throw error;
-      if (!course) return null;
+      if (!course || course.institutions?.is_demo) return null;
 
       const instId = course.institutions?.id;
       const [calls, siblings, projects] = await Promise.all([
@@ -373,8 +385,8 @@ export function programmeDetailQuery(slug: string) {
               .from("opportunities")
               .select("id, title, slug, opportunity_type, status, application_deadline")
               .eq("institution_id", instId)
+              .eq("is_demo", false)
               .in("status", OPEN_STATUSES)
-              .order("is_demo", { ascending: true })
               .order("application_deadline", { ascending: true, nullsFirst: false })
               .limit(8)
           : Promise.resolve({ data: [], error: null }),
@@ -383,6 +395,7 @@ export function programmeDetailQuery(slug: string) {
               .from("courses")
               .select("id, title, slug, degree_type, language, duration")
               .eq("institution_id", instId)
+              .eq("is_demo", false)
               .neq("slug", slug)
               .limit(8)
           : Promise.resolve({ data: [], error: null }),
@@ -391,12 +404,17 @@ export function programmeDetailQuery(slug: string) {
               .from("projects")
               .select("id, name, slug, status, summary")
               .eq("institution_id", instId)
+              .eq("is_demo", false)
               .limit(6)
           : Promise.resolve({ data: [], error: null }),
       ]);
 
+      const courseResearchers = (course.course_researchers ?? []).filter(
+        (link) => link.researchers && !link.researchers.is_demo,
+      );
+
       return {
-        course,
+        course: { ...course, course_researchers: courseResearchers },
         family: programmeFamily(course.title),
         calls: calls.data ?? [],
         siblings: siblings.data ?? [],

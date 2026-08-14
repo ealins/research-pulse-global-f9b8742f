@@ -16,7 +16,6 @@ type Body = {
   trigger?: string;
 };
 
-
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -107,7 +106,9 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         }
         if (action === "backfill-providers") {
           const { enqueueProviderBackfill } = await import("@/lib/backfill.server");
-          const result = await enqueueProviderBackfill(Math.min(400, Math.max(1, body.limit ?? 120)));
+          const result = await enqueueProviderBackfill(
+            Math.min(400, Math.max(1, body.limit ?? 120)),
+          );
           return json({ action, ...result });
         }
 
@@ -133,14 +134,15 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           return json({ action, ...result });
         }
 
-        // Structured-provider drain (OpenAlex/Crossref only). Never calls a model,
+        // Structured-provider drain (ROR/OpenAIRE/Crossref). Never calls a model,
         // so it is safe to run on its own cheap cadence.
         if (action === "drain-providers") {
           const { runQueueBatch } = await import("@/lib/ingest.server");
-          const result = await runQueueBatch(Math.min(25, Math.max(1, body.limit ?? 5)), [
-            "PROMOTE_INSTITUTION",
-            "IMPORT_PUBLICATIONS",
-          ]);
+          const result = await runQueueBatch(
+            Math.min(30, Math.max(1, body.limit ?? 12)),
+            ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"],
+            2,
+          );
           return json({ action, ...result });
         }
 
@@ -181,7 +183,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             .limit(1)
             .maybeSingle();
           if (recent) {
-            return json({ action: "drain", skipped: true, reason: "steady-state interval not elapsed", ...queueState });
+            return json({
+              action: "drain",
+              skipped: true,
+              reason: "steady-state interval not elapsed",
+              ...queueState,
+            });
           }
         }
 
@@ -195,11 +202,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           .insert({
             trigger: body.trigger ?? "cron",
             started_at: startedAt.toISOString(),
-            details: { mode: queueState.mode, batch_size: batch, due_tasks: queueState.due_tasks } as never,
+            details: {
+              mode: queueState.mode,
+              batch_size: batch,
+              due_tasks: queueState.due_tasks,
+            } as never,
           } as never)
           .select("id")
           .maybeSingle();
-
 
         try {
           // Backlog draining is adaptive: process NORMALIZE in small waves with
@@ -209,12 +219,23 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           const normalizeTarget = queueState.mode === "BACKLOG" ? 40 : Math.min(2, batch);
           const normalizeWave = queueState.mode === "BACKLOG" ? 8 : Math.min(2, batch);
           const normalizeBudgetMs = queueState.mode === "BACKLOG" ? 70_000 : 30_000;
-          const emptyResult = () => ({ processed: 0, ok: 0, failed: 0, dead: 0, normalized: 0, skipped: 0, details: [] as string[] });
+          const emptyResult = () => ({
+            processed: 0,
+            ok: 0,
+            failed: 0,
+            dead: 0,
+            normalized: 0,
+            skipped: 0,
+            details: [] as string[],
+          });
           const result = emptyResult();
           let normalizeWaves = 0;
           let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
 
-          while (result.processed < normalizeTarget && Date.now() - startedAt.getTime() < normalizeBudgetMs) {
+          while (
+            result.processed < normalizeTarget &&
+            Date.now() - startedAt.getTime() < normalizeBudgetMs
+          ) {
             const remaining = normalizeTarget - result.processed;
             const wave = await runQueueBatch(Math.min(normalizeWave, remaining), ["NORMALIZE"], 2);
             normalizeWaves += 1;
@@ -275,9 +296,13 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
               })
               .eq("id", run.id);
           }
-          return json({ action: "drain", run_id: run?.id ?? null, mode: queueState.mode, task_group: taskGroup, ...result });
-
-
+          return json({
+            action: "drain",
+            run_id: run?.id ?? null,
+            mode: queueState.mode,
+            task_group: taskGroup,
+            ...result,
+          });
         } catch (e) {
           const message = e instanceof Error ? e.message : String(e);
           if (run?.id) {

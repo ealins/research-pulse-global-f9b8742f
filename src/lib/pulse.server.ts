@@ -10,7 +10,14 @@ type PulseRow = {
   importance: number;
   link_url: string | null;
   source_url: string | null;
-  verification_status: "verified" | "auto_discovered" | "needs_review" | "possibly_outdated" | "closed" | "archived" | "unverified";
+  verification_status:
+    | "verified"
+    | "auto_discovered"
+    | "needs_review"
+    | "possibly_outdated"
+    | "closed"
+    | "archived"
+    | "unverified";
   confidence: "high" | "medium" | "low";
   is_demo: false;
   country: string | null;
@@ -26,17 +33,23 @@ function dateOnly(value: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? new Date().toISOString() : d.toISOString();
 }
 
-async function institutionCountry(institutionId: string | null | undefined): Promise<string | null> {
+async function institutionCountry(
+  institutionId: string | null | undefined,
+): Promise<string | null> {
   if (!institutionId) return null;
   const { data } = await supabaseAdmin
     .from("institutions")
     .select("country")
     .eq("id", institutionId)
+    .eq("is_demo", false)
     .maybeSingle();
   return data?.country ?? null;
 }
 
-async function buildPulseRow(entityType: PulseEntityType, entityId: string): Promise<PulseRow | null> {
+async function buildPulseRow(
+  entityType: PulseEntityType,
+  entityId: string,
+): Promise<PulseRow | null> {
   if (entityType === "opportunity") {
     const { data } = await supabaseAdmin
       .from("opportunities")
@@ -47,7 +60,12 @@ async function buildPulseRow(entityType: PulseEntityType, entityId: string): Pro
       .maybeSingle();
     if (!data || data.is_demo) return null;
     const country = data.country ?? (await institutionCountry(data.institution_id));
-    const importance = data.status === "closing_soon" ? 100 : data.status === "open" || data.status === "rolling" ? 90 : 60;
+    const importance =
+      data.status === "closing_soon"
+        ? 100
+        : data.status === "open" || data.status === "rolling"
+          ? 90
+          : 60;
     return {
       category: "PHD",
       title: data.title,
@@ -179,7 +197,10 @@ async function buildPulseRow(entityType: PulseEntityType, entityId: string): Pro
 }
 
 /** Idempotent projection of one canonical real entity into the homepage pulse feed. */
-export async function ensurePulseForEntity(entityType: PulseEntityType, entityId: string): Promise<boolean> {
+export async function ensurePulseForEntity(
+  entityType: PulseEntityType,
+  entityId: string,
+): Promise<boolean> {
   const row = await buildPulseRow(entityType, entityId);
   if (!row) return false;
 
@@ -191,7 +212,10 @@ export async function ensurePulseForEntity(entityType: PulseEntityType, entityId
     .maybeSingle();
 
   if (existing?.id) {
-    const { error } = await supabaseAdmin.from("pulse_events").update(row as never).eq("id", existing.id);
+    const { error } = await supabaseAdmin
+      .from("pulse_events")
+      .update(row as never)
+      .eq("id", existing.id);
     return !error;
   }
 
@@ -207,7 +231,11 @@ export async function backfillPulseEvents(limitPerType = 120): Promise<{
   checked: number;
   projected: number;
 }> {
-  const specs: Array<{ type: PulseEntityType; table: "opportunities" | "projects" | "researchers" | "events" | "publications"; order: string }> = [
+  const specs: Array<{
+    type: PulseEntityType;
+    table: "opportunities" | "projects" | "researchers" | "events" | "publications";
+    order: string;
+  }> = [
     { type: "opportunity", table: "opportunities", order: "created_at" },
     { type: "project", table: "projects", order: "created_at" },
     { type: "researcher", table: "researchers", order: "created_at" },

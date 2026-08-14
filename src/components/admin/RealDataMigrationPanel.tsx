@@ -8,8 +8,12 @@ function Metric({ label, value, hint }: { label: string; value: string | number;
   return (
     <div className="rounded-lg border border-border/60 bg-card/60 px-3 py-2">
       <div className="text-xl font-semibold tabular-nums text-foreground">{value}</div>
-      <div className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">{label}</div>
-      {hint ? <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{hint}</div> : null}
+      <div className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        {label}
+      </div>
+      {hint ? (
+        <div className="mt-1 text-[11px] leading-snug text-muted-foreground">{hint}</div>
+      ) : null}
     </div>
   );
 }
@@ -37,7 +41,8 @@ export function RealDataMigrationPanel() {
           <Database className="h-4 w-4 text-primary" /> Real data migration
         </h2>
         <p className="mt-3 rounded border border-destructive/40 bg-destructive/10 p-2 text-xs text-muted-foreground">
-          Migration metrics need an admin session: {error instanceof Error ? error.message : String(error)}
+          Migration metrics need an admin session:{" "}
+          {error instanceof Error ? error.message : String(error)}
         </p>
       </section>
     );
@@ -62,8 +67,8 @@ export function RealDataMigrationPanel() {
         </button>
       </div>
       <p className="mt-2 text-xs text-muted-foreground">
-        Turns already-stored raw pages into canonical records. No refetching, no new crawling — the deployed loop drains
-        the queue on its own cadence.
+        Turns already-stored raw pages into canonical records. No refetching, no new crawling — the
+        deployed loop drains the queue on its own cadence.
       </p>
 
       <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -93,9 +98,11 @@ export function RealDataMigrationPanel() {
               </tr>
             ))}
             <tr className="border-t border-border/40">
-              <td className="py-1.5 pr-3 text-foreground">Publications (OpenAlex / Crossref)</td>
-              <td className="py-1.5 pr-3 tabular-nums">{i.with_openalex_identity} institutions</td>
-              <td className="py-1.5 pr-3 tabular-nums text-primary">{data.publications.provider_backed}</td>
+              <td className="py-1.5 pr-3 text-foreground">Publications (OpenAIRE / Crossref)</td>
+              <td className="py-1.5 pr-3 tabular-nums">{i.with_ror_identity} institutions</td>
+              <td className="py-1.5 pr-3 tabular-nums text-primary">
+                {data.publications.provider_backed}
+              </td>
               <td className="py-1.5 tabular-nums">{data.publications.demo_remaining}</td>
             </tr>
             <tr className="border-t border-border/40">
@@ -114,8 +121,13 @@ export function RealDataMigrationPanel() {
         <Metric label="Validation rejects" value={data.model.validation_rejects} />
         <Metric
           label="Queued migration work"
-          value={data.queue.normalize_open + data.queue.promote_open + data.queue.publications_open}
-          hint={`${data.queue.normalize_open} extract · ${data.queue.promote_open} promote · ${data.queue.publications_open} publications`}
+          value={
+            data.queue.normalize_open +
+            data.queue.promote_open +
+            data.queue.publications_open +
+            data.queue.projects_open
+          }
+          hint={`${data.queue.normalize_open} extract · ${data.queue.promote_open} ROR · ${data.queue.publications_open} publications · ${data.queue.projects_open} projects`}
         />
       </div>
     </section>

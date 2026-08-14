@@ -17,14 +17,17 @@ const atlasQuery = queryOptions({
     const [institutions, opportunities, edges] = await Promise.all([
       supabase
         .from("institutions")
-        .select("id, name, slug, country, city, latitude, longitude, institution_type"),
+        .select("id, name, slug, country, city, latitude, longitude, institution_type")
+        .eq("is_demo", false),
       supabase
         .from("opportunities")
         .select("id, institution_id, status, application_deadline")
-        .in("status", ["open", "closing_soon", "rolling", "possibly_open"]),
+        .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
+        .eq("is_demo", false),
       supabase
         .from("collaboration_edges")
         .select("source_entity_id, target_entity_id, weight")
+        .eq("is_demo", false)
         .order("weight", { ascending: false })
         .limit(120),
     ]);
@@ -183,8 +186,8 @@ function AtlasPage() {
               </div>
             ) : (
               <p className="mt-4 max-w-md text-center text-xs text-muted-foreground">
-                Click a node to see the institution. Positions are plotted from recorded
-                coordinates only — nothing is inferred from a country name.
+                Click a node to see the institution. Positions are plotted from recorded coordinates
+                only — nothing is inferred from a country name.
               </p>
             )}
           </div>

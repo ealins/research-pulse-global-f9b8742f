@@ -25,6 +25,7 @@ export async function loadResearcherLd(slug: string): Promise<ResearcherLd | nul
        google_scholar_url, institutions!researchers_institution_id_fkey ( name )`,
     )
     .eq("slug", slug)
+    .eq("is_demo", false)
     .maybeSingle();
   if (!data) return null;
   const inst = (data as { institutions?: { name: string } | null }).institutions;
@@ -70,6 +71,7 @@ export async function loadInstitutionLd(slug: string): Promise<InstitutionLd | n
     .from("institutions")
     .select("name, slug, description, city, country, official_url, research_url, careers_url")
     .eq("slug", slug)
+    .eq("is_demo", false)
     .maybeSingle();
   if (!data) return null;
   return {
@@ -78,8 +80,8 @@ export async function loadInstitutionLd(slug: string): Promise<InstitutionLd | n
     description: data.description ?? null,
     city: data.city ?? null,
     country: data.country ?? null,
-    sameAs: [data.official_url, data.research_url, data.careers_url].filter(
-      (v): v is string => Boolean(v),
+    sameAs: [data.official_url, data.research_url, data.careers_url].filter((v): v is string =>
+      Boolean(v),
     ),
   };
 }
@@ -126,6 +128,7 @@ export async function loadJobLd(slug: string): Promise<JobLd | null> {
        institutions!opportunities_institution_id_fkey ( name )`,
     )
     .eq("slug", slug)
+    .eq("is_demo", false)
     .maybeSingle();
   if (!data) return null;
   const inst = (data as { institutions?: { name: string } | null }).institutions;
@@ -152,9 +155,7 @@ export function jobJsonLd(j: JobLd) {
     datePosted: j.datePosted,
     ...(j.validThrough ? { validThrough: j.validThrough } : {}),
     ...(j.employmentType ? { employmentType: j.employmentType.toUpperCase() } : {}),
-    ...(j.employer
-      ? { hiringOrganization: { "@type": "Organization", name: j.employer } }
-      : {}),
+    ...(j.employer ? { hiringOrganization: { "@type": "Organization", name: j.employer } } : {}),
     ...(j.city || j.country
       ? {
           jobLocation: {
@@ -188,6 +189,7 @@ export async function loadPublicationLd(id: string): Promise<PublicationLd | nul
     .from("publications")
     .select("id, title, publication_date, year, authors_text, venue, doi, landing_url, abstract")
     .eq("id", id)
+    .eq("is_demo", false)
     .maybeSingle();
   if (!data) return null;
   return {
@@ -213,11 +215,11 @@ export function publicationJsonLd(p: PublicationLd) {
     headline: p.title,
     name: p.title,
     ...(p.datePublished ? { datePublished: p.datePublished } : {}),
-    ...(p.authors.length
-      ? { author: p.authors.map((name) => ({ "@type": "Person", name })) }
-      : {}),
+    ...(p.authors.length ? { author: p.authors.map((name) => ({ "@type": "Person", name })) } : {}),
     ...(p.venue ? { isPartOf: { "@type": "Periodical", name: p.venue } } : {}),
-    ...(p.doi ? { identifier: `https://doi.org/${p.doi.replace(/^https?:\/\/doi\.org\//, "")}` } : {}),
+    ...(p.doi
+      ? { identifier: `https://doi.org/${p.doi.replace(/^https?:\/\/doi\.org\//, "")}` }
+      : {}),
     ...(p.abstract ? { abstract: p.abstract.slice(0, 600) } : {}),
     url: `${SITE}/publications/${p.id}`,
     ...(p.landingUrl ? { sameAs: p.landingUrl } : {}),
@@ -241,6 +243,7 @@ export async function loadEventLd(slug: string): Promise<EventLd | null> {
     .from("events")
     .select("title, slug, start_date, end_date, location, country, organization, website, summary")
     .eq("slug", slug)
+    .eq("is_demo", false)
     .maybeSingle();
   if (!data) return null;
   return {

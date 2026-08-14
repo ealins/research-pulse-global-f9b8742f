@@ -52,17 +52,25 @@ export const Route = createFileRoute("/sitemap.xml")({
             auth: { persistSession: false, autoRefreshToken: false },
           });
 
-          const [institutions, researchers, opportunities, events, topics, courses, projects, publications] =
-            await Promise.all([
-              supabase.from("institutions").select("slug, country"),
-              supabase.from("researchers").select("slug"),
-              supabase.from("opportunities").select("slug"),
-              supabase.from("events").select("slug"),
-              supabase.from("research_topics").select("slug"),
-              supabase.from("courses").select("slug"),
-              supabase.from("projects").select("slug"),
-              supabase.from("publications").select("id"),
-            ]);
+          const [
+            institutions,
+            researchers,
+            opportunities,
+            events,
+            topics,
+            courses,
+            projects,
+            publications,
+          ] = await Promise.all([
+            supabase.from("institutions").select("slug, country").eq("is_demo", false),
+            supabase.from("researchers").select("slug").eq("is_demo", false),
+            supabase.from("opportunities").select("slug").eq("is_demo", false),
+            supabase.from("events").select("slug").eq("is_demo", false),
+            supabase.from("research_topics").select("slug"),
+            supabase.from("courses").select("slug").eq("is_demo", false),
+            supabase.from("projects").select("slug").eq("is_demo", false),
+            supabase.from("publications").select("id").eq("is_demo", false),
+          ]);
 
           const push = (
             prefix: string,
@@ -85,7 +93,11 @@ export const Route = createFileRoute("/sitemap.xml")({
           push("/projects", projects.data, "0.6", "weekly");
 
           for (const row of publications.data ?? []) {
-            entries.push({ path: `/publications/${row.id}`, priority: "0.5", changefreq: "monthly" });
+            entries.push({
+              path: `/publications/${row.id}`,
+              priority: "0.5",
+              changefreq: "monthly",
+            });
           }
 
           const countries = new Set(
