@@ -83,10 +83,14 @@ export const countsQuery = queryOptions({
     ] as const;
     const entries = await Promise.all(
       tables.map(async (t) => {
-        const { count, error } = await supabase.from(t).select("id", {
-          count: "exact",
-          head: true,
-        }).eq("is_demo", false);
+        // NOTE: never use `head: true` here. PostgREST answers HEAD with a
+        // Content-Length body, which Chromium rejects as net::ERR_ABORTED, so
+        // every count would fail and the UI would fall back to empty states.
+        const { count, error } = await supabase
+          .from(t)
+          .select("id", { count: "exact" })
+          .eq("is_demo", false)
+          .limit(1);
         if (error) throw error;
         return [t, count ?? 0] as const;
       }),
@@ -100,9 +104,10 @@ export const openJobCountQuery = queryOptions({
   queryFn: async () => {
     const { count, error } = await supabase
       .from("opportunities")
-      .select("id", { count: "exact", head: true })
+      .select("id", { count: "exact" })
       .in("status", ["open", "closing_soon", "rolling"])
-      .eq("is_demo", false);
+      .eq("is_demo", false)
+      .limit(1);
     if (error) throw error;
     return count ?? 0;
   },
