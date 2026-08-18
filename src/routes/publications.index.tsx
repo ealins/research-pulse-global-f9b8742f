@@ -81,11 +81,8 @@ function PublicationsPage() {
                 <p className="mt-1 text-xs text-muted-foreground">
                   {p.authors_text ?? "Authors not stated"}
                 </p>
-                {p.abstract ? (
-                  <p className="mt-2.5 line-clamp-2 text-sm leading-relaxed text-foreground/80">
-                    {p.abstract}
-                  </p>
-                ) : null}
+                <AbstractToggle id={p.id} />
+
                 <div className="mt-3">
                   <TopicPills
                     topics={(p.publication_topics ?? []).map((t) => t.research_topics?.name)}
