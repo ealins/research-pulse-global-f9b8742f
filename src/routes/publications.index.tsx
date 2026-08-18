@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ExternalLink, Quote, Unlock } from "lucide-react";
+import { useState } from "react";
+import { ChevronDown, ExternalLink, Quote, Unlock } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
-import { publicationsQuery } from "@/lib/radar-queries";
+import { publicationAbstractQuery, publicationsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardLink } from "@/components/CardLink";
 
@@ -120,5 +121,33 @@ function PublicationsPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+/** Lazily loads a single abstract, so the list request stays lightweight. */
+function AbstractToggle({ id }: { id: string }) {
+  const [open, setOpen] = useState(false);
+  const { data, isLoading } = useQuery({ ...publicationAbstractQuery(id), enabled: open });
+
+  return (
+    <div className="mt-2.5">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="relative z-10 inline-flex items-center gap-1 text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
+      >
+        {open ? "Hide abstract" : "Show abstract"}
+        <ChevronDown className={`h-3 w-3 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+      {open ? (
+        isLoading ? (
+          <Skeleton className="mt-2 h-12 w-full" />
+        ) : (
+          <p className="mt-2 text-sm leading-relaxed text-foreground/80">
+            {data ?? "No abstract recorded. Follow the DOI for the authoritative text."}
+          </p>
+        )
+      ) : null}
+    </div>
   );
 }
