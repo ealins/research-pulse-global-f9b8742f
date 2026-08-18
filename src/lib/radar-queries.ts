@@ -191,8 +191,10 @@ export const publicationsQuery = queryOptions({
     const { data, error } = await supabase
       .from("publications")
       .select(
+        // NOTE: `abstract` is deliberately excluded — abstracts made this list
+        // response ~500KB. They are fetched per row on expand.
         `id, title, doi, venue, year, publication_date, authors_text, citation_count,
-         citation_source, is_open_access, abstract, landing_url, source,
+         citation_source, is_open_access, landing_url, source,
          verification_status, confidence, is_demo,
          institutions!publications_institution_id_fkey ( name, slug ),
          publication_topics ( research_topics ( name, slug ) )`,
@@ -206,6 +208,24 @@ export const publicationsQuery = queryOptions({
     return data ?? [];
   },
 });
+
+/** Abstract for a single publication, loaded only when the row is expanded. */
+export function publicationAbstractQuery(id: string) {
+  return queryOptions({
+    queryKey: ["publication-abstract", id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("publications")
+        .select("abstract")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      return data?.abstract ?? null;
+    },
+    staleTime: 10 * 60_000,
+  });
+}
+
 
 export const projectsQuery = queryOptions({
   queryKey: ["projects"],
