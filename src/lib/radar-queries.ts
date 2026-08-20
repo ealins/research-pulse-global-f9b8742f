@@ -29,6 +29,23 @@ export type OpportunityRow = {
   opportunity_topics: { research_topics: { name: string; slug: string } | null }[];
 };
 
+const NON_POSTING_TITLE =
+  /^(careers?|jobs?|vacancies|recruitment|work with us|join us|how we hire|search for your career)|privacy|cookie|job alerts?|applicant|candidate privacy|equal opportunity/i;
+const NON_POSTING_PATH =
+  /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant)(\/|$)/i;
+
+/** Final public safety net for legacy rows written before the stricter crawler gate. */
+export function isPlausibleOpportunity(row: OpportunityRow): boolean {
+  if (!row.official_source_url || row.title.trim().length < 8) return false;
+  if (["archived", "closed", "needs_review"].includes(row.verification_status)) return false;
+  if (NON_POSTING_TITLE.test(row.title.trim())) return false;
+  try {
+    return !NON_POSTING_PATH.test(new URL(row.official_source_url).pathname);
+  } catch {
+    return false;
+  }
+}
+
 export const opportunitiesQuery = queryOptions({
   queryKey: ["opportunities"],
   queryFn: async (): Promise<OpportunityRow[]> => {
@@ -44,11 +61,12 @@ export const opportunitiesQuery = queryOptions({
          opportunity_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("application_deadline", { ascending: true, nullsFirst: false })
       .limit(200);
     if (error) throw error;
-    return (data ?? []) as unknown as OpportunityRow[];
+    return ((data ?? []) as unknown as OpportunityRow[]).filter(isPlausibleOpportunity);
   },
 });
 
@@ -61,6 +79,7 @@ export const pulseQuery = queryOptions({
         "id, category, title, summary, event_date, importance, link_url, source_url, verification_status, confidence, is_demo, country",
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered"])
       .order("is_demo", { ascending: true })
       .order("importance", { ascending: false })
       .order("event_date", { ascending: false })
@@ -95,7 +114,17 @@ export const countsQuery = queryOptions({
         return [t, count ?? 0] as const;
       }),
     );
-    return Object.fromEntries(entries) as Record<(typeof tables)[number], number>;
+    const { count: publicOpportunities, error: publicOpportunityError } = await supabase
+      .from("opportunities")
+      .select("id", { count: "exact" })
+      .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
+      .limit(1);
+    if (publicOpportunityError) throw publicOpportunityError;
+    return {
+      ...(Object.fromEntries(entries) as Record<(typeof tables)[number], number>),
+      opportunities: publicOpportunities ?? 0,
+    };
   },
 });
 
@@ -106,6 +135,7 @@ export const openJobCountQuery = queryOptions({
       .from("opportunities")
       .select("id", { count: "exact" })
       .in("status", ["open", "closing_soon", "rolling"])
+      .in("verification_status", ["verified", "auto_discovered"])
       .eq("is_demo", false)
       .limit(1);
     if (error) throw error;
@@ -124,6 +154,7 @@ export const institutionsQuery = queryOptions({
          institution_topics ( weight, research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("name");
     if (error) throw error;
@@ -143,6 +174,7 @@ export const researchersQuery = queryOptions({
          researcher_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("full_name");
     if (error) throw error;
@@ -178,6 +210,7 @@ export const eventsQuery = queryOptions({
          event_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
@@ -200,6 +233,7 @@ export const publicationsQuery = queryOptions({
          publication_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("year", { ascending: false, nullsFirst: false })
       .order("citation_count", { ascending: false, nullsFirst: false })
@@ -240,6 +274,7 @@ export const projectsQuery = queryOptions({
          project_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
@@ -259,6 +294,7 @@ export const coursesQuery = queryOptions({
          course_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;

@@ -19,6 +19,7 @@ import { Route as MethodologyRouteImport } from './routes/methodology'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as TopRouteImport } from './routes/top'
 import { Route as TrendsRouteImport } from './routes/trends'
+import { Route as AuthCallbackRouteImport } from './routes/auth_.callback'
 import { Route as CountriesIndexRouteImport } from './routes/countries.index'
 import { Route as CountriesSlugRouteImport } from './routes/countries.$slug'
 import { Route as EventsIndexRouteImport } from './routes/events.index'
@@ -87,6 +88,11 @@ const TopRoute = TopRouteImport.update({
 const TrendsRoute = TrendsRouteImport.update({
   id: '/trends',
   path: '/trends',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth_/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CountriesIndexRoute = CountriesIndexRouteImport.update({
@@ -202,6 +208,7 @@ export interface FileRoutesByFullPath {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -233,6 +240,7 @@ export interface FileRoutesByTo {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
+  '/auth/callback': typeof AuthCallbackRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -266,6 +274,7 @@ export interface FileRoutesById {
   '/sitemap.xml': typeof SitemapDotxmlRoute
   '/top': typeof TopRoute
   '/trends': typeof TrendsRoute
+  '/auth_/callback': typeof AuthCallbackRoute
   '/countries/$slug': typeof CountriesSlugRoute
   '/events/$slug': typeof EventsSlugRoute
   '/institutions/$slug': typeof InstitutionsSlugRoute
@@ -299,6 +308,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/top'
     | '/trends'
+    | '/auth/callback'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -330,6 +340,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/top'
     | '/trends'
+    | '/auth/callback'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -362,6 +373,7 @@ export interface FileRouteTypes {
     | '/sitemap.xml'
     | '/top'
     | '/trends'
+    | '/auth_/callback'
     | '/countries/$slug'
     | '/events/$slug'
     | '/institutions/$slug'
@@ -395,6 +407,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   TopRoute: typeof TopRoute
   TrendsRoute: typeof TrendsRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
   CountriesSlugRoute: typeof CountriesSlugRoute
   EventsSlugRoute: typeof EventsSlugRoute
   InstitutionsSlugRoute: typeof InstitutionsSlugRoute
@@ -486,6 +499,13 @@ declare module '@tanstack/react-router' {
       path: '/trends'
       fullPath: '/trends'
       preLoaderRoute: typeof TrendsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth_/callback': {
+      id: '/auth_/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/countries/': {
@@ -653,6 +673,7 @@ const rootRouteChildren: RootRouteChildren = {
   SitemapDotxmlRoute: SitemapDotxmlRoute,
   TopRoute: TopRoute,
   TrendsRoute: TrendsRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
   CountriesSlugRoute: CountriesSlugRoute,
   EventsSlugRoute: EventsSlugRoute,
   InstitutionsSlugRoute: InstitutionsSlugRoute,

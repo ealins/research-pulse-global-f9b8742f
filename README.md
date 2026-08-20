@@ -1,5 +1,7 @@
 # GeoSphere
 
+> Production operations, required secrets, authentication redirects, and the verification lifecycle are documented in [OPERATIONS.md](./OPERATIONS.md).
+
 Build GeoAcademic Radar — a Global Academic Intelligence Platform for Photogrammetry, Remote Sensing and Geoinformatics
 
 I already have a prototype called GeoAcademic Radar. Rebuild it as a production-quality, database-driven web application rather than a static dashboard.

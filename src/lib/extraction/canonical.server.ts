@@ -94,10 +94,7 @@ async function recordEvidence(input: {
     .eq("entity_id", input.entityId)
     .eq("source_url", input.raw.final_url ?? "")
     .maybeSingle();
-  if (data) return;
-  await supabaseAdmin.from("record_sources").insert({
-    entity_type: input.entityType,
-    entity_id: input.entityId,
+  const evidence = {
     source_id: input.raw.source_id,
     source_url: input.raw.final_url ?? "",
     source_type: input.sourceType as never,
@@ -107,6 +104,15 @@ async function recordEvidence(input: {
     confidence: "medium" as never,
     is_primary: true,
     last_checked_at: new Date().toISOString(),
+  };
+  if (data) {
+    await supabaseAdmin.from("record_sources").update(evidence).eq("id", data.id);
+    return;
+  }
+  await supabaseAdmin.from("record_sources").insert({
+    entity_type: input.entityType,
+    entity_id: input.entityId,
+    ...evidence,
   });
 }
 

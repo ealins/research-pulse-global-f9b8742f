@@ -278,19 +278,27 @@ async function recordEvidence(input: {
     .eq("entity_id", input.entityId)
     .eq("source_url", sourceUrl)
     .maybeSingle();
-  if (data) return;
-  await supabaseAdmin.from("record_sources").insert({
-    entity_type: input.entityType,
-    entity_id: input.entityId,
+  const now = new Date().toISOString();
+  const evidence = {
     source_id: input.raw.source_id,
     source_url: sourceUrl,
     source_type: input.sourceType as never,
     original_title: input.raw.page_title,
     claim: input.claim,
-    verification_status: "auto_discovered" as never,
+    verification_status: "verified" as never,
     confidence: "high" as never,
     is_primary: true,
-    last_checked_at: new Date().toISOString(),
+    last_checked_at: now,
+    last_verified_at: now,
+  };
+  if (data) {
+    await supabaseAdmin.from("record_sources").update(evidence).eq("id", data.id);
+    return;
+  }
+  await supabaseAdmin.from("record_sources").insert({
+    entity_type: input.entityType,
+    entity_id: input.entityId,
+    ...evidence,
   });
 }
 
@@ -421,8 +429,9 @@ export async function normalizeStructuredNonVacancy(
       summary: textValue(node["description"])?.slice(0, 2000) ?? null,
       source: url,
       event_kind: "other",
-      verification_status: "auto_discovered" as never,
+      verification_status: "verified" as never,
       confidence: "high" as never,
+      last_verified_at: new Date().toISOString(),
       is_demo: false,
     };
     let entityId = existing?.id;
@@ -499,7 +508,8 @@ export async function normalizeStructuredNonVacancy(
       official_profile_url: profileUrl,
       research_summary: textValue(node["description"])?.slice(0, 2000) ?? null,
       active: true,
-      verification_status: "auto_discovered" as never,
+      verification_status: "verified" as never,
+      last_verified_at: new Date().toISOString(),
       is_demo: false,
     };
     let entityId = existingId;
@@ -569,7 +579,8 @@ export async function normalizeStructuredNonVacancy(
       duration: textValue(node["timeRequired"]),
       website,
       summary: textValue(node["description"])?.slice(0, 2000) ?? null,
-      verification_status: "auto_discovered" as never,
+      verification_status: "verified" as never,
+      last_verified_at: new Date().toISOString(),
       is_demo: false,
     };
     let entityId = existing?.id;
@@ -652,8 +663,9 @@ export async function normalizeStructuredNonVacancy(
       funding_organization: textValue(funder?.["name"] ?? node["funder"] ?? node["sponsor"]),
       website,
       summary: textValue(node["description"])?.slice(0, 2000) ?? null,
-      verification_status: "auto_discovered" as never,
+      verification_status: "verified" as never,
       confidence: "high" as never,
+      last_verified_at: new Date().toISOString(),
       is_demo: false,
     };
     let entityId = existing?.id;

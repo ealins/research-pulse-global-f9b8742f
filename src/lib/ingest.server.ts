@@ -1359,6 +1359,9 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
     })
     .eq("id", source.id);
   await recordRun(true, changed, null);
+  const checkedAt = new Date().toISOString();
+  const { refreshSourceTrust } = await import("./trust.server");
+  await refreshSourceTrust({ sourceId: source.id, changed, checkedAt });
   // Unchanged content stops here. Changed pages only enter semantic/canonical
   // normalization when a canonical writer actually exists for the class.
   // Generic research/news/department/publication-index pages are useful raw
@@ -1502,7 +1505,7 @@ export type NormalizeResult = {
 const LISTING_TITLE =
   /^(careers?|jobs?|vacancies|open (job )?positions?|positions?|recruitment|stellenangebote|stellen|job ?board|work (with|for) us|join (our team|us)|life at|our people|talent|employment)\b/i;
 const NON_POSTING =
-  /(meet [a-z]|faces|blog|news|resources?|contact|use ?cases?|products?|solutions?|api\b|webinar|podcast|events?|privacy|imprint|impressum|cookie|newsletter|about us|our story|benefits|culture|diversity|internship programme overview)/i;
+  /(meet [a-z]|faces|blog|news|resources?|contact|use ?cases?|products?|solutions?|api\b|webinar|podcast|events?|privacy|imprint|impressum|cookie|newsletter|about us|our story|benefits|culture|diversity|internship programme overview|how we hire|hiring process|candidate privacy|applicant privacy|privacy policy|search for your career|job alerts?|equal opportunity|accommodation request)/i;
 /** A real posting names a role in its title. */
 const ROLE_TITLE =
   /(phd|ph\.d|doctoral|doktorand|promotionsstelle|post ?doc|postdoctoral|professor|professur|juniorprofessur|lecturer|research(er)?|scientist|engineer|ingenieur|developer|analyst|technician|techniker|specialist|consultant|surveyor|geomatics|remote sensing|photogrammetr|gis\b|wissenschaftliche[rn]? mitarbeiter|w\/?m\/?d|m\/?w\/?d|f\/?m\/?d|assistant|associate|fellow|intern(ship)?|trainee|manager|lead|head of)/i;
@@ -1528,6 +1531,13 @@ export function looksLikeSinglePosting(
   if (NON_POSTING.test(t)) return { ok: false, reason: "marketing/resource page, not a posting" };
   if (/^\/?(careers?|jobs?|vacancies|stellenangebote|stellen|recruitment)\/?$/i.test(path)) {
     return { ok: false, reason: "careers index path" };
+  }
+  if (
+    /\/(privacy|policy|policies|how-we-hire|hiring-process|job-alerts?|candidate|applicant)(\/|$)/i.test(
+      path,
+    )
+  ) {
+    return { ok: false, reason: "policy or hiring-information path" };
   }
   if (body.length < 600) return { ok: false, reason: "page too thin to be a posting" };
   if (!ROLE_TITLE.test(t)) return { ok: false, reason: "title does not name a role" };
@@ -1654,6 +1664,8 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   const status = deriveStatus(deadline, rolling);
   const usedModel = Boolean(ex);
   const usedStructured = Boolean(structuredJob);
+  const verifiedAt = deterministicEnough ? new Date().toISOString() : null;
+  const verificationStatus = deterministicEnough ? "verified" : "auto_discovered";
 
   const { data: existing } = await supabaseAdmin
     .from("opportunities")
@@ -1692,9 +1704,10 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     application_url: ex?.application_url ?? structuredJob?.application_url ?? raw.final_url,
     official_source_url: raw.final_url,
     status: status as never,
-    confidence: (deadline ? "medium" : "low") as never,
-    verification_status: "auto_discovered" as never,
+    confidence: (usedStructured ? "high" : deterministicEnough ? "medium" : "low") as never,
+    verification_status: verificationStatus as never,
     last_checked_at: new Date().toISOString(),
+    last_verified_at: verifiedAt,
     application_deadline: deadline,
     is_demo: false,
     extracted_by: usedModel
@@ -1746,20 +1759,26 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       .eq("entity_id", entityId)
       .eq("source_url", raw.final_url ?? "")
       .maybeSingle();
+    const evidencePayload = {
+      source_id: raw.source_id,
+      source_url: raw.final_url ?? "",
+      source_type: "careers_page" as never,
+      original_title: raw.page_title,
+      claim: "Vacancy page fetched from the institution's own website",
+      verification_status: verificationStatus as never,
+      confidence: (usedStructured ? "high" : "medium") as never,
+      is_primary: true,
+      last_checked_at: new Date().toISOString(),
+      last_verified_at: verifiedAt,
+    };
     if (!evidence) {
       await supabaseAdmin.from("record_sources").insert({
         entity_type: "opportunity",
         entity_id: entityId,
-        source_id: raw.source_id,
-        source_url: raw.final_url ?? "",
-        source_type: "careers_page" as never,
-        original_title: raw.page_title,
-        claim: "Vacancy page fetched from the institution's own website",
-        verification_status: "auto_discovered" as never,
-        confidence: "medium" as never,
-        is_primary: true,
-        last_checked_at: new Date().toISOString(),
+        ...evidencePayload,
       });
+    } else {
+      await supabaseAdmin.from("record_sources").update(evidencePayload).eq("id", evidence.id);
     }
   }
 

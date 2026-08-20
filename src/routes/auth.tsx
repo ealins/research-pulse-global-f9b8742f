@@ -34,6 +34,8 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
 
+  const redirectTo = () => window.location.origin + "/auth/callback";
+
   useEffect(() => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === "SIGNED_IN" && session) void navigate({ to: "/admin/pipeline-health", replace: true });
@@ -49,7 +51,7 @@ function AuthPage() {
         const { data, error } = await supabase.auth.signUp({
           email,
           password,
-          options: { emailRedirectTo: window.location.origin + "/auth" },
+          options: { emailRedirectTo: redirectTo() },
         });
         if (error) throw error;
         if (!data.session) {
@@ -69,6 +71,25 @@ function AuthPage() {
     }
   };
 
+  const resend = async () => {
+    setBusy(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email,
+        options: { emailRedirectTo: redirectTo() },
+      });
+      if (error) throw error;
+      toast.success("Confirmation email sent again");
+    } catch (err) {
+      toast.error("Could not resend confirmation", {
+        description: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <AppShell>
       <PageHeader
@@ -78,9 +99,12 @@ function AuthPage() {
       />
       <div className="mx-auto w-full max-w-md px-6 py-10">
         {sent ? (
-          <p className="rounded-lg border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground">
-            Check your inbox and confirm the address, then return here to sign in.
-          </p>
+          <div className="space-y-3 rounded-lg border border-border/60 bg-card/40 p-4 text-sm text-muted-foreground">
+            <p>Check your inbox and confirm the address. The confirmation link will return you securely to the operations area.</p>
+            <Button type="button" variant="outline" className="w-full" disabled={busy} onClick={resend}>
+              {busy ? "Sending…" : "Resend confirmation email"}
+            </Button>
+          </div>
         ) : (
           <form onSubmit={submit} className="space-y-4 rounded-xl border border-border/60 bg-card/40 p-5">
             <div>
