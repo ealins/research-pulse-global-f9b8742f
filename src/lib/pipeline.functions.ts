@@ -269,7 +269,7 @@ async function assertAdmin(context: {
 
 export const runDiscovery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { institutionSlug: string }) => input)
+  .validator((input: { institutionSlug: string }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -286,7 +286,7 @@ export const runDiscovery = createServerFn({ method: "POST" })
 
 export const runQueue = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { limit?: number }) => input)
+  .validator((input: { limit?: number }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { runQueueBatch } = await import("./ingest.server");
@@ -446,7 +446,7 @@ export const getOperationsSummary = createServerFn({ method: "GET" })
 /** Lets an admin retune cadence without a code change. */
 export const updateScheduleConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: Partial<OperationsSummary["config"]>) => input)
+  .validator((input: Partial<OperationsSummary["config"]>) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { saveSchedule } = await import("./schedule.server");
