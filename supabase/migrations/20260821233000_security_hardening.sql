@@ -3,16 +3,6 @@
 
 BEGIN;
 
-DROP POLICY IF EXISTS "public read sources" ON public.sources;
-DROP POLICY IF EXISTS "public read record_sources" ON public.record_sources;
-DROP POLICY IF EXISTS "public read entity_metrics" ON public.entity_metrics;
-DROP POLICY IF EXISTS "Academic changes are public" ON public.academic_changes;
-
-REVOKE ALL ON public.sources FROM anon, authenticated;
-REVOKE ALL ON public.record_sources FROM anon, authenticated;
-REVOKE ALL ON public.entity_metrics FROM anon, authenticated;
-REVOKE ALL ON public.academic_changes FROM anon, authenticated;
-
 CREATE OR REPLACE VIEW public.public_record_sources
 WITH (security_barrier = true)
 AS
@@ -86,18 +76,13 @@ GRANT EXECUTE ON FUNCTION public.has_role(uuid, public.app_role) TO authenticate
 -- they do not need owner privileges.
 ALTER FUNCTION public.public_surface_counts() SECURITY INVOKER;
 
--- Scheduler inspection is performed by the authenticated application server
--- after its own admin check. Browser roles never need direct RPC access.
-REVOKE ALL ON FUNCTION public.scheduler_status() FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.scheduler_status() TO service_role;
-
--- Replace the browser-callable bootstrap with a service-role-only variant.
+-- Add a service-role-only bootstrap variant alongside the legacy zero-argument
+-- function. The legacy function is removed by the contract migration after
+-- the compatible application release is live.
 -- The application server validates ADMIN_BOOTSTRAP_EMAILS before invoking it;
 -- the database independently verifies the confirmed account email and the
 -- single-use owner address stored in pipeline_settings.
-DROP FUNCTION IF EXISTS public.claim_admin_if_unclaimed();
-
-CREATE FUNCTION public.claim_admin_if_unclaimed(target_user_id uuid)
+CREATE OR REPLACE FUNCTION public.claim_admin_if_unclaimed(target_user_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
