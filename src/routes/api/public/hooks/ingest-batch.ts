@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { ExternalFetchCompletion } from "@/lib/ingest.server";
 
 type Body = {
   action?:
@@ -11,9 +12,12 @@ type Body = {
     | "drain-providers"
     | "sync-pulse"
     | "reseed-high-value"
-    | "recover-detail-sources";
+    | "recover-detail-sources"
+    | "lease-fetch"
+    | "complete-fetch";
   limit?: number;
   trigger?: string;
+  completion?: ExternalFetchCompletion;
 };
 
 function json(payload: unknown, status = 200) {
@@ -147,6 +151,24 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           return json({ action, ...result });
         }
 
+        // Expensive network fetching runs on the persistent worker. The app
+        // only leases bounded tasks and stores validated, compact snapshots.
+        if (action === "lease-fetch") {
+          const { leaseExternalFetchTasks } = await import("@/lib/ingest.server");
+          const leases = await leaseExternalFetchTasks(
+            Math.min(20, Math.max(1, body.limit ?? 8)),
+          );
+          return json({ action, leases, count: leases.length });
+        }
+        if (action === "complete-fetch") {
+          if (!body.completion || typeof body.completion !== "object") {
+            return json({ error: "Missing completion payload" }, 400);
+          }
+          const { completeExternalFetch } = await import("@/lib/ingest.server");
+          const result = await completeExternalFetch(body.completion);
+          return json({ action, ...result }, result.status === "STALE" ? 409 : 200);
+        }
+
         // Structured-provider drain (ROR/OpenAIRE/Crossref). Never calls a model,
         // so it is safe to run on its own cheap cadence.
         if (action === "drain-providers") {
@@ -268,7 +290,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
           if (result.processed === 0) {
             taskGroup = "FETCH_DISCOVER";
-            const collection = await runQueueBatch(batch, ["FETCH", "DISCOVER"]);
+            const externalFetchWorker =
+              (process.env["EXTERNAL_FETCH_WORKER_ENABLED"] ?? "").toLowerCase() === "true";
+            const collection = await runQueueBatch(
+              batch,
+              externalFetchWorker ? ["DISCOVER"] : ["FETCH", "DISCOVER"],
+            );
             result.processed = collection.processed;
             result.ok = collection.ok;
             result.failed = collection.failed;
