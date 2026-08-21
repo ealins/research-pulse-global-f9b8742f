@@ -47,7 +47,8 @@ export const Route = createFileRoute("/sitemap.xml")({
         const entries: SitemapEntry[] = [...STATIC_ENTRIES];
 
         const url = import.meta.env["VITE_SUPABASE_URL"] || PUBLIC_SUPABASE_URL;
-        const key = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+        const key =
+          import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
         if (url && key) {
           const supabase = createClient(url, key, {
