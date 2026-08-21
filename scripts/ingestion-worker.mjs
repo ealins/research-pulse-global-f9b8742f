@@ -1,37 +1,94 @@
 /**
- * Optional continuous queue consumer for GeoAcademic Radar.
+ * GeoAcademic external fetch worker.
  *
- * Run locally with: npm run worker:ingest
- * Later, deploy this exact process to a persistent worker host (Render/Railway/
- * Fly/VPS). It calls the already-authenticated ingestion hook repeatedly; the
- * database's conditional task claiming prevents collisions with cron/manual runs.
- * INGESTION_HOOK_SECRET must match the server-side deployment secret.
+ * Railway performs robots checks, downloads, HTML cleanup and link extraction.
+ * Lovable only leases tasks and persists compact validated snapshots, keeping
+ * expensive and long-running network work outside the web application.
  */
-const BASE_URL = (process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app").replace(/\/$/, "");
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
+const BASE_URL = (
+  process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
+).replace(/\/$/, "");
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
-const ACTIVE_DELAY_MS = Number(process.env.INGESTION_ACTIVE_DELAY_MS || 2000);
-const IDLE_DELAY_MS = Number(process.env.INGESTION_IDLE_DELAY_MS || 60000);
-const ERROR_DELAY_MS = Number(process.env.INGESTION_ERROR_DELAY_MS || 30000);
-const RESEED_INTERVAL_MS = Number(process.env.INGESTION_RESEED_INTERVAL_MS || 6 * 60 * 60 * 1000);
+const CONCURRENCY = clamp(process.env.INGESTION_FETCH_CONCURRENCY, 1, 5, 3);
+const LEASE_LIMIT = clamp(process.env.INGESTION_LEASE_LIMIT, 1, 20, 8);
+const ACTIVE_DELAY_MS = clamp(
+  process.env.INGESTION_ACTIVE_DELAY_MS,
+  250,
+  60_000,
+  2_000,
+);
+const IDLE_DELAY_MS = clamp(
+  process.env.INGESTION_IDLE_DELAY_MS,
+  5_000,
+  10 * 60_000,
+  45_000,
+);
+const ERROR_DELAY_MS = clamp(
+  process.env.INGESTION_ERROR_DELAY_MS,
+  5_000,
+  10 * 60_000,
+  30_000,
+);
+const FETCH_TIMEOUT_MS = clamp(
+  process.env.INGESTION_FETCH_TIMEOUT_MS,
+  5_000,
+  60_000,
+  20_000,
+);
+const PER_HOST_DELAY_MS = clamp(
+  process.env.INGESTION_PER_HOST_DELAY_MS,
+  250,
+  30_000,
+  1_500,
+);
+const MAX_RESPONSE_BYTES = clamp(
+  process.env.INGESTION_MAX_RESPONSE_BYTES,
+  250_000,
+  10_000_000,
+  3_000_000,
+);
+const MAINTENANCE_INTERVAL_MS = clamp(
+  process.env.INGESTION_MAINTENANCE_INTERVAL_MS,
+  5 * 60_000,
+  24 * 60 * 60_000,
+  10 * 60_000,
+);
+const RESEED_INTERVAL_MS = clamp(
+  process.env.INGESTION_RESEED_INTERVAL_MS,
+  60 * 60_000,
+  7 * 24 * 60 * 60_000,
+  6 * 60 * 60_000,
+);
+const USER_AGENT =
+  "GeoAcademicRadarBot/1.0 (+https://geoacademic.app; academic source indexing)";
 
 if (!HOOK_SECRET) {
   console.error("Missing INGESTION_HOOK_SECRET in environment.");
   process.exit(1);
 }
 
+function clamp(value, min, max, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed)
+    ? Math.min(max, Math.max(min, Math.floor(parsed)))
+    : fallback;
+}
+
 let stopping = false;
-process.on("SIGINT", () => {
-  stopping = true;
-});
-process.on("SIGTERM", () => {
-  stopping = true;
-});
+for (const signal of ["SIGINT", "SIGTERM"]) {
+  process.on(signal, () => {
+    stopping = true;
+  });
+}
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function drainOnce() {
+async function callHook(action, payload = {}, timeoutMs = 60_000) {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 300000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
       method: "POST",
@@ -39,135 +96,487 @@ async function drainOnce() {
         "content-type": "application/json",
         authorization: `Bearer ${HOOK_SECRET}`,
       },
-      body: JSON.stringify({ action: "drain", limit: 50, trigger: "continuous-worker" }),
+      body: JSON.stringify({
+        action,
+        trigger: "railway-external-fetch",
+        ...payload,
+      }),
       signal: controller.signal,
     });
     const text = await response.text();
-    let payload = {};
+    let result = {};
     try {
-      payload = text ? JSON.parse(text) : {};
+      result = text ? JSON.parse(text) : {};
     } catch {
-      payload = { raw: text.slice(0, 500) };
+      result = { raw: text.slice(0, 500) };
     }
-    if (!response.ok)
-      throw new Error(`HTTP ${response.status}: ${JSON.stringify(payload).slice(0, 500)}`);
-    return payload;
+    if (
+      !response.ok &&
+      !(action === "complete-fetch" && response.status === 409)
+    ) {
+      throw new Error(
+        `Hook ${action} HTTP ${response.status}: ${JSON.stringify(result).slice(0, 500)}`,
+      );
+    }
+    return result;
   } finally {
     clearTimeout(timeout);
   }
 }
 
-async function syncPulse() {
-  const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${HOOK_SECRET}`,
-    },
-    body: JSON.stringify({ action: "sync-pulse", limit: 120, trigger: "continuous-worker" }),
+function isPrivateAddress(address) {
+  const normalized = address.toLowerCase().split("%")[0];
+  if (normalized.startsWith("::ffff:"))
+    return isPrivateAddress(normalized.slice(7));
+  if (isIP(normalized) === 4) {
+    const [a, b] = normalized.split(".").map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+  if (isIP(normalized) === 6) {
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      /^fe[89ab]/.test(normalized)
+    );
+  }
+  return true;
+}
+
+const dnsCache = new Map();
+
+async function assertPublicUrl(value) {
+  const url = new URL(value);
+  if (!/^https?:$/.test(url.protocol))
+    throw new Error(`Unsupported URL protocol: ${url.protocol}`);
+  if (url.username || url.password)
+    throw new Error("Credential-bearing URLs are not allowed");
+  const host = url.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local")
+  ) {
+    throw new Error("Local network URL is not allowed");
+  }
+  let addresses = dnsCache.get(host);
+  if (!addresses || addresses.expiresAt <= Date.now()) {
+    const resolved = isIP(host)
+      ? [{ address: host }]
+      : await lookup(host, { all: true, verbatim: true });
+    addresses = {
+      values: resolved.map((entry) => entry.address),
+      expiresAt: Date.now() + 10 * 60_000,
+    };
+    dnsCache.set(host, addresses);
+  }
+  if (!addresses.values.length || addresses.values.some(isPrivateAddress)) {
+    throw new Error("Private or unresolvable network target is not allowed");
+  }
+  return url;
+}
+
+async function fetchWithTimeout(url, init = {}) {
+  let current = (await assertPublicUrl(url)).toString();
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    const response = await fetch(current, {
+      ...init,
+      redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml,text/plain;q=0.8",
+        ...(init.headers || {}),
+      },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    if (!location) return response;
+    current = (
+      await assertPublicUrl(new URL(location, current).toString())
+    ).toString();
+  }
+  throw new Error("Too many redirects");
+}
+
+const robotsCache = new Map();
+
+async function robotsAllows(url) {
+  const parsed = new URL(url);
+  const cached = robotsCache.get(parsed.origin);
+  if (cached && cached.expiresAt > Date.now()) {
+    return !cached.disallow.some((path) => parsed.pathname.startsWith(path));
+  }
+  let disallow = [];
+  try {
+    const response = await fetchWithTimeout(`${parsed.origin}/robots.txt`, {
+      headers: { accept: "text/plain" },
+    });
+    if (response.ok) {
+      const text = await response.text();
+      let applies = false;
+      for (const raw of text.split("\n")) {
+        const line = (raw.split("#")[0] || "").trim();
+        const [keyRaw, ...rest] = line.split(":");
+        const key = (keyRaw || "").trim().toLowerCase();
+        const value = rest.join(":").trim();
+        if (key === "user-agent") {
+          applies =
+            value === "*" || value.toLowerCase().includes("geoacademic");
+        } else if (key === "disallow" && applies && value) {
+          disallow.push(value);
+        }
+      }
+    }
+  } catch {
+    disallow = [];
+  }
+  robotsCache.set(parsed.origin, {
+    disallow,
+    expiresAt: Date.now() + 60 * 60_000,
   });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`pulse sync HTTP ${response.status}`);
-  return payload;
+  return !disallow.some((path) => parsed.pathname.startsWith(path));
 }
 
-async function recoverExistingDetails() {
-  const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${HOOK_SECRET}`,
+const hostNextStart = new Map();
+
+async function respectHostDelay(url) {
+  const host = new URL(url).host;
+  const startAt = Math.max(Date.now(), hostNextStart.get(host) || 0);
+  hostNextStart.set(host, startAt + PER_HOST_DELAY_MS);
+  const waitMs = Math.max(0, startAt - Date.now());
+  if (waitMs) await sleep(waitMs);
+}
+
+async function readTextLimited(response) {
+  const declared = Number(response.headers.get("content-length") || 0);
+  if (declared > MAX_RESPONSE_BYTES) {
+    throw new Error(`Response exceeds ${MAX_RESPONSE_BYTES} byte limit`);
+  }
+  if (!response.body) return "";
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let total = 0;
+  let text = "";
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_RESPONSE_BYTES) {
+      await reader.cancel();
+      throw new Error(`Response exceeds ${MAX_RESPONSE_BYTES} byte limit`);
+    }
+    text += decoder.decode(value, { stream: true });
+  }
+  return text + decoder.decode();
+}
+
+function decodeEntities(value) {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;|&#34;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&auml;/gi, "ä")
+    .replace(/&ouml;/gi, "ö")
+    .replace(/&uuml;/gi, "ü")
+    .replace(/&szlig;/gi, "ß");
+}
+
+function extractTitle(html) {
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  return match?.[1]
+    ? decodeEntities(match[1]).replace(/\s+/g, " ").trim().slice(0, 300)
+    : null;
+}
+
+function extractText(html) {
+  return decodeEntities(
+    html
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+      .replace(/<[^>]+>/g, " "),
+  )
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 20_000);
+}
+
+function extractLinks(html, baseUrl) {
+  const links = [];
+  const seen = new Set();
+  const expression = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
+  let match;
+  while ((match = expression.exec(html)) !== null && links.length < 200) {
+    const href = match[1] || "";
+    if (/^(?:mailto:|tel:|javascript:)/i.test(href)) continue;
+    try {
+      const url = new URL(href, baseUrl);
+      url.hash = "";
+      if (!/^https?:$/.test(url.protocol) || seen.has(url.toString())) continue;
+      seen.add(url.toString());
+      links.push({
+        url: url.toString(),
+        label: decodeEntities(match[2] || "")
+          .replace(/<[^>]+>/g, " ")
+          .replace(/\s+/g, " ")
+          .trim()
+          .slice(0, 200),
+      });
+    } catch {
+      // Ignore malformed links.
+    }
+  }
+  return links;
+}
+
+function compactValue(value, depth = 0) {
+  if (depth > 4) return undefined;
+  if (value === null || ["string", "number", "boolean"].includes(typeof value))
+    return value;
+  if (Array.isArray(value)) {
+    return value
+      .slice(0, 12)
+      .map((item) => compactValue(item, depth + 1))
+      .filter((item) => item !== undefined);
+  }
+  if (!value || typeof value !== "object") return undefined;
+  const output = {};
+  for (const [key, nested] of Object.entries(value).slice(0, 40)) {
+    const compacted = compactValue(nested, depth + 1);
+    if (compacted !== undefined) output[key] = compacted;
+  }
+  return output;
+}
+
+function flattenStructured(value, output) {
+  if (output.length >= 30) return;
+  if (Array.isArray(value)) {
+    for (const item of value) flattenStructured(item, output);
+    return;
+  }
+  if (!value || typeof value !== "object") return;
+  if (Array.isArray(value["@graph"])) {
+    for (const item of value["@graph"]) flattenStructured(item, output);
+  }
+  if (value["@type"] || value["@id"] || value.name || value.headline) {
+    const compacted = compactValue(value);
+    if (compacted && !Array.isArray(compacted)) output.push(compacted);
+  }
+}
+
+function structuredTypes(node) {
+  const value = node["@type"];
+  if (typeof value === "string") return [value];
+  return Array.isArray(value)
+    ? value.filter((item) => typeof item === "string")
+    : [];
+}
+
+function extractStructured(html, pageUrl) {
+  const jsonld = [];
+  const expression =
+    /<script\b[^>]*type=["']application\/ld\+json[^"']*["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match;
+  let chars = 0;
+  while (
+    (match = expression.exec(html)) !== null &&
+    jsonld.length < 30 &&
+    chars < 24_000
+  ) {
+    const raw = decodeEntities((match[1] || "").trim());
+    if (!raw) continue;
+    chars += raw.length;
+    try {
+      flattenStructured(JSON.parse(raw), jsonld);
+    } catch {
+      // Ignore invalid publisher JSON-LD.
+    }
+  }
+  const meta = { page_url: pageUrl };
+  const wanted = new Set([
+    "og:title",
+    "og:type",
+    "og:url",
+    "article:published_time",
+    "profile:first_name",
+    "profile:last_name",
+  ]);
+  const metaExpression =
+    /<meta\b[^>]*(?:property|name)=["']([^"']+)["'][^>]*content=["']([^"']*)["'][^>]*>|<meta\b[^>]*content=["']([^"']*)["'][^>]*(?:property|name)=["']([^"']+)["'][^>]*>/gi;
+  while ((match = metaExpression.exec(html)) !== null) {
+    const key = (match[1] || match[4] || "").toLowerCase();
+    const value = decodeEntities(match[2] || match[3] || "").trim();
+    if (wanted.has(key) && value) meta[key] = value.slice(0, 1_000);
+  }
+  const types = [...new Set(jsonld.flatMap(structuredTypes))];
+  return jsonld.length || Object.keys(meta).length > 1
+    ? { jsonld, meta, types }
+    : null;
+}
+
+async function fetchLease(lease) {
+  const startedAt = Date.now();
+  let completion;
+  try {
+    await respectHostDelay(lease.url);
+    if (!(await robotsAllows(lease.url))) {
+      completion = {
+        success: false,
+        blocked: true,
+        error: "Disallowed by robots.txt",
+      };
+    } else {
+      const response = await fetchWithTimeout(lease.url);
+      if (!response.ok) {
+        completion = {
+          success: false,
+          http_status: response.status,
+          blocked: response.status === 403 || response.status === 429,
+          error: `HTTP ${response.status}`,
+        };
+      } else {
+        const contentType = (
+          response.headers.get("content-type") || ""
+        ).toLowerCase();
+        if (
+          contentType &&
+          !/(?:text\/html|application\/xhtml\+xml|text\/plain)/.test(
+            contentType,
+          )
+        ) {
+          throw new Error(
+            `Unsupported content type: ${contentType.slice(0, 120)}`,
+          );
+        }
+        const html = await readTextLimited(response);
+        const finalUrl = response.url || lease.url;
+        const text = extractText(html);
+        if (!text) throw new Error("Fetched page contains no usable text");
+        completion = {
+          success: true,
+          http_status: response.status,
+          final_url: finalUrl,
+          page_title: extractTitle(html),
+          text_content: text,
+          links: extractLinks(html, finalUrl),
+          structured: extractStructured(html, finalUrl),
+        };
+      }
+    }
+  } catch (error) {
+    completion = {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+  completion.response_time_ms = Date.now() - startedAt;
+  const result = await callHook(
+    "complete-fetch",
+    {
+      completion: {
+        task_id: lease.task_id,
+        source_id: lease.source_id,
+        lease_started_at: lease.lease_started_at,
+        ...completion,
+      },
     },
-    body: JSON.stringify({
-      action: "recover-detail-sources",
-      limit: 500,
-      trigger: "continuous-worker",
-    }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`detail recovery HTTP ${response.status}`);
-  return payload;
-}
-
-async function reseedHighValue() {
-  const response = await fetch(`${BASE_URL}/api/public/hooks/ingest-batch`, {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      authorization: `Bearer ${HOOK_SECRET}`,
-    },
-    body: JSON.stringify({
-      action: "reseed-high-value",
-      limit: 150,
-      trigger: "continuous-worker",
-    }),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`reseed HTTP ${response.status}`);
-  return payload;
-}
-
-console.log(`GeoAcademic continuous worker -> ${BASE_URL}`);
-console.log("Press Ctrl+C to stop. NVIDIA concurrency remains controlled by the server.");
-
-try {
-  const pulse = await syncPulse();
-  console.log(`${new Date().toISOString()} PULSE checked=${pulse.checked ?? 0} projected=${pulse.projected ?? 0}`);
-} catch (error) {
-  console.error(`${new Date().toISOString()} pulse sync warning:`, error instanceof Error ? error.message : String(error));
-}
-
-try {
-  const recovery = await recoverExistingDetails();
-  console.log(
-    `${new Date().toISOString()} DETAIL_RECOVERY scanned=${recovery.scanned ?? 0} normalize_queued=${recovery.normalize_queued ?? 0} fetch_queued=${recovery.fetch_queued ?? 0} already_normalized=${recovery.already_normalized ?? 0}`,
+    90_000,
   );
-} catch (error) {
-  console.error(`${new Date().toISOString()} detail recovery warning:`, error instanceof Error ? error.message : String(error));
+  return { lease, completion, result };
 }
 
-let loops = 0;
-let idleLoops = 0;
+async function mapConcurrent(items, concurrency, callback) {
+  const output = new Array(items.length);
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+      while (true) {
+        const index = cursor;
+        cursor += 1;
+        if (index >= items.length) return;
+        output[index] = await callback(items[index]);
+      }
+    }),
+  );
+  return output;
+}
+
+async function runMaintenance() {
+  const [refresh, discovery] = await Promise.all([
+    callHook("refresh-due", { limit: 80 }),
+    callHook("enqueue-discovery", { limit: 8 }),
+  ]);
+  console.log(
+    `${new Date().toISOString()} MAINTENANCE refresh_queued=${refresh.queued ?? 0} discovery_queued=${discovery.queued ?? 0}`,
+  );
+}
+
+console.log(
+  `GeoAcademic external fetch worker -> ${BASE_URL} concurrency=${CONCURRENCY} lease=${LEASE_LIMIT}`,
+);
+
+let lastMaintenanceAt = 0;
 let lastReseedAt = 0;
 while (!stopping) {
   try {
-    const result = await drainOnce();
-    const processed = Number(result.processed || 0);
-    const group = result.task_group || (result.skipped ? "IDLE" : "UNKNOWN");
-    const failures = Number(result.failed || 0) + Number(result.dead || 0);
-    console.log(
-      `${new Date().toISOString()} ${group} processed=${processed} normalized=${result.normalized ?? 0} skipped=${result.skipped ?? 0} ok=${result.ok ?? 0} failed=${result.failed ?? 0} dead=${result.dead ?? 0}`,
-    );
-    loops += 1;
-    idleLoops = processed === 0 ? idleLoops + 1 : 0;
+    if (Date.now() - lastMaintenanceAt >= MAINTENANCE_INTERVAL_MS) {
+      await runMaintenance();
+      lastMaintenanceAt = Date.now();
+    }
+    if (Date.now() - lastReseedAt >= RESEED_INTERVAL_MS) {
+      const reseed = await callHook("reseed-high-value", { limit: 100 });
+      lastReseedAt = Date.now();
+      console.log(
+        `${new Date().toISOString()} RESEED queued=${reseed.queued ?? 0}`,
+      );
+    }
 
-    // When the ordinary queue is empty, revisit a bounded set of high-value
-    // directories that predate deep discovery. The server marks each source,
-    // so this expands the frontier rather than looping over the same indexes.
-    if (idleLoops >= 3 && Date.now() - lastReseedAt >= RESEED_INTERVAL_MS) {
+    const leased = await callHook("lease-fetch", { limit: LEASE_LIMIT });
+    const leases = Array.isArray(leased.leases) ? leased.leases : [];
+    if (leases.length === 0) {
+      console.log(`${new Date().toISOString()} IDLE no fetch tasks due`);
+      await sleep(IDLE_DELAY_MS);
+      continue;
+    }
+
+    const results = await mapConcurrent(leases, CONCURRENCY, async (lease) => {
       try {
-        const reseed = await reseedHighValue();
-        lastReseedAt = Date.now();
-        idleLoops = 0;
-        console.log(
-          `${new Date().toISOString()} RESEED queued=${reseed.queued ?? 0} eligible=${reseed.eligible ?? 0} by_category=${JSON.stringify(reseed.by_category ?? {})}`,
-        );
+        return await fetchLease(lease);
       } catch (error) {
         console.error(
-          `${new Date().toISOString()} reseed warning:`,
+          `${new Date().toISOString()} COMPLETE_FAILED task=${lease.task_id}:`,
           error instanceof Error ? error.message : String(error),
         );
+        return null;
       }
-    }
-    if (loops % 20 === 0) {
-      try {
-        const pulse = await syncPulse();
-        console.log(`${new Date().toISOString()} PULSE checked=${pulse.checked ?? 0} projected=${pulse.projected ?? 0}`);
-      } catch (error) {
-        console.error(`${new Date().toISOString()} pulse sync warning:`, error instanceof Error ? error.message : String(error));
-      }
-    }
-    await sleep(failures > 0 ? ERROR_DELAY_MS : processed > 0 ? ACTIVE_DELAY_MS : IDLE_DELAY_MS);
+    });
+    const completed = results.filter(
+      (result) => result?.result?.status === "COMPLETE",
+    ).length;
+    const retries = results.filter(
+      (result) => result?.result?.status === "RETRY",
+    ).length;
+    const stale = results.filter(
+      (result) => result?.result?.status === "STALE",
+    ).length;
+    console.log(
+      `${new Date().toISOString()} FETCH leased=${leases.length} complete=${completed} retry=${retries} stale=${stale}`,
+    );
+    await sleep(ACTIVE_DELAY_MS);
   } catch (error) {
     console.error(
       `${new Date().toISOString()} worker error:`,
