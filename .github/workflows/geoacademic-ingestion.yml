@@ -1,0 +1,42 @@
+name: GeoAcademic ingestion burst
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Avoid the top-of-hour congestion window. 12 runs/day fits inside the
+    # GitHub Free private-repository allowance when each run stays under 5 min.
+    - cron: "17 */2 * * *"
+
+concurrency:
+  group: geoacademic-ingestion
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  review-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      GEOACADEMIC_BASE_URL: https://geoacademic.app
+      INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      REVIEW_RUNTIME_MS: "210000"
+      REVIEW_LEASE_LIMIT: "4"
+      REVIEW_CONCURRENCY: "2"
+    steps:
+      - name: Check out worker
+        uses: actions/checkout@v4
+      - name: Validate worker
+        run: node scripts/job-review-worker.mjs --self-test
+      - name: Drain vacancy review backlog
+        run: node scripts/job-review-worker.mjs
+      - name: Crawl due sources when review is healthy
+        env:
+          INGESTION_FETCH_CONCURRENCY: "2"
+          INGESTION_LEASE_LIMIT: "4"
+          INGESTION_RUNTIME_MS: "45000"
+          INGESTION_BURST_MODE: "true"
+          INGESTION_WORKER_TRIGGER: "github-actions-fetch"
+        run: node scripts/ingestion-worker.mjs
