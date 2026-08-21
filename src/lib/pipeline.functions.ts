@@ -256,15 +256,15 @@ export const getPipelineHealth = createServerFn({ method: "GET" })
     };
   });
 
-async function assertAdmin(context: {
-  supabase: { rpc: (fn: string, args: Record<string, unknown>) => Promise<{ data: unknown }> };
-  userId: string;
-}) {
-  const { data } = await context.supabase.rpc("has_role", {
-    _user_id: context.userId,
-    _role: "admin",
-  });
-  if (data !== true) throw new Error("Forbidden: admin role required");
+async function assertAdmin(context: { userId: string }) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data, error } = await supabaseAdmin
+    .from("user_roles")
+    .select("id")
+    .eq("user_id", context.userId)
+    .eq("role", "admin")
+    .maybeSingle();
+  if (error || !data) throw new Error("Forbidden: admin role required");
 }
 
 export const runDiscovery = createServerFn({ method: "POST" })
@@ -343,14 +343,9 @@ export type SchedulerHealth = {
 export const getSchedulerHealth = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<SchedulerHealth> => {
-    const { data: isAdmin } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
-    if (isAdmin !== true) throw new Error("Forbidden: admin role required");
-
-    const { data: jobs } = await context.supabase.rpc("scheduler_status");
+    await assertAdmin({ userId: context.userId });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: jobs } = await supabaseAdmin.rpc("scheduler_status");
     const { data: ticks } = await supabaseAdmin
       .from("pipeline_runs")
       .select(
@@ -679,16 +674,18 @@ export const startRealDataBackfill = createServerFn({ method: "POST" })
 export const getAdminStatus = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ isAdmin: boolean; adminExists: boolean }> => {
-    const { data } = await context.supabase.rpc("has_role", {
-      _user_id: context.userId,
-      _role: "admin",
-    });
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data } = await supabaseAdmin
+      .from("user_roles")
+      .select("id")
+      .eq("user_id", context.userId)
+      .eq("role", "admin")
+      .maybeSingle();
     const { count } = await supabaseAdmin
       .from("user_roles")
       .select("user_id", { count: "exact", head: true })
       .eq("role", "admin");
-    return { isAdmin: data === true, adminExists: (count ?? 0) > 0 };
+    return { isAdmin: Boolean(data), adminExists: (count ?? 0) > 0 };
   });
 
 /** One-time bootstrap, restricted to an explicitly configured operator email. */
@@ -699,14 +696,18 @@ export const claimAdminRole = createServerFn({ method: "POST" })
       .split(",")
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean);
-    const email = typeof context.claims.email === "string" ? context.claims.email.toLowerCase() : "";
+    const email =
+      typeof context.claims.email === "string" ? context.claims.email.toLowerCase() : "";
     if (allowed.length === 0) {
       throw new Error("Admin bootstrap is disabled until ADMIN_BOOTSTRAP_EMAILS is configured");
     }
     if (!email || !allowed.includes(email)) {
       throw new Error("This account is not allowed to claim the admin role");
     }
-    const { data, error } = await context.supabase.rpc("claim_admin_if_unclaimed");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data, error } = await supabaseAdmin.rpc("claim_admin_if_unclaimed", {
+      target_user_id: context.userId,
+    });
     if (error) throw new Error(error.message);
     return { isAdmin: data === true };
   });
