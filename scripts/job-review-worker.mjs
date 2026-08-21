@@ -164,9 +164,12 @@ async function reviewLease(lease) {
     lease_started_at: lease.lease_started_at,
   };
   try {
-    const modelResult = lease.requires_model
-      ? await extractWithNemotron(lease)
-      : {};
+    const modelResult =
+      lease.requires_model && NVIDIA_API_KEY
+        ? await extractWithNemotron(lease)
+        : lease.requires_model
+          ? { allow_server_model: true }
+          : {};
     return await callHook("complete-review", {
       completion: { ...base, success: true, ...modelResult },
     });
@@ -198,13 +201,15 @@ async function main() {
   const deadline = Date.now() + RUNTIME_MS;
   const totals = { leased: 0, complete: 0, retry: 0, dead: 0, stale: 0 };
   console.log(
-    `GeoAcademic review burst -> ${BASE_URL} runtime=${Math.round(RUNTIME_MS / 1000)}s model=${NVIDIA_API_KEY ? NVIDIA_MODEL : "deterministic-only"}`,
+    `GeoAcademic review burst -> ${BASE_URL} runtime=${Math.round(RUNTIME_MS / 1000)}s model=${NVIDIA_API_KEY ? NVIDIA_MODEL : "Lovable backend fallback"}`,
   );
 
   while (Date.now() < deadline - 10_000) {
     const response = await callHook("lease-review", {
       limit: LEASE_LIMIT,
-      model_available: Boolean(NVIDIA_API_KEY),
+      // The Lovable backend already has Nemotron configured and can act as a
+      // fallback. Adding NVIDIA_API_KEY moves those calls out as well.
+      model_available: true,
     });
     const leases = Array.isArray(response.leases) ? response.leases : [];
     if (leases.length === 0) break;
