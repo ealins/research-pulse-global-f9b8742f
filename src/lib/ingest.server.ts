@@ -5,8 +5,10 @@ import {
   extractStructuredSnapshot,
   structuredVacancyFromPayload,
 } from "./extraction/structured.server";
+import type { VacancyExtraction } from "./extraction/vacancy.server";
 
-const UA = "GeoAcademicRadarBot/1.0 (+https://geoacademic.app; academic source indexing)";
+const UA =
+  "GeoAcademicRadarBot/1.0 (+https://geoacademic.app; academic source indexing)";
 const FETCH_TIMEOUT_MS = 20_000;
 
 /** Keyword vocabulary (English + German) used for discovery scoring and classification. */
@@ -78,7 +80,14 @@ const CATEGORY_RULES: { category: string; kind: string; words: string[] }[] = [
   {
     category: "courses",
     kind: "COURSE",
-    words: ["course", "lehre", "lehrveranstaltung", "teaching", "module", "vorlesung"],
+    words: [
+      "course",
+      "lehre",
+      "lehrveranstaltung",
+      "teaching",
+      "module",
+      "vorlesung",
+    ],
   },
   {
     category: "programmes",
@@ -97,12 +106,26 @@ const CATEGORY_RULES: { category: string; kind: string; words: string[] }[] = [
   {
     category: "research_groups",
     kind: "RESEARCH_GROUP",
-    words: ["research-group", "arbeitsgruppe", "group", "abteilung", "chair", "lehrstuhl"],
+    words: [
+      "research-group",
+      "arbeitsgruppe",
+      "group",
+      "abteilung",
+      "chair",
+      "lehrstuhl",
+    ],
   },
   {
     category: "research",
     kind: "RESEARCH_NEWS",
-    words: ["research", "forschung", "news", "aktuelles", "topics", "forschungsschwerpunkt"],
+    words: [
+      "research",
+      "forschung",
+      "news",
+      "aktuelles",
+      "topics",
+      "forschungsschwerpunkt",
+    ],
   },
   {
     category: "department",
@@ -138,7 +161,11 @@ function pathOf(url: string): string {
   }
 }
 
-export function classifyUrlAndText(url: string, title: string, text: string): Classification {
+export function classifyUrlAndText(
+  url: string,
+  title: string,
+  text: string,
+): Classification {
   // Match on path + title only: the host (e.g. ifp.uni-stuttgart.de) would
   // otherwise tag every page of an institute with the same category.
   const path = pathOf(url);
@@ -157,7 +184,8 @@ export function classifyUrlAndText(url: string, title: string, text: string): Cl
     if (score > best.confidence)
       best = { classification: rule.kind, confidence: Math.min(0.95, score) };
   }
-  if (best.confidence < 0.2) return { classification: "GENERAL", confidence: 0.1 };
+  if (best.confidence < 0.2)
+    return { classification: "GENERAL", confidence: 0.1 };
   return best;
 }
 
@@ -171,7 +199,9 @@ function categoryForUrl(url: string): string | null {
 
 function isDomainRelevant(url: string, label: string): boolean {
   const s = `${pathOf(url)} ${label}`.toLowerCase().replace(/\s+/g, "-");
-  return DOMAIN_WORDS.some((w) => s.includes(w)) || categoryForUrl(url) !== null;
+  return (
+    DOMAIN_WORDS.some((w) => s.includes(w)) || categoryForUrl(url) !== null
+  );
 }
 
 async function timedFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -201,7 +231,9 @@ export async function robotsDisallows(origin: string): Promise<string[]> {
   if (cached) return cached;
   let rules: string[] = [];
   try {
-    const res = await timedFetch(`${origin}/robots.txt`, { headers: { accept: "text/plain" } });
+    const res = await timedFetch(`${origin}/robots.txt`, {
+      headers: { accept: "text/plain" },
+    });
     if (res.ok) {
       const txt = await res.text();
       let applies = false;
@@ -211,7 +243,8 @@ export async function robotsDisallows(origin: string): Promise<string[]> {
         const key = (keyRaw ?? "").trim().toLowerCase();
         const value = rest.join(":").trim();
         if (key === "user-agent")
-          applies = value === "*" || value.toLowerCase().includes("geoacademic");
+          applies =
+            value === "*" || value.toLowerCase().includes("geoacademic");
         else if (key === "disallow" && applies && value) rules.push(value);
       }
     }
@@ -268,7 +301,10 @@ export function extractText(html: string): string {
     .slice(0, 20_000);
 }
 
-export function extractLinks(html: string, baseUrl: string): { url: string; label: string }[] {
+export function extractLinks(
+  html: string,
+  baseUrl: string,
+): { url: string; label: string }[] {
   const out: { url: string; label: string }[] = [];
   const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
@@ -315,9 +351,15 @@ function junkDiscoveryReason(url: string, label = ""): string | null {
   const path = decodeURIComponent(u.pathname).toLowerCase();
   const haystack = `${path} ${u.search.toLowerCase()} ${label.toLowerCase()}`;
 
-  if (/\.(?:pdf|docx?|xlsx?|pptx?|zip|jpg|jpeg|png|gif|svg)(?:\/|$)/i.test(path))
+  if (
+    /\.(?:pdf|docx?|xlsx?|pptx?|zip|jpg|jpeg|png|gif|svg)(?:\/|$)/i.test(path)
+  )
     return "document-or-asset";
-  if (/(?:\/|^)(?:feedback|print|login|logout|privacy|impressum|sitemap)(?:\/|$)/i.test(path))
+  if (
+    /(?:\/|^)(?:feedback|print|login|logout|privacy|impressum|sitemap)(?:\/|$)/i.test(
+      path,
+    )
+  )
     return "utility-page";
   if (
     /(?:faq|frequently[-_ ]asked|application[-_ ]?form|sollicitatieformulier|salary[-_ ]?scale|salarisschaal)/i.test(
@@ -325,7 +367,11 @@ function junkDiscoveryReason(url: string, label = ""): string | null {
     )
   )
     return "support-or-form";
-  if (/[?&](?:download|attachment|format|output)=(?:1|true|pdf|doc|docx)/i.test(u.search))
+  if (
+    /[?&](?:download|attachment|format|output)=(?:1|true|pdf|doc|docx)/i.test(
+      u.search,
+    )
+  )
     return "download-link";
   if (/\/(?:view|feedback)\/?$/i.test(path) && /\.(?:pdf|docx?)\//i.test(path))
     return "document-view";
@@ -347,7 +393,10 @@ const DETAIL_KIND_BY_CATEGORY: Record<string, string> = {
 
 function detailKindFromAdapter(adapterKey: string | null): string | null {
   if (!adapterKey) return null;
-  const m = /^html-(vacancies|people|projects|events|programmes|courses)-detail$/.exec(adapterKey);
+  const m =
+    /^html-(vacancies|people|projects|events|programmes|courses)-detail$/.exec(
+      adapterKey,
+    );
   return m?.[1]
     ? (DETAIL_KIND_BY_CATEGORY[m[1]] ?? null)
     : adapterKey === "html-vacancy"
@@ -369,7 +418,8 @@ function likelyDetailLink(
   } catch {
     return false;
   }
-  if (child.host !== parent.host || child.toString() === parent.toString()) return false;
+  if (child.host !== parent.host || child.toString() === parent.toString())
+    return false;
   if (isJunkDiscoveryUrl(child.toString(), label)) return false;
 
   const cleanLabel = label.replace(/\s+/g, " ").trim();
@@ -422,7 +472,9 @@ function likelyDetailLink(
       );
     case "programmes":
       return (
-        /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(text) ||
+        /(programme|program|degree|study|studium|master|bachelor|doctoral|phd)/i.test(
+          text,
+        ) ||
         detailQuery ||
         (deeper && informative)
       );
@@ -469,7 +521,9 @@ async function registerDetailSourcesFromLinks(input: {
   const candidates: { url: string; label: string; category: string }[] = [];
   for (const targetCategory of targetCategories) {
     for (const link of allLinks) {
-      if (likelyDetailLink(targetCategory, link.url, link.label, input.finalUrl)) {
+      if (
+        likelyDetailLink(targetCategory, link.url, link.label, input.finalUrl)
+      ) {
         candidates.push({ ...link, category: targetCategory });
       }
     }
@@ -488,9 +542,12 @@ async function registerDetailSourcesFromLinks(input: {
       .maybeSingle();
 
     if (existing) {
-      const targetClassification = DETAIL_KIND_BY_CATEGORY[link.category] ?? null;
+      const targetClassification =
+        DETAIL_KIND_BY_CATEGORY[link.category] ?? null;
       const nextPriority =
-        link.category === "people" || link.category === "projects" || link.category === "events"
+        link.category === "people" ||
+        link.category === "projects" ||
+        link.category === "events"
           ? 1
           : 2;
 
@@ -512,13 +569,19 @@ async function registerDetailSourcesFromLinks(input: {
 
       const { data: latestRaw } = await supabaseAdmin
         .from("raw_records")
-        .select("id, normalization_status, classification, classification_confidence")
+        .select(
+          "id, normalization_status, classification, classification_confidence",
+        )
         .eq("source_id", existing.id)
         .order("fetched_at", { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      if (latestRaw && targetClassification && latestRaw.normalization_status !== "NORMALIZED") {
+      if (
+        latestRaw &&
+        targetClassification &&
+        latestRaw.normalization_status !== "NORMALIZED"
+      ) {
         await supabaseAdmin
           .from("raw_records")
           .update({
@@ -533,16 +596,22 @@ async function registerDetailSourcesFromLinks(input: {
           .eq("id", latestRaw.id);
         await enqueue("NORMALIZE", {
           source_id: existing.id,
-          institution_id: existing.institution_id ?? input.institutionId ?? undefined,
+          institution_id:
+            existing.institution_id ?? input.institutionId ?? undefined,
           payload: {
             classification: targetClassification,
             reason: "deep-discovery-v6.1-existing-detail",
           },
         });
-      } else if (!latestRaw && existing.status !== "BLOCKED" && existing.active !== false) {
+      } else if (
+        !latestRaw &&
+        existing.status !== "BLOCKED" &&
+        existing.active !== false
+      ) {
         await enqueue("FETCH", {
           source_id: existing.id,
-          institution_id: existing.institution_id ?? input.institutionId ?? undefined,
+          institution_id:
+            existing.institution_id ?? input.institutionId ?? undefined,
           payload: { reason: "deep-discovery-v6.1-existing-detail" },
         });
       }
@@ -555,12 +624,17 @@ async function registerDetailSourcesFromLinks(input: {
         url: link.url,
         canonical_url: link.url,
         name: (link.label || link.url).slice(0, 200),
-        source_type: link.category === "projects" ? ("project" as never) : ("institution" as never),
+        source_type:
+          link.category === "projects"
+            ? ("project" as never)
+            : ("institution" as never),
         adapter_key: `html-${link.category}-detail`,
         institution_id: input.institutionId,
         category: link.category,
         priority:
-          link.category === "people" || link.category === "projects" || link.category === "events"
+          link.category === "people" ||
+          link.category === "projects" ||
+          link.category === "events"
             ? 1
             : 2,
         status: "PENDING",
@@ -602,30 +676,67 @@ async function registerVacancySources(input: {
   finalUrl: string;
   institutionId: string | null;
 }): Promise<number> {
-  const host = new URL(input.finalUrl).host;
-  const postings = input.links.filter((link) => {
+  const host = new URL(input.finalUrl).host.toLowerCase();
+  const knownApplicantTrackingHost = (candidate: string) =>
+    /(?:^|\.)(?:myworkdayjobs\.com|workdayjobs\.com|jobs\.lever\.co|greenhouse\.io|smartrecruiters\.com|personio\.(?:de|com)|successfactors\.(?:com|eu)|jobs\.sap\.com|taleo\.net|icims\.com|jobvite\.com|recruitee\.com|workable\.com|onlyfy\.io|jobylon\.com)$/i.test(
+      candidate,
+    );
+  const canonicalJobUrl = (value: string): string | null => {
     try {
-      const url = new URL(link.url);
-      return (
-        url.host === host &&
-        !isJunkDiscoveryUrl(link.url, link.label) &&
-        /\/(job|jobs|stelle|stellenangebot|position)\//i.test(url.pathname)
-      );
+      const url = new URL(value);
+      if (!/^https?:$/.test(url.protocol)) return null;
+      url.hash = "";
+      for (const key of [...url.searchParams.keys()]) {
+        if (
+          /^(?:utm_.+|fbclid|gclid|mc_[a-z]+|ref|referrer|source|campaign|trk|tracking)$/i.test(
+            key,
+          )
+        ) {
+          url.searchParams.delete(key);
+        }
+      }
+      return url.toString();
     } catch {
-      return false;
+      return null;
     }
+  };
+  const genericLabel =
+    /^(?:apply|apply now|details|learn more|more|next|previous|search|view|view all|view jobs|all jobs|open positions?)$/i;
+  const postings = input.links.flatMap((link) => {
+    const canonical = canonicalJobUrl(link.url);
+    if (!canonical || isJunkDiscoveryUrl(canonical, link.label)) return [];
+    const url = new URL(canonical);
+    const label = link.label.replace(/\s+/g, " ").trim();
+    const signal = `${url.pathname} ${url.search} ${label}`;
+    const sameHost = url.host.toLowerCase() === host;
+    const atsHost = knownApplicantTrackingHost(url.hostname.toLowerCase());
+    const detailSignal =
+      /(?:\/(?:job|jobs|vacanc(?:y|ies)|position|stelle|stellenangebot|requisition)(?:\/|[-_]))|(?:[?&](?:jobid|job_id|job|reqid|req_id|requisitionid|positionid|postingid)=)|(?:\/(?:job|requisition)\/\d{3,})/i.test(
+        signal,
+      );
+    const roleLabel =
+      label.length >= 8 && !genericLabel.test(label) && ROLE_TITLE.test(label);
+    if ((!sameHost && !atsHost) || (!detailSignal && !roleLabel)) return [];
+    return [{ url: canonical, label }];
   });
   let inserted = 0;
   const seen = new Set<string>();
   for (const posting of postings.slice(0, 60)) {
     if (seen.has(posting.url)) continue;
     seen.add(posting.url);
-    const { data: duplicate } = await supabaseAdmin
-      .from("sources")
-      .select("id")
-      .eq("url", posting.url)
-      .maybeSingle();
-    if (duplicate) continue;
+    const [urlMatch, canonicalMatch] = await Promise.all([
+      supabaseAdmin
+        .from("sources")
+        .select("id")
+        .eq("url", posting.url)
+        .maybeSingle(),
+      supabaseAdmin
+        .from("sources")
+        .select("id")
+        .eq("canonical_url", posting.url)
+        .maybeSingle(),
+    ]);
+    if (urlMatch.data || canonicalMatch.data) continue;
     const { data: child } = await supabaseAdmin
       .from("sources")
       .insert({
@@ -684,7 +795,9 @@ export async function discoverInstitutionSources(
   if (error) throw error;
   if (!inst) throw new Error(`Institution ${institutionId} not found`);
 
-  const seeds = [inst.research_url, inst.careers_url].filter((u): u is string => Boolean(u));
+  const seeds = [inst.research_url, inst.careers_url].filter((u): u is string =>
+    Boolean(u),
+  );
   if (seeds.length === 0 && inst.official_url) seeds.push(inst.official_url);
 
   const result: DiscoveryResult = {
@@ -725,7 +838,10 @@ export async function discoverInstitutionSources(
           candidates.set(u.toString(), { label: link.label, from: finalUrl });
       }
     } catch (e) {
-      result.errors.push({ url: seed, error: e instanceof Error ? e.message : String(e) });
+      result.errors.push({
+        url: seed,
+        error: e instanceof Error ? e.message : String(e),
+      });
     }
   }
 
@@ -778,12 +894,17 @@ export async function discoverInstitutionSources(
         institution_id: inst.id,
         category,
         priority:
-          category === "vacancies" ? 1 : category === "people" || category === "projects" ? 2 : 4,
+          category === "vacancies"
+            ? 1
+            : category === "people" || category === "projects"
+              ? 2
+              : 4,
         status: "PENDING",
         discovered_from: meta.from,
         trust_level: 5,
         active: true,
-        notes: "Discovered by discover-academic-sources (institution-scoped crawl)",
+        notes:
+          "Discovered by discover-academic-sources (institution-scoped crawl)",
       })
       .select("id")
       .maybeSingle();
@@ -792,7 +913,11 @@ export async function discoverInstitutionSources(
       continue;
     }
     result.inserted += 1;
-    if (inserted) await enqueue("FETCH", { source_id: inserted.id, institution_id: inst.id });
+    if (inserted)
+      await enqueue("FETCH", {
+        source_id: inserted.id,
+        institution_id: inst.id,
+      });
   }
   return result;
 }
@@ -843,7 +968,10 @@ export async function enqueueHighValueReseed(limit = 150): Promise<{
     .filter((source) => {
       const category = source.category ?? "";
       if (!HIGH_VALUE_RESEED_CATEGORIES.has(category)) return false;
-      if (source.adapter_key?.endsWith("-detail") || source.adapter_key === "html-vacancy")
+      if (
+        source.adapter_key?.endsWith("-detail") ||
+        source.adapter_key === "html-vacancy"
+      )
         return false;
       if (source.status === "BLOCKED") return false;
       if (isJunkDiscoveryUrl(source.url)) return false;
@@ -873,7 +1001,10 @@ export async function enqueueHighValueReseed(limit = 150): Promise<{
         0,
         4000,
       );
-    await supabaseAdmin.from("sources").update({ notes: nextNotes }).eq("id", source.id);
+    await supabaseAdmin
+      .from("sources")
+      .update({ notes: nextNotes })
+      .eq("id", source.id);
     queued += 1;
     const category = source.category ?? "unknown";
     byCategory[category] = (byCategory[category] ?? 0) + 1;
@@ -917,7 +1048,9 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
 
     const { data: raw } = await supabaseAdmin
       .from("raw_records")
-      .select("id, normalization_status, classification, classification_confidence")
+      .select(
+        "id, normalization_status, classification, classification_confidence",
+      )
       .eq("source_id", source.id)
       .order("fetched_at", { ascending: false })
       .limit(1)
@@ -932,7 +1065,10 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
         .from("raw_records")
         .update({
           classification,
-          classification_confidence: Math.max(Number(raw.classification_confidence ?? 0), 0.72),
+          classification_confidence: Math.max(
+            Number(raw.classification_confidence ?? 0),
+            0.72,
+          ),
           normalization_status: "PENDING",
           normalization_error: null,
         } as never)
@@ -996,7 +1132,9 @@ export async function enqueue(
     if (dup) return;
   } else if (
     opts.institution_id &&
-    ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"].includes(taskType)
+    ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"].includes(
+      taskType,
+    )
   ) {
     const { data: dup } = await supabaseAdmin
       .from("ingestion_tasks")
@@ -1040,7 +1178,11 @@ const NORMALIZE_CLASS_PRIORITY: Record<string, number> = {
 };
 
 function queuedClassification(task: { payload?: unknown }): string {
-  if (!task.payload || typeof task.payload !== "object" || Array.isArray(task.payload))
+  if (
+    !task.payload ||
+    typeof task.payload !== "object" ||
+    Array.isArray(task.payload)
+  )
     return "UNKNOWN";
   const value = (task.payload as Record<string, unknown>)["classification"];
   return typeof value === "string" ? value.toUpperCase() : "UNKNOWN";
@@ -1075,21 +1217,28 @@ export async function runQueueBatch(
     .select("*")
     .in("status", ["QUEUED", "RETRY"])
     .lte("run_after", new Date().toISOString());
-  if (taskTypes && taskTypes.length > 0) query = query.in("task_type", taskTypes);
+  if (taskTypes && taskTypes.length > 0)
+    query = query.in("task_type", taskTypes);
 
   const normalizeOnly = taskTypes?.length === 1 && taskTypes[0] === "NORMALIZE";
   // Pull a wider candidate window for NORMALIZE so high-value academic pages
   // are not buried behind hundreds of generic pages with older run_after values.
-  const candidateLimit = normalizeOnly ? Math.min(200, Math.max(limit * 6, 48)) : limit;
-  const { data: candidates, error } = await query.order("run_after").limit(candidateLimit);
+  const candidateLimit = normalizeOnly
+    ? Math.min(200, Math.max(limit * 6, 48))
+    : limit;
+  const { data: candidates, error } = await query
+    .order("run_after")
+    .limit(candidateLimit);
   if (error) throw error;
 
   let selected = [...(candidates ?? [])];
   if (normalizeOnly) {
     selected.sort((a, b) => {
       const fallbackPriority = NORMALIZE_CLASS_PRIORITY["UNKNOWN"] ?? 99;
-      const ap = NORMALIZE_CLASS_PRIORITY[queuedClassification(a)] ?? fallbackPriority;
-      const bp = NORMALIZE_CLASS_PRIORITY[queuedClassification(b)] ?? fallbackPriority;
+      const ap =
+        NORMALIZE_CLASS_PRIORITY[queuedClassification(a)] ?? fallbackPriority;
+      const bp =
+        NORMALIZE_CLASS_PRIORITY[queuedClassification(b)] ?? fallbackPriority;
       if (ap !== bp) return ap - bp;
       return new Date(a.run_after).getTime() - new Date(b.run_after).getTime();
     });
@@ -1106,7 +1255,10 @@ export async function runQueueBatch(
     details: [] as string[],
   };
   const queue = selected;
-  const workers = Math.max(1, Math.min(Math.floor(concurrency), queue.length || 1));
+  const workers = Math.max(
+    1,
+    Math.min(Math.floor(concurrency), queue.length || 1),
+  );
   let cursor = 0;
 
   const processTask = async (task: (typeof queue)[number]) => {
@@ -1139,7 +1291,10 @@ export async function runQueueBatch(
         if (r.status === "NORMALIZED") out.normalized += 1;
         if (r.status === "SKIPPED") out.skipped += 1;
         detail = `NORMALIZE ${r.status}${r.reason ? `: ${r.reason}` : ""}`;
-      } else if (task.task_type === "PROMOTE_INSTITUTION" && task.institution_id) {
+      } else if (
+        task.task_type === "PROMOTE_INSTITUTION" &&
+        task.institution_id
+      ) {
         const { promoteInstitution } = await import("./openalex.server");
         const r = await promoteInstitution(task.institution_id);
         if (r.matched) {
@@ -1153,7 +1308,10 @@ export async function runQueueBatch(
           });
         }
         detail = `PROMOTE ${r.institution}: ${r.matched ? `matched ${r.ror ?? r.provider_id ?? "ROR"}${r.promoted ? " (promoted)" : ""}` : `no match (${r.reason})`}`;
-      } else if (task.task_type === "IMPORT_PUBLICATIONS" && task.institution_id) {
+      } else if (
+        task.task_type === "IMPORT_PUBLICATIONS" &&
+        task.institution_id
+      ) {
         const { importInstitutionPublications, promoteInstitution } =
           await import("./openalex.server");
         const { data: inst } = await supabaseAdmin
@@ -1177,7 +1335,8 @@ export async function runQueueBatch(
           detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via ${r.provider}`;
         }
       } else if (task.task_type === "IMPORT_PROJECTS" && task.institution_id) {
-        const { importInstitutionProjects, promoteInstitution } = await import("./openalex.server");
+        const { importInstitutionProjects, promoteInstitution } =
+          await import("./openalex.server");
         const { data: inst } = await supabaseAdmin
           .from("institutions")
           .select("institution_identifier, is_demo")
@@ -1199,7 +1358,9 @@ export async function runQueueBatch(
           detail = `PROJECTS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via OpenAIRE`;
         }
       } else {
-        throw new Error(`Unsupported task ${task.task_type} (missing source/institution)`);
+        throw new Error(
+          `Unsupported task ${task.task_type} (missing source/institution)`,
+        );
       }
       await supabaseAdmin
         .from("ingestion_tasks")
@@ -1234,7 +1395,9 @@ export async function runQueueBatch(
           })
           .eq("id", task.id);
         out.failed += 1;
-        out.details.push(`DEFERRED ${task.task_type}: ${message.slice(0, 160)} (${minutes}m)`);
+        out.details.push(
+          `DEFERRED ${task.task_type}: ${message.slice(0, 160)} (${minutes}m)`,
+        );
         return;
       }
       const attempts = task.attempts + 1;
@@ -1245,7 +1408,9 @@ export async function runQueueBatch(
         .update({
           status: dead ? "DEAD" : "RETRY",
           last_error: message.slice(0, 1000),
-          run_after: new Date(Date.now() + backoffMinutes * 60_000).toISOString(),
+          run_after: new Date(
+            Date.now() + backoffMinutes * 60_000,
+          ).toISOString(),
         })
         .eq("id", task.id);
       if (dead) out.dead += 1;
@@ -1311,15 +1476,71 @@ export type ExternalFetchCompletion = {
 };
 
 const EXTERNAL_FETCH_LEASE_MS = 15 * 60_000;
+const EXTERNAL_REVIEW_LEASE_MS = 20 * 60_000;
+const REVIEW_BACKPRESSURE_HIGH_WATER = 120;
+
+export type ExternalWorkerStatus = {
+  due_fetch: number;
+  due_vacancy_review: number;
+  processing_vacancy_review: number;
+  fetch_paused: boolean;
+  review_high_water: number;
+};
+
+export async function getExternalWorkerStatus(): Promise<ExternalWorkerStatus> {
+  const now = new Date().toISOString();
+  const [
+    { count: dueFetch, error: fetchError },
+    { data: reviewRows, error: reviewError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("ingestion_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("task_type", "FETCH")
+      .in("status", ["QUEUED", "RETRY"])
+      .lte("run_after", now),
+    supabaseAdmin
+      .from("ingestion_tasks")
+      .select("status, run_after, payload")
+      .eq("task_type", "NORMALIZE")
+      .in("status", ["QUEUED", "RETRY", "PROCESSING"])
+      .limit(2_000),
+  ]);
+  if (fetchError) throw fetchError;
+  if (reviewError) throw reviewError;
+  const vacancyRows = (reviewRows ?? []).filter(
+    (row) => queuedClassification(row) === "VACANCY",
+  );
+  const dueReview = vacancyRows.filter(
+    (row) => row.status !== "PROCESSING" && row.run_after <= now,
+  ).length;
+  const processingReview = vacancyRows.filter(
+    (row) => row.status === "PROCESSING",
+  ).length;
+  return {
+    due_fetch: dueFetch ?? 0,
+    due_vacancy_review: dueReview,
+    processing_vacancy_review: processingReview,
+    fetch_paused:
+      dueReview + processingReview >= REVIEW_BACKPRESSURE_HIGH_WATER,
+    review_high_water: REVIEW_BACKPRESSURE_HIGH_WATER,
+  };
+}
 
 /**
  * Claims FETCH work for a remote crawler. The lease timestamp is returned to
  * the worker and must be echoed on completion, preventing a late response from
  * overwriting a task that has already been recovered and leased again.
  */
-export async function leaseExternalFetchTasks(limit = 8): Promise<ExternalFetchLease[]> {
+export async function leaseExternalFetchTasks(
+  limit = 8,
+): Promise<ExternalFetchLease[]> {
   const now = new Date();
-  const staleBefore = new Date(now.getTime() - EXTERNAL_FETCH_LEASE_MS).toISOString();
+  const workerStatus = await getExternalWorkerStatus();
+  if (workerStatus.fetch_paused) return [];
+  const staleBefore = new Date(
+    now.getTime() - EXTERNAL_FETCH_LEASE_MS,
+  ).toISOString();
 
   const { data: stale, error: staleError } = await supabaseAdmin
     .from("ingestion_tasks")
@@ -1411,7 +1632,9 @@ export async function leaseExternalFetchTasks(limit = 8): Promise<ExternalFetchL
         .update({
           status: "COMPLETE",
           completed_at: new Date().toISOString(),
-          last_error: source ? "Source is inactive or blocked" : "Source no longer exists",
+          last_error: source
+            ? "Source is inactive or blocked"
+            : "Source no longer exists",
         })
         .eq("id", task.id)
         .eq("status", "PROCESSING")
@@ -1449,7 +1672,9 @@ function externalUrl(value: string | undefined, fallback: string): string {
   }
 }
 
-function externalLinks(value: ExternalFetchCompletion["links"]): { url: string; label: string }[] {
+function externalLinks(
+  value: ExternalFetchCompletion["links"],
+): { url: string; label: string }[] {
   if (!Array.isArray(value)) return [];
   const links: { url: string; label: string }[] = [];
   for (const item of value.slice(0, 200)) {
@@ -1459,7 +1684,8 @@ function externalLinks(value: ExternalFetchCompletion["links"]): { url: string; 
       if (url.protocol !== "http:" && url.protocol !== "https:") continue;
       links.push({
         url: url.toString(),
-        label: typeof item.label === "string" ? item.label.trim().slice(0, 200) : "",
+        label:
+          typeof item.label === "string" ? item.label.trim().slice(0, 200) : "",
       });
     } catch {
       // Ignore malformed worker output rather than failing the leased page.
@@ -1469,7 +1695,9 @@ function externalLinks(value: ExternalFetchCompletion["links"]): { url: string; 
 }
 
 /** Stores a bounded page snapshot fetched by the external worker. */
-export async function completeExternalFetch(input: ExternalFetchCompletion): Promise<{
+export async function completeExternalFetch(
+  input: ExternalFetchCompletion,
+): Promise<{
   accepted: boolean;
   status: "COMPLETE" | "RETRY" | "DEAD" | "STALE";
   changed?: boolean;
@@ -1494,13 +1722,19 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
 
   const { data: source, error: sourceError } = await supabaseAdmin
     .from("sources")
-    .select("id, url, institution_id, adapter_key, category, refresh_frequency_hours")
+    .select(
+      "id, url, institution_id, adapter_key, category, refresh_frequency_hours",
+    )
     .eq("id", task.source_id)
     .maybeSingle();
   if (sourceError) throw sourceError;
   if (!source) throw new Error(`Source ${task.source_id} not found`);
 
-  const recordRun = async (success: boolean, changed: boolean, message: string | null) => {
+  const recordRun = async (
+    success: boolean,
+    changed: boolean,
+    message: string | null,
+  ) => {
     await supabaseAdmin.from("sync_runs").insert({
       source_id: source.id,
       adapter_key: source.adapter_key ?? "html-generic",
@@ -1515,12 +1749,20 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
     });
   };
 
-  const statusCode = Math.min(599, Math.max(0, Math.round(input.http_status ?? 0)));
+  const statusCode = Math.min(
+    599,
+    Math.max(0, Math.round(input.http_status ?? 0)),
+  );
   if (!input.success) {
-    const message = (input.error || (statusCode ? `HTTP ${statusCode}` : "External fetch failed"))
+    const message = (
+      input.error ||
+      (statusCode ? `HTTP ${statusCode}` : "External fetch failed")
+    )
       .trim()
       .slice(0, 1000);
-    const blocked = input.blocked === true || statusCode === 403 || statusCode === 429;
+    // 429 is temporary rate limiting and must be retried with backoff. Marking
+    // it BLOCKED permanently removed healthy career sites from future crawls.
+    const blocked = input.blocked === true || statusCode === 403;
     await supabaseAdmin
       .from("sources")
       .update({
@@ -1550,15 +1792,28 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
   }
 
   const finalUrl = externalUrl(input.final_url, source.url);
-  const title = typeof input.page_title === "string" ? input.page_title.trim().slice(0, 300) : null;
-  const text = typeof input.text_content === "string" ? input.text_content.trim().slice(0, 20_000) : "";
-  if (!text) throw new Error("External fetch completion did not include page text");
+  const title =
+    typeof input.page_title === "string"
+      ? input.page_title.trim().slice(0, 300)
+      : null;
+  const text =
+    typeof input.text_content === "string"
+      ? input.text_content.trim().slice(0, 20_000)
+      : "";
+  if (!text)
+    throw new Error("External fetch completion did not include page text");
   const hash = await sha256(text);
-  let { classification, confidence } = classifyUrlAndText(finalUrl, title ?? "", text);
+  let { classification, confidence } = classifyUrlAndText(
+    finalUrl,
+    title ?? "",
+    text,
+  );
   const detailKind = detailKindFromAdapter(source.adapter_key);
   if (
     detailKind &&
-    (classification === "GENERAL" || classification === "UNKNOWN" || confidence < 0.5)
+    (classification === "GENERAL" ||
+      classification === "UNKNOWN" ||
+      confidence < 0.5)
   ) {
     classification = detailKind;
     confidence = Math.max(confidence, 0.72);
@@ -1663,7 +1918,11 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
     adapterKey: source.adapter_key,
   });
   if (source.category === "vacancies") {
-    await registerVacancySources({ links, finalUrl, institutionId: source.institution_id });
+    await registerVacancySources({
+      links,
+      finalUrl,
+      institutionId: source.institution_id,
+    });
   }
 
   const { data: completed } = await supabaseAdmin
@@ -1683,17 +1942,457 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
   };
 }
 
+export type ExternalReviewLease = {
+  task_id: string;
+  source_id: string;
+  raw_record_id: string;
+  lease_started_at: string;
+  url: string;
+  title: string;
+  text_content: string;
+  content_hash: string | null;
+  structured: unknown;
+  institution_id: string | null;
+  institution_name: string | null;
+  institution_type: string | null;
+  requires_model: boolean;
+  gate: { ok: boolean; reason?: string };
+  attempt: number;
+  max_attempts: number;
+};
+
+export type ExternalReviewCompletion = {
+  task_id: string;
+  source_id: string;
+  raw_record_id: string;
+  lease_started_at: string;
+  success: boolean;
+  extraction?: unknown;
+  error?: string;
+  model?: string;
+  latency_ms?: number;
+  input_characters?: number;
+  output_characters?: number;
+};
+
+async function retryExternalReviewTask(
+  task: {
+    id: string;
+    attempts: number;
+    max_attempts: number;
+    started_at: string | null;
+  },
+  leaseStartedAt: string,
+  message: string,
+): Promise<"RETRY" | "DEAD" | "STALE"> {
+  const dead = task.attempts >= task.max_attempts;
+  const backoffMinutes = Math.min(12 * 60, 2 ** Math.max(1, task.attempts));
+  const { data } = await supabaseAdmin
+    .from("ingestion_tasks")
+    .update({
+      status: dead ? "DEAD" : "RETRY",
+      last_error: message.slice(0, 1_000),
+      run_after: new Date(Date.now() + backoffMinutes * 60_000).toISOString(),
+      started_at: null,
+    })
+    .eq("id", task.id)
+    .eq("status", "PROCESSING")
+    .eq("started_at", leaseStartedAt)
+    .select("id")
+    .maybeSingle();
+  return data ? (dead ? "DEAD" : "RETRY") : "STALE";
+}
+
+/** Claims only vacancy NORMALIZE tasks; all canonical writes stay server-side. */
+export async function leaseExternalReviewTasks(
+  limit = 4,
+  modelAvailable = true,
+): Promise<ExternalReviewLease[]> {
+  const now = new Date();
+  const staleBefore = new Date(
+    now.getTime() - EXTERNAL_REVIEW_LEASE_MS,
+  ).toISOString();
+  const { data: processing, error: staleError } = await supabaseAdmin
+    .from("ingestion_tasks")
+    .select("id, attempts, max_attempts, started_at, payload")
+    .eq("task_type", "NORMALIZE")
+    .eq("status", "PROCESSING")
+    .lt("started_at", staleBefore)
+    .limit(500);
+  if (staleError) throw staleError;
+  for (const task of (processing ?? []).filter(
+    (row) => queuedClassification(row) === "VACANCY",
+  )) {
+    const dead = task.attempts >= task.max_attempts;
+    await supabaseAdmin
+      .from("ingestion_tasks")
+      .update({
+        status: dead ? "DEAD" : "RETRY",
+        last_error: "External vacancy-review lease expired before completion",
+        run_after: now.toISOString(),
+        started_at: null,
+      })
+      .eq("id", task.id)
+      .eq("status", "PROCESSING")
+      .lt("started_at", staleBefore);
+  }
+
+  const requested = Math.min(10, Math.max(1, Math.floor(limit)));
+  const { data: candidates, error } = await supabaseAdmin
+    .from("ingestion_tasks")
+    .select("id, source_id, attempts, max_attempts, payload")
+    .eq("task_type", "NORMALIZE")
+    .in("status", ["QUEUED", "RETRY"])
+    .lte("run_after", now.toISOString())
+    .order("run_after")
+    .limit(Math.max(100, requested * 20));
+  if (error) throw error;
+
+  const claimed: {
+    id: string;
+    source_id: string;
+    started_at: string;
+    attempts: number;
+    max_attempts: number;
+  }[] = [];
+  for (const task of (candidates ?? []).filter(
+    (row) => queuedClassification(row) === "VACANCY",
+  )) {
+    if (claimed.length >= requested) break;
+    if (!task.source_id) continue;
+    const startedAt = new Date().toISOString();
+    const { data: row, error: claimError } = await supabaseAdmin
+      .from("ingestion_tasks")
+      .update({
+        status: "PROCESSING",
+        attempts: task.attempts + 1,
+        started_at: startedAt,
+        last_error: null,
+      })
+      .eq("id", task.id)
+      .in("status", ["QUEUED", "RETRY"])
+      .select("id, source_id, started_at, attempts, max_attempts")
+      .maybeSingle();
+    if (claimError) throw claimError;
+    if (row?.source_id && row.started_at) {
+      claimed.push({
+        id: row.id,
+        source_id: row.source_id,
+        started_at: row.started_at,
+        attempts: row.attempts,
+        max_attempts: row.max_attempts,
+      });
+    }
+  }
+  if (claimed.length === 0) return [];
+
+  const sourceIds = claimed.map((task) => task.source_id);
+  const [
+    { data: rawRows, error: rawError },
+    { data: sources, error: sourceError },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from("raw_records")
+      .select(
+        "id, source_id, final_url, page_title, text_content, content_hash, payload, classification, institution_id, fetched_at",
+      )
+      .in("source_id", sourceIds)
+      .order("fetched_at", { ascending: false }),
+    supabaseAdmin
+      .from("sources")
+      .select("id, institution_id")
+      .in("id", sourceIds),
+  ]);
+  if (rawError) throw rawError;
+  if (sourceError) throw sourceError;
+  const rawBySource = new Map<string, (typeof rawRows)[number]>();
+  for (const raw of rawRows ?? []) {
+    if (raw.source_id && !rawBySource.has(raw.source_id))
+      rawBySource.set(raw.source_id, raw);
+  }
+  const institutionIds = [
+    ...new Set(
+      (sources ?? [])
+        .map((source) => source.institution_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const { data: institutions, error: institutionError } = institutionIds.length
+    ? await supabaseAdmin
+        .from("institutions")
+        .select("id, name, institution_type")
+        .in("id", institutionIds)
+    : { data: [], error: null };
+  if (institutionError) throw institutionError;
+  const institutionById = new Map(
+    (institutions ?? []).map((row) => [row.id, row]),
+  );
+  const sourceById = new Map((sources ?? []).map((row) => [row.id, row]));
+
+  const leases: ExternalReviewLease[] = [];
+  for (const task of claimed) {
+    const raw = rawBySource.get(task.source_id);
+    if (!raw || raw.classification !== "VACANCY") {
+      await supabaseAdmin
+        .from("ingestion_tasks")
+        .update({
+          status: "COMPLETE",
+          completed_at: new Date().toISOString(),
+          last_error: raw
+            ? "Latest raw record is no longer a vacancy"
+            : "Raw record is missing",
+        })
+        .eq("id", task.id)
+        .eq("status", "PROCESSING")
+        .eq("started_at", task.started_at);
+      continue;
+    }
+    const title = (raw.page_title ?? "").trim().slice(0, 300);
+    const text = (raw.text_content ?? "").trim().slice(0, 20_000);
+    const url = raw.final_url ?? "";
+    const gate = looksLikeSinglePosting(url, title, text);
+    const structured = structuredVacancyFromPayload(raw.payload, url);
+    const deterministicEvidence = Boolean(
+      structured ||
+      parseDeadline(text) ||
+      /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text),
+    );
+    const source = sourceById.get(task.source_id);
+    const institution = source?.institution_id
+      ? institutionById.get(source.institution_id)
+      : undefined;
+    const requiresModel =
+      gate.ok &&
+      !(deterministicEvidence && hasStrongGeospatialEvidence(title, text));
+    if (requiresModel && !modelAvailable) {
+      // Do not burn retries when a free runner has not been given the optional
+      // NVIDIA secret. Defer semantic pages and continue draining deterministic ones.
+      await supabaseAdmin
+        .from("ingestion_tasks")
+        .update({
+          status: "RETRY",
+          attempts: Math.max(0, task.attempts - 1),
+          run_after: new Date(Date.now() + 6 * 60 * 60_000).toISOString(),
+          started_at: null,
+          last_error:
+            "Waiting for NVIDIA_API_KEY on the external review worker",
+        })
+        .eq("id", task.id)
+        .eq("status", "PROCESSING")
+        .eq("started_at", task.started_at);
+      continue;
+    }
+    leases.push({
+      task_id: task.id,
+      source_id: task.source_id,
+      raw_record_id: raw.id,
+      lease_started_at: task.started_at,
+      url,
+      title,
+      text_content: text,
+      content_hash: raw.content_hash,
+      structured: raw.payload,
+      institution_id: raw.institution_id,
+      institution_name: institution?.name ?? null,
+      institution_type: institution?.institution_type ?? null,
+      requires_model: requiresModel,
+      gate,
+      attempt: task.attempts,
+      max_attempts: task.max_attempts,
+    });
+  }
+  return leases;
+}
+
+function evidenceIsSupported(
+  extraction: VacancyExtraction,
+  pageText: string,
+): boolean {
+  if (!extraction.is_single_real_position) return true;
+  if (extraction.evidence.length === 0) return false;
+  const normalizedPage = pageText.toLowerCase().replace(/\s+/g, " ");
+  return extraction.evidence.every((snippet) => {
+    const normalizedSnippet = snippet.toLowerCase().replace(/\s+/g, " ").trim();
+    return (
+      normalizedSnippet.length >= 8 &&
+      normalizedPage.includes(normalizedSnippet)
+    );
+  });
+}
+
+/** Validates remote model output, then invokes the existing canonical writer. */
+export async function completeExternalReview(
+  input: ExternalReviewCompletion,
+): Promise<{
+  accepted: boolean;
+  status: "COMPLETE" | "RETRY" | "DEAD" | "STALE";
+  outcome?: NormalizeResult;
+}> {
+  const { data: task, error: taskError } = await supabaseAdmin
+    .from("ingestion_tasks")
+    .select(
+      "id, task_type, source_id, status, started_at, attempts, max_attempts, payload",
+    )
+    .eq("id", input.task_id)
+    .maybeSingle();
+  if (taskError) throw taskError;
+  if (
+    !task ||
+    task.task_type !== "NORMALIZE" ||
+    task.source_id !== input.source_id ||
+    task.status !== "PROCESSING" ||
+    task.started_at !== input.lease_started_at ||
+    queuedClassification(task) !== "VACANCY"
+  ) {
+    return { accepted: false, status: "STALE" };
+  }
+
+  const { data: raw, error: rawError } = await supabaseAdmin
+    .from("raw_records")
+    .select("id, text_content, content_hash")
+    .eq("id", input.raw_record_id)
+    .eq("source_id", input.source_id)
+    .maybeSingle();
+  if (rawError) throw rawError;
+  if (!raw) {
+    const status = await retryExternalReviewTask(
+      task,
+      input.lease_started_at,
+      "Leased raw record no longer exists",
+    );
+    return { accepted: status !== "STALE", status };
+  }
+  const { data: latestRaw } = await supabaseAdmin
+    .from("raw_records")
+    .select("id")
+    .eq("source_id", input.source_id)
+    .order("fetched_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (latestRaw?.id !== raw.id) {
+    const status = await retryExternalReviewTask(
+      task,
+      input.lease_started_at,
+      "A newer source snapshot arrived during review; review will restart",
+    );
+    return { accepted: status !== "STALE", status };
+  }
+  if (!input.success) {
+    const status = await retryExternalReviewTask(
+      task,
+      input.lease_started_at,
+      input.error?.trim() || "External vacancy review failed",
+    );
+    return { accepted: status !== "STALE", status };
+  }
+
+  let extraction: VacancyExtraction | null = null;
+  if (input.extraction !== undefined && input.extraction !== null) {
+    const { validateVacancy } = await import("./extraction/validate.server");
+    const validation = validateVacancy(JSON.stringify(input.extraction));
+    if (
+      !validation.ok ||
+      !evidenceIsSupported(
+        validation.ok ? validation.value : ({} as VacancyExtraction),
+        raw.text_content ?? "",
+      )
+    ) {
+      const message = !validation.ok
+        ? `${validation.code}: ${validation.message}`
+        : "BUSINESS_RULE_FAILURE: evidence is missing or not present in the source page";
+      await supabaseAdmin.from("llm_processing_runs").insert({
+        provider: "NVIDIA",
+        model: (input.model || "external-nemotron").slice(0, 200),
+        operation: "VACANCY_EXTRACTION",
+        source_id: input.source_id,
+        raw_page_id: raw.id,
+        content_hash: raw.content_hash,
+        status: "VALIDATION_FAILED",
+        completed_at: new Date().toISOString(),
+        latency_ms: boundedResponseTime(input.latency_ms),
+        error_code: "EXTERNAL_VALIDATION_FAILED",
+        error_message: message.slice(0, 1_000),
+      } as never);
+      const status = await retryExternalReviewTask(
+        task,
+        input.lease_started_at,
+        message,
+      );
+      return { accepted: status !== "STALE", status };
+    }
+    extraction = validation.value;
+    await supabaseAdmin.from("llm_processing_runs").insert({
+      provider: "NVIDIA",
+      model: (input.model || "external-nemotron").slice(0, 200),
+      operation: "VACANCY_EXTRACTION",
+      source_id: input.source_id,
+      raw_page_id: raw.id,
+      content_hash: raw.content_hash,
+      status: "SUCCESS",
+      completed_at: new Date().toISOString(),
+      input_characters: Math.min(
+        20_000,
+        Math.max(0, Math.round(input.input_characters ?? 0)),
+      ),
+      output_characters: Math.min(
+        20_000,
+        Math.max(0, Math.round(input.output_characters ?? 0)),
+      ),
+      latency_ms: boundedResponseTime(input.latency_ms),
+      result: extraction as never,
+    } as never);
+  }
+
+  const outcome = await normalizeSource(input.source_id, {
+    provided: true,
+    extraction,
+    model: input.model ?? null,
+  });
+  if (outcome.status === "FAILED") {
+    const status = await retryExternalReviewTask(
+      task,
+      input.lease_started_at,
+      outcome.reason ?? "Canonical vacancy normalization failed",
+    );
+    return { accepted: status !== "STALE", status, outcome };
+  }
+  const { data: completed } = await supabaseAdmin
+    .from("ingestion_tasks")
+    .update({
+      status: "COMPLETE",
+      completed_at: new Date().toISOString(),
+      started_at: null,
+      last_error: outcome.reason ?? null,
+    })
+    .eq("id", task.id)
+    .eq("status", "PROCESSING")
+    .eq("started_at", input.lease_started_at)
+    .select("id")
+    .maybeSingle();
+  return {
+    accepted: Boolean(completed),
+    status: completed ? "COMPLETE" : "STALE",
+    outcome,
+  };
+}
+
 export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const started = Date.now();
   const { data: source, error } = await supabaseAdmin
     .from("sources")
-    .select("id, url, institution_id, adapter_key, category, refresh_frequency_hours")
+    .select(
+      "id, url, institution_id, adapter_key, category, refresh_frequency_hours",
+    )
     .eq("id", sourceId)
     .maybeSingle();
   if (error) throw error;
   if (!source) throw new Error(`Source ${sourceId} not found`);
 
-  const recordRun = async (success: boolean, changed: boolean, errorMessage: string | null) => {
+  const recordRun = async (
+    success: boolean,
+    changed: boolean,
+    errorMessage: string | null,
+  ) => {
     await supabaseAdmin.from("sync_runs").insert({
       source_id: source.id,
       adapter_key: source.adapter_key ?? "html-generic",
@@ -1760,11 +2459,17 @@ export async function fetchSource(sourceId: string): Promise<FetchOutcome> {
   const structured = extractStructuredSnapshot(html, finalUrl);
   const text = extractText(html);
   const hash = await sha256(text);
-  let { classification, confidence } = classifyUrlAndText(finalUrl, title ?? "", text);
+  let { classification, confidence } = classifyUrlAndText(
+    finalUrl,
+    title ?? "",
+    text,
+  );
   const detailKind = detailKindFromAdapter(source.adapter_key);
   if (
     detailKind &&
-    (classification === "GENERAL" || classification === "UNKNOWN" || confidence < 0.5)
+    (classification === "GENERAL" ||
+      classification === "UNKNOWN" ||
+      confidence < 0.5)
   ) {
     classification = detailKind;
     confidence = Math.max(confidence, 0.72);
@@ -1904,7 +2609,8 @@ function parseDeadline(text: string): string | null {
   const scope = cue ? windowText.slice(cue.index, cue.index + 200) : "";
   const m = DATE_RE.exec(scope);
   if (!m) return null;
-  if (m[3]) return `${m[3]}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}`;
+  if (m[3])
+    return `${m[3]}-${String(m[2]).padStart(2, "0")}-${String(m[1]).padStart(2, "0")}`;
   if (m[4]) return `${m[4]}-${m[5]}-${m[6]}`;
   return null;
 }
@@ -1922,7 +2628,9 @@ function slugify(s: string): string {
 function deriveStatus(deadline: string | null, rolling: boolean): string {
   if (rolling) return "rolling";
   if (!deadline) return "possibly_open";
-  const days = Math.ceil((new Date(`${deadline}T00:00:00Z`).getTime() - Date.now()) / 86_400_000);
+  const days = Math.ceil(
+    (new Date(`${deadline}T00:00:00Z`).getTime() - Date.now()) / 86_400_000,
+  );
   if (days < 0) return "closed";
   if (days <= 14) return "closing_soon";
   return "open";
@@ -1949,6 +2657,15 @@ const ROLE_TITLE =
 /** A real posting reads like a job ad. */
 const POSTING_BODY =
   /(application deadline|apply by|closing date|deadline for applications|bewerbungsfrist|bewerbungen? bis|reference number|kennziffer|ref\.? no|job id|requisition|full[- ]time|part[- ]time|vollzeit|teilzeit|fixed[- ]term|befristet|salary|remuneration|entgeltgruppe|verg[uü]tung|tv-?l|tv-?[oö]d|e ?13|start(ing)? date|eintrittstermin|your (tasks|profile|responsibilities)|ihre aufgaben|ihr profil|we offer|wir bieten|required qualifications|qualification[s]? required|how to apply|submit your application|bewerbungsunterlagen)/i;
+const STRONG_GEOSPATIAL =
+  /(photogrammetr|remote sensing|fernerkundung|geoinformat|geospatial|geographic information systems?|\bgis\b|geodes[yi]|geomatic|earth observation|geoai|lidar|laser scann|point cloud|punktwolke|synthetic aperture radar|\bsar\b|spatial data|surveying|cartograph|mapping|satellite imagery)/i;
+
+export function hasStrongGeospatialEvidence(
+  title: string,
+  text: string,
+): boolean {
+  return STRONG_GEOSPATIAL.test(`${title}\n${text.slice(0, 12_000)}`);
+}
 
 /**
  * True only when a fetched page really is ONE vacancy posting.
@@ -1964,9 +2681,15 @@ export function looksLikeSinglePosting(
   const body = text || "";
   const path = pathOf(url);
   if (!t) return { ok: false, reason: "no title" };
-  if (LISTING_TITLE.test(t)) return { ok: false, reason: "careers listing/landing page title" };
-  if (NON_POSTING.test(t)) return { ok: false, reason: "marketing/resource page, not a posting" };
-  if (/^\/?(careers?|jobs?|vacancies|stellenangebote|stellen|recruitment)\/?$/i.test(path)) {
+  if (LISTING_TITLE.test(t))
+    return { ok: false, reason: "careers listing/landing page title" };
+  if (NON_POSTING.test(t))
+    return { ok: false, reason: "marketing/resource page, not a posting" };
+  if (
+    /^\/?(careers?|jobs?|vacancies|stellenangebote|stellen|recruitment)\/?$/i.test(
+      path,
+    )
+  ) {
     return { ok: false, reason: "careers index path" };
   }
   if (
@@ -1976,14 +2699,26 @@ export function looksLikeSinglePosting(
   ) {
     return { ok: false, reason: "policy or hiring-information path" };
   }
-  if (body.length < 600) return { ok: false, reason: "page too thin to be a posting" };
-  if (!ROLE_TITLE.test(t)) return { ok: false, reason: "title does not name a role" };
+  if (body.length < 600)
+    return { ok: false, reason: "page too thin to be a posting" };
+  if (!ROLE_TITLE.test(t))
+    return { ok: false, reason: "title does not name a role" };
   if (!POSTING_BODY.test(body))
-    return { ok: false, reason: "no job-ad signals (deadline, contract, tasks, salary)" };
+    return {
+      ok: false,
+      reason: "no job-ad signals (deadline, contract, tasks, salary)",
+    };
   return { ok: true };
 }
 
-export async function normalizeSource(sourceId: string): Promise<NormalizeResult> {
+export async function normalizeSource(
+  sourceId: string,
+  externalReview?: {
+    provided: true;
+    extraction: VacancyExtraction | null;
+    model?: string | null;
+  },
+): Promise<NormalizeResult> {
   const { data: raw } = await supabaseAdmin
     .from("raw_records")
     .select(
@@ -2011,12 +2746,16 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       await mark("SKIPPED", "no page title to extract from");
       return { status: "SKIPPED", reason: "no page title" };
     }
-    const { normalizeNonVacancy } = await import("./extraction/canonical.server");
+    const { normalizeNonVacancy } =
+      await import("./extraction/canonical.server");
     const outcome = await normalizeNonVacancy(
       raw,
       rawTitle.split(/\s*[|·–—]\s*/)[0]?.trim() || rawTitle,
     );
-    await mark(outcome.status, outcome.status === "NORMALIZED" ? null : (outcome.reason ?? null));
+    await mark(
+      outcome.status,
+      outcome.status === "NORMALIZED" ? null : (outcome.reason ?? null),
+    );
     if (outcome.status === "NORMALIZED" && outcome.entity_id) {
       const typeByClass: Record<string, "project" | "researcher" | "event"> = {
         PROJECT: "project",
@@ -2036,13 +2775,21 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     await mark("FAILED", "missing institution");
     return { status: "FAILED", reason: "missing institution" };
   }
+  const { data: institution } = await supabaseAdmin
+    .from("institutions")
+    .select("name, institution_type")
+    .eq("id", raw.institution_id)
+    .maybeSingle();
   const title = (raw.page_title ?? "")
     // Strip site chrome that job portals append to <title>.
     .replace(
       /\s*[|·–—-]\s*[^|·–—-]*(university|universit\u00e4t|hochschule|institut\w*|careers?|karriere)[^|·–—-]*$/gi,
       "",
     )
-    .replace(/\s*(job\s*details?|stellendetails|stellenanzeige|job\s*description)\s*$/i, "")
+    .replace(
+      /\s*(job\s*details?|stellendetails|stellenanzeige|job\s*description)\s*$/i,
+      "",
+    )
     .trim();
   if (!title) {
     await mark("FAILED", "missing title");
@@ -2053,13 +2800,18 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   const gate = looksLikeSinglePosting(raw.final_url ?? "", title, text);
   if (!gate.ok) {
     await mark("SKIPPED", `not a single vacancy posting: ${gate.reason}`);
-    return { status: "SKIPPED", reason: `not a single vacancy posting: ${gate.reason}` };
+    return {
+      status: "SKIPPED",
+      reason: `not a single vacancy posting: ${gate.reason}`,
+    };
   }
-  const rolling = /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
+  const rolling =
+    /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
   const deterministicDeadline = parseDeadline(text);
   // Only the posting's own title decides the type: body text mentioning a
   // doctoral programme must not turn a staff role into a PhD position.
-  const isPhd = /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
+  const isPhd =
+    /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
   const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
 
   // Fast path: an official single-posting page with an explicit deadline or
@@ -2067,24 +2819,42 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
   // exists. Nemotron is reserved for ambiguous postings that need semantic
   // interpretation. This keeps verification source-backed and dramatically
   // reduces model calls.
-  const structuredJob = structuredVacancyFromPayload(raw.payload, raw.final_url ?? "");
+  const structuredJob = structuredVacancyFromPayload(
+    raw.payload,
+    raw.final_url ?? "",
+  );
   const structuredDeadline = structuredJob?.application_deadline ?? null;
-  const deterministicEnough = Boolean(structuredJob || deterministicDeadline || rolling);
+  const deterministicEvidence = Boolean(
+    structuredJob || deterministicDeadline || rolling,
+  );
+  const deterministicEnough =
+    deterministicEvidence && hasStrongGeospatialEvidence(title, text);
 
-  let ex: Awaited<
-    ReturnType<(typeof import("./extraction/enrich.server"))["enrichVacancy"]>
-  >["extraction"] = null;
+  let ex: VacancyExtraction | null = externalReview?.extraction ?? null;
   if (!deterministicEnough) {
-    const { enrichVacancy } = await import("./extraction/enrich.server");
-    const enriched = await enrichVacancy({
-      url: raw.final_url ?? "",
-      title,
-      text,
-      sourceId: raw.source_id,
-      rawRecordId: raw.id,
-      contentHash: raw.content_hash,
-    });
-    ex = enriched.extraction;
+    if (!externalReview?.provided) {
+      const { enrichVacancy } = await import("./extraction/enrich.server");
+      const enriched = await enrichVacancy({
+        url: raw.final_url ?? "",
+        title,
+        text,
+        sourceId: raw.source_id,
+        rawRecordId: raw.id,
+        contentHash: raw.content_hash,
+      });
+      ex = enriched.extraction;
+    }
+    if (!ex) {
+      await mark(
+        "FAILED",
+        "semantic vacancy review is required but no validated result is available",
+      );
+      return {
+        status: "FAILED",
+        reason:
+          "semantic vacancy review is required but no validated result is available",
+      };
+    }
     if (ex && !ex.is_single_real_position) {
       await mark(
         "SKIPPED",
@@ -2095,14 +2865,75 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
         reason: `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`,
       };
     }
+    if (!ex.geospatial_relevance) {
+      await mark(
+        "SKIPPED",
+        "intelligence engine rejected: role is not geospatially relevant",
+      );
+      return { status: "SKIPPED", reason: "role is not geospatially relevant" };
+    }
+    if (ex.confidence < 0.65) {
+      await mark(
+        "SKIPPED",
+        `intelligence engine confidence too low (${ex.confidence.toFixed(2)})`,
+      );
+      return {
+        status: "SKIPPED",
+        reason: `intelligence engine confidence too low (${ex.confidence.toFixed(2)})`,
+      };
+    }
+    if (!evidenceIsSupported(ex, text)) {
+      await mark(
+        "FAILED",
+        "model evidence is missing or not supported by the fetched page",
+      );
+      return {
+        status: "FAILED",
+        reason:
+          "model evidence is missing or not supported by the fetched page",
+      };
+    }
   }
 
-  const deadline = deterministicDeadline ?? structuredDeadline ?? ex?.application_deadline ?? null;
+  const deadline =
+    deterministicDeadline ??
+    structuredDeadline ??
+    ex?.application_deadline ??
+    null;
   const status = deriveStatus(deadline, rolling);
-  const usedModel = Boolean(ex);
+  const usedModel = !deterministicEnough && Boolean(ex);
   const usedStructured = Boolean(structuredJob);
   const verifiedAt = deterministicEnough ? new Date().toISOString() : null;
-  const verificationStatus = deterministicEnough ? "verified" : "auto_discovered";
+  const verificationStatus = deterministicEnough
+    ? "verified"
+    : ex && ex.confidence >= 0.86
+      ? "auto_discovered"
+      : "needs_review";
+
+  const safeApplicationUrl = (() => {
+    const candidate =
+      ex?.application_url ?? structuredJob?.application_url ?? null;
+    if (!candidate) return raw.final_url;
+    try {
+      const application = new URL(candidate, raw.final_url ?? undefined);
+      if (!/^https?:$/.test(application.protocol)) return raw.final_url;
+      const source = new URL(raw.final_url ?? application.toString());
+      const supported =
+        application.host === source.host ||
+        text.includes(candidate) ||
+        text.includes(application.toString());
+      return supported ? application.toString() : raw.final_url;
+    } catch {
+      return raw.final_url;
+    }
+  })();
+  const sector =
+    institution?.institution_type === "company"
+      ? "industry"
+      : institution?.institution_type &&
+          institution.institution_type !== "other"
+        ? "academic"
+        : (ex?.sector ?? "industry");
 
   const { data: existing } = await supabaseAdmin
     .from("opportunities")
@@ -2128,9 +2959,14 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     slug: uniqueSlug,
     normalized_title: title.toLowerCase().slice(0, 300),
     institution_id: raw.institution_id,
-    opportunity_type: (ex?.opportunity_type ?? (isPhd ? "phd" : "other")) as string as never,
-    sector: ex?.sector ?? "academic",
-    description: (ex?.summary ?? structuredJob?.description ?? text).slice(0, 2000),
+    employer_name: institution?.name ?? null,
+    opportunity_type: (ex?.opportunity_type ??
+      (isPhd ? "phd" : "other")) as string as never,
+    sector,
+    description: (ex?.summary ?? structuredJob?.description ?? text).slice(
+      0,
+      2000,
+    ),
     requirements: ex?.requirements ?? null,
     funding_type: ex?.funding_type ?? null,
     salary_text: ex?.salary_text ?? null,
@@ -2138,10 +2974,14 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
     city: ex?.city ?? structuredJob?.city ?? null,
     country: ex?.country ?? structuredJob?.country ?? null,
     start_date: ex?.start_date ?? structuredJob?.start_date ?? null,
-    application_url: ex?.application_url ?? structuredJob?.application_url ?? raw.final_url,
+    application_url: safeApplicationUrl,
     official_source_url: raw.final_url,
     status: status as never,
-    confidence: (usedStructured ? "high" : deterministicEnough ? "medium" : "low") as never,
+    confidence: (deterministicEnough && usedStructured
+      ? "high"
+      : deterministicEnough || (ex?.confidence ?? 0) >= 0.86
+        ? "medium"
+        : "low") as never,
     verification_status: verificationStatus as never,
     last_checked_at: new Date().toISOString(),
     last_verified_at: verifiedAt,
@@ -2152,14 +2992,19 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       : usedStructured
         ? "STRUCTURED_METADATA"
         : "DETERMINISTIC",
-    extraction_model: usedModel ? "nvidia/nemotron-3-ultra-550b-a55b" : null,
+    extraction_model: usedModel
+      ? (externalReview?.model ?? "nvidia/nemotron-routed")
+      : null,
     extraction_confidence: ex?.confidence ?? null,
     extraction_timestamp: usedModel ? new Date().toISOString() : null,
   };
 
   let entityId = existing?.id;
   if (entityId) {
-    const { error } = await supabaseAdmin.from("opportunities").update(payload).eq("id", entityId);
+    const { error } = await supabaseAdmin
+      .from("opportunities")
+      .update(payload)
+      .eq("id", entityId);
     if (error) {
       await mark("FAILED", error.message);
       return { status: "FAILED", reason: error.message };
@@ -2203,7 +3048,7 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       original_title: raw.page_title,
       claim: "Vacancy page fetched from the institution's own website",
       verification_status: verificationStatus as never,
-      confidence: (usedStructured ? "high" : "medium") as never,
+      confidence: (deterministicEnough && usedStructured ? "high" : "medium") as never,
       is_primary: true,
       last_checked_at: new Date().toISOString(),
       last_verified_at: verifiedAt,
@@ -2215,7 +3060,10 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
         ...evidencePayload,
       });
     } else {
-      await supabaseAdmin.from("record_sources").update(evidencePayload).eq("id", evidence.id);
+      await supabaseAdmin
+        .from("record_sources")
+        .update(evidencePayload)
+        .eq("id", evidence.id);
     }
   }
 
@@ -2229,7 +3077,8 @@ export async function normalizeSource(sourceId: string): Promise<NormalizeResult
       .limit(50);
     const twin = (twins ?? []).find(
       (t) =>
-        t.normalized_title && payload.normalized_title.startsWith(t.normalized_title.slice(0, 25)),
+        t.normalized_title &&
+        payload.normalized_title.startsWith(t.normalized_title.slice(0, 25)),
     );
     if (twin) {
       const { data: known } = await supabaseAdmin
