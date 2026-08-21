@@ -696,8 +696,7 @@ export const claimAdminRole = createServerFn({ method: "POST" })
       .split(",")
       .map((value) => value.trim().toLowerCase())
       .filter(Boolean);
-    const email =
-      typeof context.claims.email === "string" ? context.claims.email.toLowerCase() : "";
+    const email = typeof context.claims.email === "string" ? context.claims.email.toLowerCase() : "";
     if (allowed.length === 0) {
       throw new Error("Admin bootstrap is disabled until ADMIN_BOOTSTRAP_EMAILS is configured");
     }
