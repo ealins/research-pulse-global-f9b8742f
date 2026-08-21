@@ -8,6 +8,10 @@ import {
   canonicalCountry,
   countrySlug,
 } from "@/lib/public-data";
+import {
+  PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  PUBLIC_SUPABASE_URL,
+} from "@/integrations/supabase/public-config";
 
 const BASE_URL = "https://geoacademic.app";
 
@@ -42,8 +46,8 @@ export const Route = createFileRoute("/sitemap.xml")({
       GET: async () => {
         const entries: SitemapEntry[] = [...STATIC_ENTRIES];
 
-        const url = import.meta.env["VITE_SUPABASE_URL"];
-        const key = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"];
+        const url = import.meta.env["VITE_SUPABASE_URL"] || PUBLIC_SUPABASE_URL;
+        const key = import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] || PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
         if (url && key) {
           const supabase = createClient(url, key, {
