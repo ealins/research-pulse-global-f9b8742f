@@ -5,6 +5,9 @@
  * Lovable only leases tasks and persists compact validated snapshots, keeping
  * expensive and long-running network work outside the web application.
  */
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
+
 const BASE_URL = (
   process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
 ).replace(/\/$/, "");
@@ -121,17 +124,89 @@ async function callHook(action, payload = {}, timeoutMs = 60_000) {
   }
 }
 
+function isPrivateAddress(address) {
+  const normalized = address.toLowerCase().split("%")[0];
+  if (normalized.startsWith("::ffff:"))
+    return isPrivateAddress(normalized.slice(7));
+  if (isIP(normalized) === 4) {
+    const [a, b] = normalized.split(".").map(Number);
+    return (
+      a === 0 ||
+      a === 10 ||
+      a === 127 ||
+      (a === 100 && b >= 64 && b <= 127) ||
+      (a === 169 && b === 254) ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      a >= 224
+    );
+  }
+  if (isIP(normalized) === 6) {
+    return (
+      normalized === "::" ||
+      normalized === "::1" ||
+      normalized.startsWith("fc") ||
+      normalized.startsWith("fd") ||
+      /^fe[89ab]/.test(normalized)
+    );
+  }
+  return true;
+}
+
+const dnsCache = new Map();
+
+async function assertPublicUrl(value) {
+  const url = new URL(value);
+  if (!/^https?:$/.test(url.protocol))
+    throw new Error(`Unsupported URL protocol: ${url.protocol}`);
+  if (url.username || url.password)
+    throw new Error("Credential-bearing URLs are not allowed");
+  const host = url.hostname.toLowerCase();
+  if (
+    host === "localhost" ||
+    host.endsWith(".localhost") ||
+    host.endsWith(".local")
+  ) {
+    throw new Error("Local network URL is not allowed");
+  }
+  let addresses = dnsCache.get(host);
+  if (!addresses || addresses.expiresAt <= Date.now()) {
+    const resolved = isIP(host)
+      ? [{ address: host }]
+      : await lookup(host, { all: true, verbatim: true });
+    addresses = {
+      values: resolved.map((entry) => entry.address),
+      expiresAt: Date.now() + 10 * 60_000,
+    };
+    dnsCache.set(host, addresses);
+  }
+  if (!addresses.values.length || addresses.values.some(isPrivateAddress)) {
+    throw new Error("Private or unresolvable network target is not allowed");
+  }
+  return url;
+}
+
 async function fetchWithTimeout(url, init = {}) {
-  return fetch(url, {
-    ...init,
-    redirect: "follow",
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    headers: {
-      "user-agent": USER_AGENT,
-      accept: "text/html,application/xhtml+xml,text/plain;q=0.8",
-      ...(init.headers || {}),
-    },
-  });
+  let current = (await assertPublicUrl(url)).toString();
+  for (let redirects = 0; redirects <= 5; redirects += 1) {
+    const response = await fetch(current, {
+      ...init,
+      redirect: "manual",
+      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+      headers: {
+        "user-agent": USER_AGENT,
+        accept: "text/html,application/xhtml+xml,text/plain;q=0.8",
+        ...(init.headers || {}),
+      },
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    if (!location) return response;
+    current = (
+      await assertPublicUrl(new URL(location, current).toString())
+    ).toString();
+  }
+  throw new Error("Too many redirects");
 }
 
 const robotsCache = new Map();
