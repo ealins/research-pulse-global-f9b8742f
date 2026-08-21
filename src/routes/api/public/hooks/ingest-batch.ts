@@ -1,5 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type { ExternalFetchCompletion } from "@/lib/ingest.server";
+import type {
+  ExternalFetchCompletion,
+  ExternalReviewCompletion,
+} from "@/lib/ingest.server";
 
 type Body = {
   action?:
@@ -13,11 +16,15 @@ type Body = {
     | "sync-pulse"
     | "reseed-high-value"
     | "recover-detail-sources"
+    | "worker-status"
     | "lease-fetch"
-    | "complete-fetch";
+    | "complete-fetch"
+    | "lease-review"
+    | "complete-review";
   limit?: number;
   trigger?: string;
-  completion?: ExternalFetchCompletion;
+  model_available?: boolean;
+  completion?: ExternalFetchCompletion | ExternalReviewCompletion;
 };
 
 function json(payload: unknown, status = 200) {
@@ -48,13 +55,15 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
       POST: async ({ request }) => {
         const expected = process.env["INGESTION_HOOK_SECRET"] ?? "";
         if (!expected) {
-          console.error("[ingestion-hook] INGESTION_HOOK_SECRET is not configured");
+          console.error(
+            "[ingestion-hook] INGESTION_HOOK_SECRET is not configured",
+          );
           return json({ error: "Ingestion hook is not configured" }, 503);
         }
         const authorization = request.headers.get("authorization") ?? "";
         const supplied = authorization.startsWith("Bearer ")
           ? authorization.slice("Bearer ".length)
-          : request.headers.get("x-ingestion-secret") ?? "";
+          : (request.headers.get("x-ingestion-secret") ?? "");
         if (!safeEqual(supplied, expected)) {
           return json({ error: "Unauthorized" }, 401);
         }
@@ -68,7 +77,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         const action = body.action ?? "drain";
         const limit = Math.min(50, Math.max(1, body.limit ?? 8));
 
-        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        const { supabaseAdmin } =
+          await import("@/integrations/supabase/client.server");
         const { enqueue, runQueueBatch } = await import("@/lib/ingest.server");
 
         if (action === "enqueue-discovery") {
@@ -76,7 +86,9 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             .from("sources")
             .select("institution_id")
             .not("institution_id", "is", null);
-          const covered = new Set((withSources ?? []).map((r) => r.institution_id as string));
+          const covered = new Set(
+            (withSources ?? []).map((r) => r.institution_id as string),
+          );
 
           const { data: pendingTasks } = await supabaseAdmin
             .from("ingestion_tasks")
@@ -98,8 +110,10 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           const backlog = (institutions ?? [])
             .filter((i) => !covered.has(i.id))
             .sort((a, b) => {
-              const score = (i: { research_url: string | null; careers_url: string | null }) =>
-                (i.research_url ? 2 : 0) + (i.careers_url ? 1 : 0);
+              const score = (i: {
+                research_url: string | null;
+                careers_url: string | null;
+              }) => (i.research_url ? 2 : 0) + (i.careers_url ? 1 : 0);
               return score(b) - score(a);
             });
           const targets = backlog.slice(0, limit);
@@ -118,11 +132,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         // already stored; the autonomous drain loop does the processing.
         if (action === "backfill-raw") {
           const { enqueueRawBackfill } = await import("@/lib/backfill.server");
-          const result = await enqueueRawBackfill(Math.min(1000, Math.max(1, body.limit ?? 400)));
+          const result = await enqueueRawBackfill(
+            Math.min(1000, Math.max(1, body.limit ?? 400)),
+          );
           return json({ action, ...result });
         }
         if (action === "backfill-providers") {
-          const { enqueueProviderBackfill } = await import("@/lib/backfill.server");
+          const { enqueueProviderBackfill } =
+            await import("@/lib/backfill.server");
           const result = await enqueueProviderBackfill(
             Math.min(400, Math.max(1, body.limit ?? 120)),
           );
@@ -131,12 +148,15 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
         if (action === "sync-pulse") {
           const { backfillPulseEvents } = await import("@/lib/pulse.server");
-          const result = await backfillPulseEvents(Math.min(250, Math.max(10, body.limit ?? 120)));
+          const result = await backfillPulseEvents(
+            Math.min(250, Math.max(10, body.limit ?? 120)),
+          );
           return json({ action, ...result });
         }
 
         if (action === "reseed-high-value") {
-          const { enqueueHighValueReseed } = await import("@/lib/ingest.server");
+          const { enqueueHighValueReseed } =
+            await import("@/lib/ingest.server");
           const result = await enqueueHighValueReseed(
             Math.min(300, Math.max(10, body.limit ?? 150)),
           );
@@ -144,7 +164,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         }
 
         if (action === "recover-detail-sources") {
-          const { enqueueExistingDetailRecovery } = await import("@/lib/ingest.server");
+          const { enqueueExistingDetailRecovery } =
+            await import("@/lib/ingest.server");
           const result = await enqueueExistingDetailRecovery(
             Math.min(1000, Math.max(10, body.limit ?? 300)),
           );
@@ -153,20 +174,66 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
         // Expensive network fetching runs on the persistent worker. The app
         // only leases bounded tasks and stores validated, compact snapshots.
+        if (action === "worker-status") {
+          const { getExternalWorkerStatus } =
+            await import("@/lib/ingest.server");
+          return json({ action, ...(await getExternalWorkerStatus()) });
+        }
         if (action === "lease-fetch") {
-          const { leaseExternalFetchTasks } = await import("@/lib/ingest.server");
+          const { getExternalWorkerStatus, leaseExternalFetchTasks } =
+            await import("@/lib/ingest.server");
+          const worker = await getExternalWorkerStatus();
+          if (worker.fetch_paused) {
+            return json({
+              action,
+              leases: [],
+              count: 0,
+              paused: true,
+              reason:
+                "vacancy review backlog reached the safety high-water mark",
+              worker,
+            });
+          }
           const leases = await leaseExternalFetchTasks(
             Math.min(20, Math.max(1, body.limit ?? 8)),
           );
-          return json({ action, leases, count: leases.length });
+          return json({ action, leases, count: leases.length, worker });
         }
         if (action === "complete-fetch") {
           if (!body.completion || typeof body.completion !== "object") {
             return json({ error: "Missing completion payload" }, 400);
           }
           const { completeExternalFetch } = await import("@/lib/ingest.server");
-          const result = await completeExternalFetch(body.completion);
-          return json({ action, ...result }, result.status === "STALE" ? 409 : 200);
+          const result = await completeExternalFetch(
+            body.completion as ExternalFetchCompletion,
+          );
+          return json(
+            { action, ...result },
+            result.status === "STALE" ? 409 : 200,
+          );
+        }
+        if (action === "lease-review") {
+          const { leaseExternalReviewTasks } =
+            await import("@/lib/ingest.server");
+          const leases = await leaseExternalReviewTasks(
+            Math.min(10, Math.max(1, body.limit ?? 4)),
+            body.model_available === true,
+          );
+          return json({ action, leases, count: leases.length });
+        }
+        if (action === "complete-review") {
+          if (!body.completion || typeof body.completion !== "object") {
+            return json({ error: "Missing completion payload" }, 400);
+          }
+          const { completeExternalReview } =
+            await import("@/lib/ingest.server");
+          const result = await completeExternalReview(
+            body.completion as ExternalReviewCompletion,
+          );
+          return json(
+            { action, ...result },
+            result.status === "STALE" ? 409 : 200,
+          );
         }
 
         // Structured-provider drain (ROR/OpenAIRE/Crossref). Never calls a model,
@@ -185,31 +252,42 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         // Only sources whose own cadence is due are queued.
         if (action === "refresh-due") {
           const { enqueueDueRefreshes } = await import("@/lib/schedule.server");
-          const result = await enqueueDueRefreshes(Math.min(200, Math.max(1, body.limit ?? 40)));
+          const result = await enqueueDueRefreshes(
+            Math.min(200, Math.max(1, body.limit ?? 40)),
+          );
           return json({ action, ...result });
         }
 
         // Deterministic deadline maintenance — pure date arithmetic, no model call.
         if (action === "deadline-sweep") {
-          const { sweepOpportunityDeadlines } = await import("@/lib/schedule.server");
+          const { sweepOpportunityDeadlines } =
+            await import("@/lib/schedule.server");
           const result = await sweepOpportunityDeadlines();
           return json({ action, ...result });
         }
 
         // Queue processing: waking up is cheap, working is not. Check first.
-        const { loadSchedule, readQueueState } = await import("@/lib/schedule.server");
+        const { loadSchedule, readQueueState } =
+          await import("@/lib/schedule.server");
         const schedule = await loadSchedule();
         const queueState = await readQueueState(schedule);
 
         if (queueState.due_tasks === 0) {
           // Nothing to do: no fetch, no extraction, no NVIDIA call.
-          return json({ action: "drain", skipped: true, reason: "queue empty", ...queueState });
+          return json({
+            action: "drain",
+            skipped: true,
+            reason: "queue empty",
+            ...queueState,
+          });
         }
 
         // In steady state the processor only works every steady_interval_minutes
         // even though the scheduler wakes on the backlog cadence.
         if (queueState.mode === "STEADY_STATE") {
-          const cutoff = new Date(Date.now() - queueState.interval_minutes * 60_000).toISOString();
+          const cutoff = new Date(
+            Date.now() - queueState.interval_minutes * 60_000,
+          ).toISOString();
           const { data: recent } = await supabaseAdmin
             .from("pipeline_runs")
             .select("id")
@@ -227,7 +305,10 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           }
         }
 
-        const batch = Math.min(50, Math.max(1, body.limit ?? queueState.batch_size));
+        const batch = Math.min(
+          50,
+          Math.max(1, body.limit ?? queueState.batch_size),
+        );
 
         // Every autonomous tick is recorded so /admin/pipeline-health can prove
         // that scheduled processing is really running.
@@ -251,9 +332,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           // NVIDIA concurrency fixed at 2, but keep draining cheap deterministic
           // rejects within the same cron invocation. A wall-clock budget prevents
           // one model-heavy tick from running indefinitely or hammering a busy API.
-          const normalizeTarget = queueState.mode === "BACKLOG" ? 40 : Math.min(2, batch);
-          const normalizeWave = queueState.mode === "BACKLOG" ? 8 : Math.min(2, batch);
-          const normalizeBudgetMs = queueState.mode === "BACKLOG" ? 70_000 : 30_000;
+          const normalizeTarget =
+            queueState.mode === "BACKLOG" ? 40 : Math.min(2, batch);
+          const normalizeWave =
+            queueState.mode === "BACKLOG" ? 8 : Math.min(2, batch);
+          const normalizeBudgetMs =
+            queueState.mode === "BACKLOG" ? 70_000 : 30_000;
           const emptyResult = () => ({
             processed: 0,
             ok: 0,
@@ -272,7 +356,11 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             Date.now() - startedAt.getTime() < normalizeBudgetMs
           ) {
             const remaining = normalizeTarget - result.processed;
-            const wave = await runQueueBatch(Math.min(normalizeWave, remaining), ["NORMALIZE"], 2);
+            const wave = await runQueueBatch(
+              Math.min(normalizeWave, remaining),
+              ["NORMALIZE"],
+              2,
+            );
             normalizeWaves += 1;
             result.processed += wave.processed;
             result.ok += wave.ok;
@@ -291,7 +379,9 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           if (result.processed === 0) {
             taskGroup = "FETCH_DISCOVER";
             const externalFetchWorker =
-              (process.env["EXTERNAL_FETCH_WORKER_ENABLED"] ?? "").toLowerCase() === "true";
+              (
+                process.env["EXTERNAL_FETCH_WORKER_ENABLED"] ?? ""
+              ).toLowerCase() === "true";
             const collection = await runQueueBatch(
               batch,
               externalFetchWorker ? ["DISCOVER"] : ["FETCH", "DISCOVER"],
@@ -324,11 +414,15 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
                 errors: result.failed + result.dead,
                 details: {
                   mode: queueState.mode,
-                  batch_size: taskGroup === "NORMALIZE" ? normalizeTarget : batch,
+                  batch_size:
+                    taskGroup === "NORMALIZE" ? normalizeTarget : batch,
                   task_group: taskGroup,
-                  normalize_waves: taskGroup === "NORMALIZE" ? normalizeWaves : 0,
-                  normalize_target: taskGroup === "NORMALIZE" ? normalizeTarget : 0,
-                  normalize_budget_ms: taskGroup === "NORMALIZE" ? normalizeBudgetMs : 0,
+                  normalize_waves:
+                    taskGroup === "NORMALIZE" ? normalizeWaves : 0,
+                  normalize_target:
+                    taskGroup === "NORMALIZE" ? normalizeTarget : 0,
+                  normalize_budget_ms:
+                    taskGroup === "NORMALIZE" ? normalizeBudgetMs : 0,
                   normalized: result.normalized,
                   skipped: result.skipped,
                   sample: result.details.slice(0, 20),
