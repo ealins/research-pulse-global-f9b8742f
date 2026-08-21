@@ -40,3 +40,8 @@ jobs:
           INGESTION_BURST_MODE: "true"
           INGESTION_WORKER_TRIGGER: "github-actions-fetch"
         run: node scripts/ingestion-worker.mjs
+      - name: Review newly fetched job pages
+        env:
+          REVIEW_RUNTIME_MS: "30000"
+          REVIEW_LEASE_LIMIT: "2"
+        run: node scripts/job-review-worker.mjs
