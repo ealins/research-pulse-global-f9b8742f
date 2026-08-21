@@ -1,7 +1,14 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  LIVE_OPPORTUNITY_STATUSES,
+  PUBLIC_CONFIDENCE_LEVELS,
+  PUBLIC_VERIFICATION_STATUSES,
+  canonicalCountry,
+  countryVariants,
+} from "@/lib/public-data";
 
-export const LIVE_STATUSES = ["open", "closing_soon", "rolling", "possibly_open"] as const;
+export const LIVE_STATUSES = LIVE_OPPORTUNITY_STATUSES;
 
 export const KIND_LABEL: Record<string, string> = {
   conference: "Conference",
@@ -20,6 +27,7 @@ export const SECTOR_LABEL: Record<string, string> = {
 export function eventDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["event-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data: event, error } = await supabase
         .from("events")
@@ -27,10 +35,11 @@ export function eventDetailQuery(slug: string) {
           `id, title, slug, organization, location, country, start_date, end_date,
            abstract_deadline, paper_deadline, registration_deadline, website, recurrence,
            summary, source, event_kind, verification_status, confidence, last_verified_at, is_demo,
-           event_topics ( research_topics ( name, slug, category ) )`,
+           event_topics!inner ( research_topics ( name, slug, category ) )`,
         )
         .eq("slug", slug)
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .maybeSingle();
       if (error) throw error;
       if (!event) return null;
@@ -42,17 +51,24 @@ export function eventDetailQuery(slug: string) {
       const [siblings, calls] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, slug, start_date, location, event_kind")
+          .select("id, title, slug, start_date, location, event_kind, event_topics!inner(topic_id)")
           .neq("slug", slug)
           .eq("is_demo", false)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+          .gte("start_date", new Date().toISOString().slice(0, 10))
           .order("start_date", { ascending: true, nullsFirst: false })
           .limit(8),
         event.country
           ? supabase
               .from("opportunities")
-              .select("id, title, slug, sector, status, application_deadline, employer_name")
-              .eq("country", event.country)
+              .select(
+                "id, title, slug, sector, status, application_deadline, employer_name, official_source_url, opportunity_topics!inner(topic_id)",
+              )
+              .in("country", countryVariants(event.country))
               .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+              .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+              .not("official_source_url", "is", null)
               .in(
                 "status",
                 LIVE_STATUSES as unknown as (
@@ -64,7 +80,14 @@ export function eventDetailQuery(slug: string) {
           : Promise.resolve({ data: [], error: null }),
       ]);
 
-      return { event, topicIds, siblings: siblings.data ?? [], calls: calls.data ?? [] };
+      if (siblings.error) throw siblings.error;
+      if (calls.error) throw calls.error;
+      return {
+        event: { ...event, country: canonicalCountry(event.country) },
+        topicIds,
+        siblings: siblings.data ?? [],
+        calls: calls.data ?? [],
+      };
     },
     staleTime: 60_000,
   });
@@ -93,10 +116,14 @@ export const topPicksQuery = queryOptions({
         .from("opportunities")
         .select(
           `id, title, slug, sector, seniority, employer_name, country, status, opportunity_type,
-           application_deadline, institutions ( name, slug )`,
+           application_deadline, official_source_url, institutions ( name, slug ),
+           opportunity_topics!inner(topic_id)`,
         )
         .eq("sector", "academic")
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+        .not("official_source_url", "is", null)
         .in(
           "status",
           LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
@@ -107,10 +134,14 @@ export const topPicksQuery = queryOptions({
         .from("opportunities")
         .select(
           `id, title, slug, sector, seniority, employer_name, country, status, opportunity_type,
-           application_deadline, institutions ( name, slug )`,
+           application_deadline, official_source_url, institutions ( name, slug ),
+           opportunity_topics!inner(topic_id)`,
         )
         .eq("sector", "industry")
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+        .not("official_source_url", "is", null)
         .in(
           "status",
           LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
@@ -129,10 +160,11 @@ export const topPicksQuery = queryOptions({
         .from("courses")
         .select(
           `id, title, slug, degree_type, language, duration,
-           institutions ( name, slug, country )`,
+           institutions ( name, slug, country ), course_topics!inner(topic_id)`,
         )
         .in("degree_type", ["MSc", "MEng", "PhD"])
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .order("title")
         .limit(400),
       supabase
@@ -143,9 +175,12 @@ export const topPicksQuery = queryOptions({
         .limit(400),
       supabase
         .from("events")
-        .select("id, title, slug, start_date, location, country, event_kind, abstract_deadline")
+        .select(
+          "id, title, slug, start_date, location, country, event_kind, abstract_deadline, event_topics!inner(topic_id)",
+        )
         .gte("start_date", new Date().toISOString().slice(0, 10))
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .order("start_date")
         .limit(6),
     ]);
@@ -162,12 +197,15 @@ export const topPicksQuery = queryOptions({
     // Rank courses by how much live activity their host institution has.
     const { data: liveCalls } = await supabase
       .from("opportunities")
-      .select("institution_id")
+      .select("institution_id, opportunity_topics!inner(topic_id)")
       .in(
         "status",
         LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
       )
       .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("official_source_url", "is", null)
       .limit(1000);
     const callCount = new Map<string, number>();
     for (const c of liveCalls ?? []) {

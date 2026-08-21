@@ -17,6 +17,7 @@ const GROUP_LABEL: Record<string, string> = {
   institution: "Institutions",
   researcher: "Researchers",
   opportunity: "Positions",
+  programme: "Programmes",
   project: "Projects",
   publication: "Publications",
   event: "Events",
@@ -49,7 +50,7 @@ export function CommandPalette() {
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  const { data, isFetching } = useQuery({
+  const { data, isFetching, error } = useQuery({
     queryKey: ["global-search", debounced],
     queryFn: () => runGlobalSearch(debounced),
     enabled: debounced.trim().length >= 2,
@@ -81,14 +82,17 @@ export function CommandPalette() {
       case "topic":
         navigate({ to: "/topics/$slug", params: { slug: hit.slug } });
         break;
+      case "programme":
+        navigate({ to: "/programmes/$slug", params: { slug: hit.slug } });
+        break;
       case "project":
-        navigate({ to: "/projects" });
+        navigate({ to: "/projects/$slug", params: { slug: hit.slug } });
         break;
       case "publication":
-        navigate({ to: "/publications" });
+        navigate({ to: "/publications/$id", params: { id: hit.slug } });
         break;
       case "event":
-        navigate({ to: "/events" });
+        navigate({ to: "/events/$slug", params: { slug: hit.slug } });
         break;
       default:
         break;
@@ -120,6 +124,8 @@ export function CommandPalette() {
             <CommandEmpty>Type at least two characters. Typos are tolerated.</CommandEmpty>
           ) : isFetching && !data ? (
             <CommandEmpty>Searching…</CommandEmpty>
+          ) : error ? (
+            <CommandEmpty>Search is temporarily unavailable. Please try again.</CommandEmpty>
           ) : grouped.length === 0 ? (
             <CommandEmpty>
               Nothing recorded for that. We only show what a source backs up.

@@ -44,7 +44,9 @@ This is scheduled burst processing, not an always-on daemon. If truly continuous
 Apply `supabase/migrations/20260821120000_cross_section_insights.sql` before relying on the combined insight refresh. It adds:
 
 - one relevance-gated public count RPC for the home dashboard;
-- scheduled momentum and collaboration refresh functions;
+- relevance-gated global search across jobs, programmes and every knowledge-base entity;
+- scheduled momentum and evidence-only collaboration refresh functions;
+- removal of inactive/stale topic snapshots from the trend surface;
 - queue and current-event indexes used by the worker and public pages.
 
 The application includes a rolling-deploy fallback: before this migration is applied it will still refresh topic momentum, but collaboration edges and the single-query dashboard counts will remain on their compatibility paths.

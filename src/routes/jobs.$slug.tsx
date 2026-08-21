@@ -13,17 +13,18 @@ export const Route = createFileRoute("/jobs/$slug")({
   loader: ({ params }) => loadJobLd(params.slug).catch(() => null),
   head: ({ params, loaderData }) => {
     const pretty = params.slug.replace(/-demo$/, "").replace(/-/g, " ");
+    const title = loaderData?.title ?? pretty;
     return {
       meta: [
-        { title: `${pretty} — Position — GeoAcademic Radar` },
+        { title: `${title} — Position — GeoAcademic Radar` },
         {
           name: "description",
-          content: `${pretty}: requirements, funding, supervisor, deadline and the official application link.`,
+          content: `${title}: requirements, funding, supervisor, deadline and the official application link.`,
         },
-        { property: "og:title", content: `${pretty} — Position` },
+        { property: "og:title", content: `${title} — Position` },
         {
           property: "og:description",
-          content: `Requirements, funding, supervisor and deadline for ${pretty}, with the official source link.`,
+          content: `Requirements, funding, supervisor and deadline for ${title}, with the official source link.`,
         },
         { property: "og:type", content: "article" },
         { name: "twitter:card", content: "summary_large_image" },

@@ -13,17 +13,18 @@ export const Route = createFileRoute("/events/$slug")({
   loader: ({ params }) => loadEventLd(params.slug).catch(() => null),
   head: ({ params, loaderData }) => {
     const pretty = params.slug.replace(/-demo$/, "").replace(/-/g, " ");
+    const title = loaderData?.name ?? pretty;
     return {
       meta: [
-        { title: `${pretty} — Event synopsis | GeoAcademic Radar` },
+        { title: `${title} — Event synopsis | GeoAcademic Radar` },
         {
           name: "description",
-          content: `Dates, deadlines, location, topics and related open positions for ${pretty}, in photogrammetry, remote sensing and geoinformatics.`,
+          content: `Dates, deadlines, location, topics and related open positions for ${title}, in photogrammetry, remote sensing and geoinformatics.`,
         },
-        { property: "og:title", content: `${pretty} — Event synopsis` },
+        { property: "og:title", content: `${title} — Event synopsis` },
         {
           property: "og:description",
-          content: `One-page synopsis of ${pretty}: dates, submission deadlines, topics and nearby open calls.`,
+          content: `One-page synopsis of ${title}: dates, submission deadlines, topics and nearby open calls.`,
         },
         { property: "og:type", content: "website" },
         { name: "twitter:card", content: "summary_large_image" },

@@ -1,5 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
+import {
+  LIVE_OPPORTUNITY_STATUSES,
+  PUBLIC_CONFIDENCE_LEVELS,
+  PUBLIC_VERIFICATION_STATUSES,
+  canonicalCountry,
+} from "@/lib/public-data";
 
 /* ---------- provenance ---------- */
 
@@ -83,6 +89,7 @@ export const sourceRegistryQuery = queryOptions({
 export function institutionDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["institution-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data: institution, error } = await supabase
         .from("institutions")
@@ -94,6 +101,7 @@ export function institutionDetailQuery(slug: string) {
         )
         .eq("slug", slug)
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .maybeSingle();
       if (error) throw error;
       if (!institution) return null;
@@ -115,40 +123,64 @@ export function institutionDetailQuery(slug: string) {
             .order("name"),
           supabase
             .from("researchers")
-            .select("id, full_name, slug, academic_title, current_position, verification_status")
+            .select(
+              "id, full_name, slug, academic_title, current_position, verification_status, researcher_topics!inner(topic_id)",
+            )
             .eq("institution_id", id)
             .eq("is_demo", false)
+            .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
             .order("full_name"),
           supabase
             .from("opportunities")
             .select(
-              "id, title, slug, opportunity_type, status, application_deadline, application_url, verification_status",
+              "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics!inner(topic_id)",
             )
             .eq("institution_id", id)
             .eq("is_demo", false)
+            .in("status", LIVE_OPPORTUNITY_STATUSES)
+            .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+            .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+            .not("official_source_url", "is", null)
             .order("application_deadline", { ascending: true, nullsFirst: false }),
           supabase
             .from("projects")
             .select(
-              "id, name, slug, acronym, status, start_date, end_date, funding_organization, website",
+              "id, name, slug, acronym, status, start_date, end_date, funding_organization, website, project_topics!inner(topic_id)",
             )
             .eq("institution_id", id)
             .eq("is_demo", false)
+            .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
             .order("start_date", { ascending: false, nullsFirst: false }),
           supabase
             .from("publications")
-            .select("id, title, doi, venue, year, citation_count, is_open_access, landing_url")
+            .select(
+              "id, title, doi, venue, year, citation_count, is_open_access, landing_url, publication_topics!inner(topic_id)",
+            )
             .eq("institution_id", id)
             .eq("is_demo", false)
+            .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
             .order("year", { ascending: false, nullsFirst: false })
             .limit(25),
           supabase
             .from("courses")
-            .select("id, title, slug, degree_type, language, duration, website")
+            .select(
+              "id, title, slug, degree_type, language, duration, website, course_topics!inner(topic_id)",
+            )
             .eq("institution_id", id)
             .eq("is_demo", false)
+            .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
             .order("title"),
         ]);
+
+      const relatedError =
+        departments.error ||
+        groups.error ||
+        researchers.error ||
+        opportunities.error ||
+        projects.error ||
+        publications.error ||
+        courses.error;
+      if (relatedError) throw relatedError;
 
       return {
         institution,
@@ -167,6 +199,7 @@ export function institutionDetailQuery(slug: string) {
 export function researcherDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["researcher-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data: researcher, error } = await supabase
         .from("researchers")
@@ -177,10 +210,11 @@ export function researcherDetailQuery(slug: string) {
            institutions ( id, name, slug, country ),
            departments ( name, slug ),
            research_groups ( name, slug ),
-           researcher_topics ( weight, research_topics ( name, slug ) )`,
+           researcher_topics!inner ( weight, research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .maybeSingle();
       if (error) throw error;
       if (!researcher) return null;
@@ -199,27 +233,42 @@ export function researcherDetailQuery(slug: string) {
           .from("publication_researchers")
           .select(
             `author_position,
-             publications ( id, title, doi, venue, year, citation_count, is_open_access, landing_url, is_demo )`,
+             publications!inner ( id, title, doi, venue, year, citation_count, is_open_access,
+               landing_url, is_demo, verification_status, publication_topics!inner(topic_id) )`,
           )
           .eq("researcher_id", id)
           .limit(50),
         supabase
           .from("project_researchers")
-          .select(`role, projects ( id, name, slug, acronym, status, funding_organization, website, is_demo )`)
+          .select(
+            `role, projects!inner ( id, name, slug, acronym, status, funding_organization,
+              website, is_demo, verification_status, project_topics!inner(topic_id) )`,
+          )
           .eq("researcher_id", id),
         supabase
           .from("opportunities")
           .select(
-            "id, title, slug, opportunity_type, status, application_deadline, application_url",
+            "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics!inner(topic_id)",
           )
           .eq("supervisor_id", id)
           .eq("is_demo", false)
+          .in("status", LIVE_OPPORTUNITY_STATUSES)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+          .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+          .not("official_source_url", "is", null)
           .order("application_deadline", { ascending: true, nullsFirst: false }),
         supabase
           .from("course_researchers")
-          .select(`courses ( id, title, slug, degree_type, is_demo )`)
+          .select(
+            `courses!inner ( id, title, slug, degree_type, is_demo, verification_status,
+              course_topics!inner(topic_id) )`,
+          )
           .eq("researcher_id", id),
       ]);
+
+      const relatedError =
+        roles.error || pubs.error || projects.error || supervising.error || courses.error;
+      if (relatedError) throw relatedError;
 
       return {
         researcher,
@@ -232,7 +281,9 @@ export function researcherDetailQuery(slug: string) {
           .map((r: any) => ({ ...r.projects, member_role: r.role }))
           .filter((p: any) => p?.id && !p.is_demo),
         supervising: supervising.data ?? [],
-        courses: (courses.data ?? []).map((r: any) => r.courses).filter((c: any) => c && !c.is_demo),
+        courses: (courses.data ?? [])
+          .map((r: any) => r.courses)
+          .filter((c: any) => c && !c.is_demo),
       };
     },
   });
@@ -241,6 +292,7 @@ export function researcherDetailQuery(slug: string) {
 export function opportunityDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["opportunity-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("opportunities")
@@ -254,13 +306,17 @@ export function opportunityDetailQuery(slug: string) {
            research_groups ( name ),
            researchers ( full_name, slug, current_position ),
            projects ( name, slug, acronym ),
-           opportunity_topics ( research_topics ( name, slug ) )`,
+           opportunity_topics!inner ( research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
         .eq("is_demo", false)
+        .in("status", LIVE_OPPORTUNITY_STATUSES)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+        .not("official_source_url", "is", null)
         .maybeSingle();
       if (error) throw error;
-      return data;
+      return data ? { ...data, country: canonicalCountry(data.country) } : null;
     },
   });
 }
@@ -268,11 +324,13 @@ export function opportunityDetailQuery(slug: string) {
 export function topicDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["topic-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data: topic, error } = await supabase
         .from("research_topics")
         .select("id, name, slug, category, description")
         .eq("slug", slug)
+        .eq("active", true)
         .maybeSingle();
       if (error) throw error;
       if (!topic) return null;
@@ -292,51 +350,83 @@ export function topicDetailQuery(slug: string) {
             .from("opportunity_topics")
             .select(
               `opportunities ( id, title, slug, opportunity_type, status, application_deadline,
+                 official_source_url, confidence, verification_status, is_demo,
                  institutions ( name, slug, is_demo ) )`,
             )
             .eq("topic_id", id),
           supabase
             .from("publication_topics")
-            .select(`publications ( id, title, doi, venue, year, citation_count, landing_url, is_demo )`)
+            .select(
+              `publications ( id, title, doi, venue, year, citation_count, landing_url,
+                verification_status, is_demo )`,
+            )
             .eq("topic_id", id),
           supabase
             .from("project_topics")
-            .select(`projects ( id, name, slug, acronym, status, funding_organization, is_demo )`)
+            .select(
+              `projects ( id, name, slug, acronym, status, funding_organization,
+                verification_status, is_demo )`,
+            )
             .eq("topic_id", id),
           supabase
             .from("researcher_topics")
             .select(
-              `weight, researchers ( id, full_name, slug, current_position, is_demo, institutions ( name, slug, is_demo ) )`,
+              `weight, researchers ( id, full_name, slug, current_position, verification_status,
+                is_demo, institutions ( name, slug, is_demo ) )`,
             )
             .eq("topic_id", id),
           supabase
             .from("institution_topics")
-            .select(`weight, institutions ( id, name, slug, country, is_demo )`)
+            .select(
+              `weight, institutions ( id, name, slug, country, verification_status, is_demo )`,
+            )
             .eq("topic_id", id)
             .order("weight", { ascending: false }),
           supabase
             .from("event_topics")
-            .select(`events ( id, title, slug, start_date, location, abstract_deadline, is_demo )`)
+            .select(
+              `events ( id, title, slug, start_date, location, abstract_deadline,
+                verification_status, is_demo )`,
+            )
             .eq("topic_id", id),
         ]);
 
-      const pick = <T,>(rows: any[] | null, key: string): T[] =>
-        (rows ?? []).map((r) => r[key]).filter((value: any) => value && !value.is_demo) as T[];
+      const relatedError =
+        momentum.error ||
+        opportunities.error ||
+        publications.error ||
+        projects.error ||
+        researchers.error ||
+        institutions.error ||
+        events.error;
+      if (relatedError) throw relatedError;
+
+      const isPublicRecord = (value: any) =>
+        value &&
+        !value.is_demo &&
+        (PUBLIC_VERIFICATION_STATUSES as readonly string[]).includes(value.verification_status);
+      const pick = <T>(rows: any[] | null, key: string): T[] =>
+        (rows ?? []).map((r) => r[key]).filter(isPublicRecord) as T[];
 
       return {
         topic,
         momentum: momentum.data,
-        opportunities: pick<any>(opportunities.data, "opportunities"),
+        opportunities: pick<any>(opportunities.data, "opportunities").filter(
+          (row) =>
+            (LIVE_OPPORTUNITY_STATUSES as readonly string[]).includes(row.status) &&
+            (PUBLIC_CONFIDENCE_LEVELS as readonly string[]).includes(row.confidence) &&
+            Boolean(row.official_source_url),
+        ),
         publications: pick<any>(publications.data, "publications").sort(
           (a, b) => (b.year ?? 0) - (a.year ?? 0),
         ),
         projects: pick<any>(projects.data, "projects"),
         researchers: (researchers.data ?? [])
           .map((r: any) => ({ ...r.researchers, weight: r.weight }))
-          .filter((r: any) => r?.id && !r.is_demo),
+          .filter(isPublicRecord),
         institutions: (institutions.data ?? [])
           .map((r: any) => ({ ...r.institutions, weight: r.weight }))
-          .filter((r: any) => r?.id && !r.is_demo),
+          .filter(isPublicRecord),
         events: pick<any>(events.data, "events"),
       };
     },
@@ -374,6 +464,7 @@ export function citationFor(kind: string, title: string, url: string) {
 export function projectDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["project-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data: project, error } = await supabase
         .from("projects")
@@ -384,10 +475,11 @@ export function projectDetailQuery(slug: string) {
            institutions!projects_institution_id_fkey ( id, name, slug, country ),
            departments ( name, slug ),
            organizations!projects_funder_id_fkey ( name, slug, org_type ),
-           project_topics ( research_topics ( name, slug ) )`,
+           project_topics!inner ( research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .maybeSingle();
       if (error) throw error;
       if (!project) return null;
@@ -411,11 +503,18 @@ export function projectDetailQuery(slug: string) {
         supabase
           .from("opportunities")
           .select(
-            "id, title, slug, opportunity_type, status, application_deadline, application_url",
+            "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics!inner(topic_id)",
           )
           .eq("project_id", id)
-          .eq("is_demo", false),
+          .eq("is_demo", false)
+          .in("status", LIVE_OPPORTUNITY_STATUSES)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+          .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+          .not("official_source_url", "is", null),
       ]);
+
+      const relatedError = people.error || partners.error || orgs.error || opportunities.error;
+      if (relatedError) throw relatedError;
 
       return {
         project,
@@ -437,6 +536,7 @@ export function projectDetailQuery(slug: string) {
 export function publicationDetailQuery(id: string) {
   return queryOptions({
     queryKey: ["publication-detail", id],
+    throwOnError: true,
     queryFn: async () => {
       const { data: publication, error } = await supabase
         .from("publications")
@@ -445,10 +545,11 @@ export function publicationDetailQuery(id: string) {
            citation_source, is_open_access, abstract, source, external_id, landing_url,
            verification_status, confidence, last_verified_at, is_demo,
            institutions!publications_institution_id_fkey ( id, name, slug, country ),
-           publication_topics ( research_topics ( name, slug ) )`,
+           publication_topics!inner ( research_topics ( name, slug ) )`,
         )
         .eq("id", id)
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .maybeSingle();
       if (error) throw error;
       if (!publication) return null;
@@ -466,6 +567,9 @@ export function publicationDetailQuery(id: string) {
           .select(`institutions ( id, name, slug, country, is_demo )`)
           .eq("publication_id", publication.id),
       ]);
+
+      const relatedError = authors.error || institutions.error;
+      if (relatedError) throw relatedError;
 
       return {
         publication,

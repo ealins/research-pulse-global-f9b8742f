@@ -1,5 +1,11 @@
 import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
+import {
+  LIVE_OPPORTUNITY_STATUSES,
+  PUBLIC_CONFIDENCE_LEVELS,
+  PUBLIC_VERIFICATION_STATUSES,
+  canonicalCountry,
+} from "@/lib/public-data";
 
 export type OpportunityRow = {
   id: string;
@@ -61,15 +67,20 @@ export const opportunitiesQuery = queryOptions({
          status, confidence, verification_status,
          last_checked_at, is_demo,
          institutions ( name, slug, abbreviation ),
-         opportunity_topics ( research_topics ( name, slug ) )`,
+         opportunity_topics!inner ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
-      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
+      .in("status", LIVE_OPPORTUNITY_STATUSES)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("official_source_url", "is", null)
       .order("is_demo", { ascending: true })
       .order("application_deadline", { ascending: true, nullsFirst: false })
       .limit(200);
     if (error) throw error;
-    return ((data ?? []) as unknown as OpportunityRow[]).filter(isPlausibleOpportunity);
+    return ((data ?? []) as unknown as OpportunityRow[])
+      .map((row) => ({ ...row, country: canonicalCountry(row.country) }))
+      .filter(isPlausibleOpportunity);
   },
 });
 
@@ -138,11 +149,12 @@ export const countsQuery = queryOptions({
     );
     const { count: publicOpportunities, error: publicOpportunityError } = await supabase
       .from("opportunities")
-      .select("id", { count: "exact" })
+      .select("id, opportunity_topics!inner(topic_id)", { count: "exact" })
       .eq("is_demo", false)
       .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
-      .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
-      .in("confidence", ["high", "medium"])
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("official_source_url", "is", null)
       .limit(1);
     if (publicOpportunityError) throw publicOpportunityError;
     return {
@@ -157,10 +169,11 @@ export const openJobCountQuery = queryOptions({
   queryFn: async () => {
     const { count, error } = await supabase
       .from("opportunities")
-      .select("id", { count: "exact" })
+      .select("id, opportunity_topics!inner(topic_id)", { count: "exact" })
       .in("status", ["open", "closing_soon", "rolling"])
       .in("verification_status", ["verified", "auto_discovered"])
-      .in("confidence", ["high", "medium"])
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("official_source_url", "is", null)
       .eq("is_demo", false)
       .limit(1);
     if (error) throw error;
@@ -183,7 +196,10 @@ export const institutionsQuery = queryOptions({
       .order("is_demo", { ascending: true })
       .order("name");
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []).map((event) => ({
+      ...event,
+      country: canonicalCountry(event.country),
+    }));
   },
 });
 
@@ -239,7 +255,10 @@ export const eventsQuery = queryOptions({
       .order("is_demo", { ascending: true })
       .order("start_date", { ascending: true, nullsFirst: false });
     if (error) throw error;
-    return data ?? [];
+    return (data ?? []).map((event) => ({
+      ...event,
+      country: canonicalCountry(event.country),
+    }));
   },
 });
 

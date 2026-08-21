@@ -14,7 +14,7 @@ export const Route = createFileRoute("/collaboration")({
       {
         name: "description",
         content:
-          "How geospatial institutions connect through shared topics, projects and co-authored papers, with an evidence link per edge.",
+          "How geospatial institutions connect through sourced joint projects and co-authored papers, with an evidence link per edge.",
       },
       { property: "og:title", content: "Collaboration Graph — GeoAcademic Radar" },
       {
@@ -71,7 +71,7 @@ function CollaborationPage() {
       <PageHeader
         eyebrow="Network structure"
         title="Collaboration graph"
-        description="Edges are derived from evidence already in the database — shared research topics, joint projects and co-authorship. Every edge keeps the URL that justifies it."
+        description="Edges are derived from sourced joint projects and co-authored publications. Topic overlap alone is not called collaboration, and every edge keeps the URL that justifies it."
       />
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">

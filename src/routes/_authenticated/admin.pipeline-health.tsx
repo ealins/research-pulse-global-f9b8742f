@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -29,6 +29,7 @@ import { NvidiaEnginePanel } from "@/components/admin/NvidiaEnginePanel";
 import { SchedulerPanel } from "@/components/admin/SchedulerPanel";
 import { OperatingModePanel } from "@/components/admin/OperatingModePanel";
 import { RealDataMigrationPanel } from "@/components/admin/RealDataMigrationPanel";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/_authenticated/admin/pipeline-health")({
   head: () => ({
@@ -92,7 +93,7 @@ function AdminGate() {
   const status = useServerFn(getAdminStatus);
   const claim = useServerFn(claimAdminRole);
   const qc = useQueryClient();
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ["admin-status"],
     queryFn: () => status(),
     retry: false,
@@ -117,6 +118,22 @@ function AdminGate() {
   });
 
   if (isLoading) return <Skeleton className="h-24 w-full" />;
+  if (error) {
+    return (
+      <AppShell>
+        <PageHeader
+          eyebrow="Operations"
+          title="Admin status unavailable"
+          description="The signed-in account could not be checked. Retry before assuming access was denied."
+        />
+        <div className="mx-auto w-full max-w-2xl px-6 py-10">
+          <Button onClick={() => void qc.invalidateQueries({ queryKey: ["admin-status"] })}>
+            Retry admin check
+          </Button>
+        </div>
+      </AppShell>
+    );
+  }
   if (data?.isAdmin) return <PipelineHealthPanels />;
 
   return (
@@ -153,6 +170,7 @@ function AdminGate() {
 }
 
 function PipelineHealthPanels() {
+  const navigate = useNavigate();
   const health = useServerFn(getPipelineHealth);
   const discover = useServerFn(runDiscovery);
   const queue = useServerFn(runQueue);
@@ -194,6 +212,17 @@ function PipelineHealthPanels() {
         eyebrow="Operations"
         title="Pipeline health"
         description="Every number below is read live from the database. If a stage reads zero, that is exactly where ingestion stops — no record is ever invented to fill the gap."
+        actions={
+          <Button
+            variant="outline"
+            onClick={async () => {
+              await supabase.auth.signOut();
+              await navigate({ to: "/auth", replace: true });
+            }}
+          >
+            Sign out
+          </Button>
+        }
       />
 
       <div className="mx-auto w-full max-w-6xl space-y-8 px-6 py-8">

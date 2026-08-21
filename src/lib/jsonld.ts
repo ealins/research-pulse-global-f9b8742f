@@ -1,4 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
+import {
+  LIVE_OPPORTUNITY_STATUSES,
+  PUBLIC_CONFIDENCE_LEVELS,
+  PUBLIC_VERIFICATION_STATUSES,
+} from "@/lib/public-data";
 
 /**
  * Lightweight, SSR-safe fetchers used by route loaders purely to build
@@ -22,10 +27,12 @@ export async function loadResearcherLd(slug: string): Promise<ResearcherLd | nul
     .from("researchers")
     .select(
       `full_name, slug, academic_title, current_position, orcid, official_profile_url,
-       google_scholar_url, institutions!researchers_institution_id_fkey ( name )`,
+       google_scholar_url, institutions!researchers_institution_id_fkey ( name ),
+       researcher_topics!inner(topic_id)`,
     )
     .eq("slug", slug)
     .eq("is_demo", false)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
     .maybeSingle();
   if (!data) return null;
   const inst = (data as { institutions?: { name: string } | null }).institutions;
@@ -72,6 +79,7 @@ export async function loadInstitutionLd(slug: string): Promise<InstitutionLd | n
     .select("name, slug, description, city, country, official_url, research_url, careers_url")
     .eq("slug", slug)
     .eq("is_demo", false)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
     .maybeSingle();
   if (!data) return null;
   return {
@@ -125,10 +133,15 @@ export async function loadJobLd(slug: string): Promise<JobLd | null> {
     .select(
       `title, slug, description, requirements, first_discovered_at, application_deadline,
        employer_name, city, country, opportunity_type, application_url,
-       institutions!opportunities_institution_id_fkey ( name )`,
+       institutions!opportunities_institution_id_fkey ( name ),
+       opportunity_topics!inner(topic_id)`,
     )
     .eq("slug", slug)
     .eq("is_demo", false)
+    .in("status", LIVE_OPPORTUNITY_STATUSES)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+    .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+    .not("official_source_url", "is", null)
     .maybeSingle();
   if (!data) return null;
   const inst = (data as { institutions?: { name: string } | null }).institutions;
@@ -187,9 +200,12 @@ export type PublicationLd = {
 export async function loadPublicationLd(id: string): Promise<PublicationLd | null> {
   const { data } = await supabase
     .from("publications")
-    .select("id, title, publication_date, year, authors_text, venue, doi, landing_url, abstract")
+    .select(
+      "id, title, publication_date, year, authors_text, venue, doi, landing_url, abstract, publication_topics!inner(topic_id)",
+    )
     .eq("id", id)
     .eq("is_demo", false)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
     .maybeSingle();
   if (!data) return null;
   return {
@@ -241,9 +257,12 @@ export type EventLd = {
 export async function loadEventLd(slug: string): Promise<EventLd | null> {
   const { data } = await supabase
     .from("events")
-    .select("title, slug, start_date, end_date, location, country, organization, website, summary")
+    .select(
+      "title, slug, start_date, end_date, location, country, organization, website, summary, event_topics!inner(topic_id)",
+    )
     .eq("slug", slug)
     .eq("is_demo", false)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
     .maybeSingle();
   if (!data) return null;
   return {
