@@ -62,6 +62,11 @@ const RESEED_INTERVAL_MS = clamp(
   7 * 24 * 60 * 60_000,
   6 * 60 * 60_000,
 );
+const RUNTIME_MS = clamp(process.env.INGESTION_RUNTIME_MS, 0, 4 * 60_000, 0);
+const BURST_MODE =
+  (process.env.INGESTION_BURST_MODE || "").toLowerCase() === "true";
+const WORKER_TRIGGER =
+  process.env.INGESTION_WORKER_TRIGGER || "external-fetch-worker";
 const USER_AGENT =
   "GeoAcademicRadarBot/1.0 (+https://geoacademic.app; academic source indexing)";
 
@@ -98,7 +103,7 @@ async function callHook(action, payload = {}, timeoutMs = 60_000) {
       },
       body: JSON.stringify({
         action,
-        trigger: "railway-external-fetch",
+        trigger: WORKER_TRIGGER,
         ...payload,
       }),
       signal: controller.signal,
@@ -445,7 +450,7 @@ async function fetchLease(lease) {
         completion = {
           success: false,
           http_status: response.status,
-          blocked: response.status === 403 || response.status === 429,
+          blocked: response.status === 403,
           error: `HTTP ${response.status}`,
         };
       } else {
@@ -526,18 +531,19 @@ async function runMaintenance() {
 }
 
 console.log(
-  `GeoAcademic external fetch worker -> ${BASE_URL} concurrency=${CONCURRENCY} lease=${LEASE_LIMIT}`,
+  `GeoAcademic external fetch worker -> ${BASE_URL} concurrency=${CONCURRENCY} lease=${LEASE_LIMIT}${RUNTIME_MS ? ` runtime=${Math.round(RUNTIME_MS / 1000)}s` : " continuous"}`,
 );
 
 let lastMaintenanceAt = 0;
 let lastReseedAt = 0;
-while (!stopping) {
+const stopAt = RUNTIME_MS ? Date.now() + RUNTIME_MS : Number.POSITIVE_INFINITY;
+while (!stopping && Date.now() < stopAt) {
   try {
     if (Date.now() - lastMaintenanceAt >= MAINTENANCE_INTERVAL_MS) {
       await runMaintenance();
       lastMaintenanceAt = Date.now();
     }
-    if (Date.now() - lastReseedAt >= RESEED_INTERVAL_MS) {
+    if (!BURST_MODE && Date.now() - lastReseedAt >= RESEED_INTERVAL_MS) {
       const reseed = await callHook("reseed-high-value", { limit: 100 });
       lastReseedAt = Date.now();
       console.log(
@@ -549,6 +555,7 @@ while (!stopping) {
     const leases = Array.isArray(leased.leases) ? leased.leases : [];
     if (leases.length === 0) {
       console.log(`${new Date().toISOString()} IDLE no fetch tasks due`);
+      if (RUNTIME_MS) break;
       await sleep(IDLE_DELAY_MS);
       continue;
     }
@@ -576,12 +583,13 @@ while (!stopping) {
     console.log(
       `${new Date().toISOString()} FETCH leased=${leases.length} complete=${completed} retry=${retries} stale=${stale}`,
     );
-    await sleep(ACTIVE_DELAY_MS);
+    if (Date.now() + ACTIVE_DELAY_MS < stopAt) await sleep(ACTIVE_DELAY_MS);
   } catch (error) {
     console.error(
       `${new Date().toISOString()} worker error:`,
       error instanceof Error ? error.message : String(error),
     );
+    if (RUNTIME_MS) break;
     await sleep(ERROR_DELAY_MS);
   }
 }
