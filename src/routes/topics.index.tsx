@@ -7,6 +7,13 @@ import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { topicsQuery, trendsQuery } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
+type TopicActivity = {
+  pubs_last_12m: number;
+  active_projects: number;
+  open_opportunities: number;
+  research_topics: { slug: string } | null;
+};
+
 export const Route = createFileRoute("/topics/")({
   head: () => ({
     meta: [
@@ -32,14 +39,14 @@ export const Route = createFileRoute("/topics/")({
 });
 
 function TopicsPage() {
-  const { data: topics, isLoading } = useQuery(topicsQuery);
+  const { data: topics, isLoading, error } = useQuery(topicsQuery);
   const { data: trends } = useQuery(trendsQuery);
   const [q, setQ] = useState("");
 
   const activity = useMemo(() => {
-    const map = new Map<string, any>();
+    const map = new Map<string, TopicActivity>();
     for (const t of trends ?? []) {
-      const slug = (t as any).research_topics?.slug;
+      const slug = t.research_topics?.slug;
       if (slug) map.set(slug, t);
     }
     return map;
@@ -75,12 +82,18 @@ function TopicsPage() {
       />
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
+        {error ? (
+          <p className="mb-6 rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+            The topic taxonomy could not be loaded. The rest of the catalogue remains available, but
+            matching and topic filters may be incomplete.
+          </p>
+        ) : null}
         {isLoading ? (
           <div className="space-y-3">
             <Skeleton className="h-24 w-full" />
             <Skeleton className="h-24 w-full" />
           </div>
-        ) : (
+        ) : grouped.length > 0 ? (
           grouped.map(([category, list]) => (
             <section key={category} className="mb-10">
               <h2 className="flex items-center gap-2 text-[0.68rem] font-medium uppercase tracking-[0.18em] text-muted-foreground">
@@ -113,6 +126,14 @@ function TopicsPage() {
               </div>
             </section>
           ))
+        ) : (
+          <div className="panel p-8 text-center">
+            <p className="text-sm font-medium text-foreground">No active topics are available.</p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              This is an empty taxonomy, not a loading state. Matching stays disabled until a
+              sourced topic vocabulary is restored.
+            </p>
+          </div>
         )}
       </div>
     </AppShell>

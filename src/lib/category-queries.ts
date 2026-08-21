@@ -1,5 +1,12 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  LIVE_OPPORTUNITY_STATUSES,
+  PUBLIC_CONFIDENCE_LEVELS,
+  PUBLIC_VERIFICATION_STATUSES,
+  canonicalCountry,
+  countrySlug,
+} from "@/lib/public-data";
 
 export const OPEN_STATUSES = [
   "open",
@@ -8,14 +15,7 @@ export const OPEN_STATUSES = [
   "possibly_open",
 ] as const satisfies readonly ("open" | "closing_soon" | "rolling" | "possibly_open")[];
 
-export function countrySlug(country: string): string {
-  return country
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
+export { countrySlug };
 
 /** Programme families derived from the programme title + linked topics. */
 export const PROGRAMME_FAMILIES = [
@@ -91,19 +91,43 @@ async function fetchLandscape() {
     supabase
       .from("institutions")
       .select("id, name, slug, country, continent, city, institution_type")
-      .eq("is_demo", false),
+      .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
     supabase
       .from("opportunities")
-      .select("id, institution_id, country, status, application_deadline")
-      .eq("is_demo", false),
-    supabase.from("courses").select("id, institution_id, degree_type").eq("is_demo", false),
-    supabase.from("projects").select("id, institution_id, status").eq("is_demo", false),
+      .select(
+        "id, institution_id, country, status, application_deadline, opportunity_topics!inner(topic_id)",
+      )
+      .eq("is_demo", false)
+      .in("status", LIVE_OPPORTUNITY_STATUSES)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("official_source_url", "is", null),
+    supabase
+      .from("courses")
+      .select("id, institution_id, degree_type, course_topics!inner(topic_id)")
+      .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+    supabase
+      .from("projects")
+      .select("id, institution_id, status, project_topics!inner(topic_id)")
+      .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
     supabase
       .from("publications")
-      .select("id, institution_id, publication_date, year")
-      .eq("is_demo", false),
-    supabase.from("researchers").select("id, institution_id").eq("is_demo", false),
-    supabase.from("events").select("id, country, start_date").eq("is_demo", false),
+      .select("id, institution_id, publication_date, year, publication_topics!inner(topic_id)")
+      .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+    supabase
+      .from("researchers")
+      .select("id, institution_id, researcher_topics!inner(topic_id)")
+      .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+    supabase
+      .from("events")
+      .select("id, country, start_date, event_topics!inner(topic_id)")
+      .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
   ]);
   const err =
     inst.error ||
@@ -116,13 +140,22 @@ async function fetchLandscape() {
   if (err) throw err;
   return {
     since,
-    institutions: inst.data ?? [],
-    opportunities: opps.data ?? [],
+    institutions: (inst.data ?? []).map((row) => ({
+      ...row,
+      country: canonicalCountry(row.country),
+    })),
+    opportunities: (opps.data ?? []).map((row) => ({
+      ...row,
+      country: canonicalCountry(row.country),
+    })),
     courses: courses.data ?? [],
     projects: projects.data ?? [],
     publications: pubs.data ?? [],
     researchers: researchers.data ?? [],
-    events: events.data ?? [],
+    events: (events.data ?? []).map((row) => ({
+      ...row,
+      country: canonicalCountry(row.country),
+    })),
   };
 }
 
@@ -190,7 +223,7 @@ export const countriesRollupQuery = queryOptions({
     const map = new Map<string, Rollup>();
     for (const i of ranked) {
       if (!i.country) continue;
-      const key = i.country;
+      const key = canonicalCountry(i.country) ?? i.country;
       const row =
         map.get(key) ??
         ({
@@ -218,8 +251,9 @@ export const countriesRollupQuery = queryOptions({
       map.set(key, row);
     }
     for (const e of l.events) {
-      if (!e.country) continue;
-      const row = map.get(e.country);
+      const eventCountry = canonicalCountry(e.country);
+      if (!eventCountry) continue;
+      const row = map.get(eventCountry);
       if (row) row.events += 1;
     }
     return [...map.values()].sort((a, b) => b.pulse - a.pulse);
@@ -230,12 +264,13 @@ export const countriesRollupQuery = queryOptions({
 export function countryDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["country-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const l = await fetchLandscape();
       const ranked = scoreInstitutions(l);
       const country = ranked.find((i) => i.country && countrySlug(i.country) === slug)?.country;
       if (!country) return null;
-      const institutions = ranked.filter((i) => i.country === country);
+      const institutions = ranked.filter((i) => canonicalCountry(i.country) === country);
       const ids = institutions.map((i) => i.id);
 
       const [opps, courses, events, researchers, projects, topics] = await Promise.all([
@@ -243,10 +278,15 @@ export function countryDetailQuery(slug: string) {
           .from("opportunities")
           .select(
             `id, title, slug, opportunity_type, status, application_deadline, city, funding_type,
-             verification_status, is_demo, institutions ( name, slug )`,
+             verification_status, confidence, official_source_url, is_demo,
+             institutions ( name, slug ), opportunity_topics!inner ( topic_id )`,
           )
-          .or(`institution_id.in.(${ids.join(",")}),country.eq.${country}`)
+          .in("institution_id", ids)
           .eq("is_demo", false)
+          .in("status", LIVE_OPPORTUNITY_STATUSES)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+          .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+          .not("official_source_url", "is", null)
           .order("is_demo", { ascending: true })
           .order("application_deadline", { ascending: true, nullsFirst: false })
           .limit(60),
@@ -254,34 +294,39 @@ export function countryDetailQuery(slug: string) {
           .from("courses")
           .select(
             `id, title, slug, degree_type, language, duration, summary,
-             institutions ( name, slug )`,
+             institutions ( name, slug ), course_topics!inner ( topic_id )`,
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
           .order("is_demo", { ascending: true })
           .order("title"),
         supabase
           .from("events")
-          .select("id, title, slug, start_date, location, organization, website")
-          .eq("country", country)
+          .select(
+            "id, title, slug, start_date, location, organization, website, country, event_topics!inner(topic_id)",
+          )
           .eq("is_demo", false)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
           .order("is_demo", { ascending: true })
           .order("start_date"),
         supabase
           .from("researchers")
           .select(
-            "id, full_name, slug, academic_title, current_position, institutions ( name, slug )",
+            "id, full_name, slug, academic_title, current_position, institutions ( name, slug ), researcher_topics!inner(topic_id)",
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
           .limit(40),
         supabase
           .from("projects")
           .select(
-            "id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug )",
+            "id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug ), project_topics!inner(topic_id)",
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
+          .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
           .order("is_demo", { ascending: true })
           .order("start_date", { ascending: false, nullsFirst: false })
           .limit(30),
@@ -315,7 +360,7 @@ export function countryDetailQuery(slug: string) {
         institutions,
         opportunities: opps.data ?? [],
         courses: courses.data ?? [],
-        events: events.data ?? [],
+        events: (events.data ?? []).filter((event) => canonicalCountry(event.country) === country),
         researchers: researchers.data ?? [],
         projects: projects.data ?? [],
         topics: [...topicCount.values()].sort((a, b) => b.count - a.count).slice(0, 12),
@@ -343,9 +388,10 @@ export const programmeCatalogueQuery = queryOptions({
         `id, title, slug, degree_type, language, duration, website, summary,
          verification_status, is_demo,
          institutions ( name, slug, country, city, continent ),
-         course_topics ( research_topics ( name, slug ) )`,
+         course_topics!inner ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;
@@ -361,6 +407,7 @@ export const programmeCatalogueQuery = queryOptions({
 export function programmeDetailQuery(slug: string) {
   return queryOptions({
     queryKey: ["programme-detail", slug],
+    throwOnError: true,
     queryFn: async () => {
       const { data: course, error } = await supabase
         .from("courses")
@@ -369,11 +416,12 @@ export function programmeDetailQuery(slug: string) {
            verification_status, last_verified_at, is_demo, institution_id,
            institutions ( id, name, slug, country, city, continent, official_url, research_url, description, is_demo ),
            departments ( name, slug, website ),
-           course_topics ( research_topics ( name, slug, category, description ) ),
+           course_topics!inner ( research_topics ( name, slug, category, description ) ),
            course_researchers ( researchers ( full_name, slug, academic_title, current_position, is_demo ) )`,
         )
         .eq("slug", slug)
         .eq("is_demo", false)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .maybeSingle();
       if (error) throw error;
       if (!course || course.institutions?.is_demo) return null;
@@ -383,9 +431,14 @@ export function programmeDetailQuery(slug: string) {
         instId
           ? supabase
               .from("opportunities")
-              .select("id, title, slug, opportunity_type, status, application_deadline")
+              .select(
+                "id, title, slug, opportunity_type, status, application_deadline, opportunity_topics!inner(topic_id)",
+              )
               .eq("institution_id", instId)
               .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+              .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+              .not("official_source_url", "is", null)
               .in("status", OPEN_STATUSES)
               .order("application_deadline", { ascending: true, nullsFirst: false })
               .limit(8)
@@ -393,18 +446,22 @@ export function programmeDetailQuery(slug: string) {
         instId
           ? supabase
               .from("courses")
-              .select("id, title, slug, degree_type, language, duration")
+              .select(
+                "id, title, slug, degree_type, language, duration, course_topics!inner(topic_id)",
+              )
               .eq("institution_id", instId)
               .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
               .neq("slug", slug)
               .limit(8)
           : Promise.resolve({ data: [], error: null }),
         instId
           ? supabase
               .from("projects")
-              .select("id, name, slug, status, summary")
+              .select("id, name, slug, status, summary, project_topics!inner(topic_id)")
               .eq("institution_id", instId)
               .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
               .limit(6)
           : Promise.resolve({ data: [], error: null }),
       ]);

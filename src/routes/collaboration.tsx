@@ -14,7 +14,7 @@ export const Route = createFileRoute("/collaboration")({
       {
         name: "description",
         content:
-          "How geospatial institutions connect through shared topics, projects and co-authored papers, with an evidence link per edge.",
+          "How geospatial institutions connect through sourced joint projects and co-authored papers, with an evidence link per edge.",
       },
       { property: "og:title", content: "Collaboration Graph — GeoAcademic Radar" },
       {
@@ -71,11 +71,15 @@ function CollaborationPage() {
       <PageHeader
         eyebrow="Network structure"
         title="Collaboration graph"
-        description="Edges are derived from evidence already in the database — shared research topics, joint projects and co-authorship. Every edge keeps the URL that justifies it."
+        description="Edges are derived from sourced joint projects and co-authored publications. Topic overlap alone is not called collaboration, and every edge keeps the URL that justifies it."
       />
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatTile label="Institutions in graph" value={model?.nodes.length ?? "—"} tone="signal" />
+          <StatTile
+            label="Institutions in graph"
+            value={model?.nodes.length ?? "—"}
+            tone="signal"
+          />
           <StatTile label="Edges" value={data?.edges.length ?? "—"} />
           <StatTile
             label="Most connected"
@@ -98,6 +102,17 @@ function CollaborationPage() {
 
         {isLoading ? (
           <Skeleton className="mt-6 h-96 w-full" />
+        ) : model && model.edges.length === 0 ? (
+          <div className="panel mt-6 p-8 text-center">
+            <p className="text-sm font-medium text-foreground">
+              No evidence-backed collaboration links yet
+            </p>
+            <p className="mx-auto mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Institutions still appear elsewhere in the atlas. This graph only draws a link when
+              two tracked institutions share a sourced project or publication; a shared topic by
+              itself is not treated as collaboration.
+            </p>
+          </div>
         ) : (
           <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_24rem]">
             <div className="panel p-5">

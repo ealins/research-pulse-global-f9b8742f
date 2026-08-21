@@ -3,7 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ExternalLink, Repeat } from "lucide-react";
 
-import { AppShell, PageHeader, ProvenanceChips, StatTile, TopicPills } from "@/components/layout/AppShell";
+import {
+  AppShell,
+  PageHeader,
+  ProvenanceChips,
+  StatTile,
+  TopicPills,
+} from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { eventsQuery, formatDate, daysUntil } from "@/lib/radar-queries";
 import { KIND_LABEL } from "@/lib/relevance-queries";
@@ -38,6 +44,8 @@ function EventsPage() {
   const { data, isLoading, error } = useQuery(eventsQuery);
   const [kind, setKind] = useState("all");
   const [country, setCountry] = useState("all");
+  const [scope, setScope] = useState("upcoming");
+  const [visible, setVisible] = useState(40);
 
   const kinds = useMemo(() => {
     const map = new Map<string, number>();
@@ -53,16 +61,34 @@ function EventsPage() {
     for (const e of data ?? []) if (e.country) map.set(e.country, (map.get(e.country) ?? 0) + 1);
     return [
       { key: "all", label: "Everywhere" },
-      ...[...map.entries()].sort((a, b) => b[1] - a[1]).map(([c, n]) => ({ key: c, label: c, count: n })),
+      ...[...map.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([c, n]) => ({ key: c, label: c, count: n })),
     ];
   }, [data]);
 
-  const rows = (data ?? []).filter(
-    (e) => (kind === "all" || e.event_kind === kind) && (country === "all" || e.country === country),
-  );
-
   const upcoming = (data ?? []).filter((e) => (daysUntil(e.start_date) ?? -1) >= 0).length;
   const openCfp = (data ?? []).filter((e) => (daysUntil(e.abstract_deadline) ?? -1) >= 0).length;
+  const undated = (data ?? []).filter((e) => !e.start_date).length;
+  const archived = Math.max((data?.length ?? 0) - upcoming - undated, 0);
+
+  const rows = useMemo(() => {
+    const selected = (data ?? []).filter(
+      (e) =>
+        (kind === "all" || e.event_kind === kind) &&
+        (country === "all" || e.country === country) &&
+        (scope === "all" ||
+          (scope === "upcoming" && (daysUntil(e.start_date) ?? -1) >= 0) ||
+          (scope === "undated" && !e.start_date) ||
+          (scope === "archive" && e.start_date && (daysUntil(e.start_date) ?? 0) < 0)),
+    );
+    return selected.sort((a, b) => {
+      const aTime = a.start_date ? new Date(a.start_date).getTime() : Number.POSITIVE_INFINITY;
+      const bTime = b.start_date ? new Date(b.start_date).getTime() : Number.POSITIVE_INFINITY;
+      return scope === "archive" ? bTime - aTime : aTime - bTime || a.title.localeCompare(b.title);
+    });
+  }, [data, kind, country, scope]);
+  const visibleRows = rows.slice(0, visible);
 
   return (
     <AppShell>
@@ -80,11 +106,26 @@ function EventsPage() {
         </section>
 
         <div className="mt-6 space-y-2">
+          <CategoryTabs
+            tabs={[
+              { key: "upcoming", label: "Upcoming", count: upcoming },
+              { key: "undated", label: "Date not stated", count: undated },
+              { key: "archive", label: "Past archive", count: archived },
+              { key: "all", label: "All tracked", count: data?.length ?? 0 },
+            ]}
+            active={scope}
+            onSelect={(key) => {
+              setScope(key);
+              setVisible(40);
+            }}
+          />
           <CategoryTabs tabs={kinds} active={kind} onSelect={setKind} />
           <CategoryTabs tabs={countries.slice(0, 14)} active={country} onSelect={setCountry} />
         </div>
 
-        {error ? <p className="mt-6 text-sm text-destructive">Events could not be loaded.</p> : null}
+        {error ? (
+          <p className="mt-6 text-sm text-destructive">Events could not be loaded.</p>
+        ) : null}
         {isLoading ? (
           <div className="mt-6 grid gap-3 md:grid-cols-2">
             {Array.from({ length: 6 }).map((_, i) => (
@@ -93,9 +134,13 @@ function EventsPage() {
           </div>
         ) : (
           <ul className="mt-6 grid gap-3 md:grid-cols-2">
-            {rows.map((e) => (
+            {visibleRows.map((e) => (
               <li key={e.id} className="panel panel-hover rise-in relative flex flex-col p-5">
-                <CardLink to="/events/$slug" params={{ slug: e.slug }} label={`${e.title}: open event synopsis`} />
+                <CardLink
+                  to="/events/$slug"
+                  params={{ slug: e.slug }}
+                  label={`${e.title}: open event synopsis`}
+                />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-primary/40 bg-primary/12 px-2.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-primary">
                     {KIND_LABEL[e.event_kind] ?? e.event_kind}
@@ -157,7 +202,21 @@ function EventsPage() {
           </ul>
         )}
         {!isLoading && rows.length === 0 ? (
-          <p className="mt-6 text-sm text-muted-foreground">No events match these filters.</p>
+          <p className="mt-6 text-sm text-muted-foreground">
+            No {scope === "upcoming" ? "upcoming " : ""}events match these filters. Past and undated
+            records remain available in the timeline tabs.
+          </p>
+        ) : null}
+        {!isLoading && rows.length > visibleRows.length ? (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setVisible((count) => count + 40)}
+              className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              Show 40 more · {rows.length - visibleRows.length} remaining
+            </button>
+          </div>
         ) : null}
       </div>
     </AppShell>

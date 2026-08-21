@@ -13,17 +13,18 @@ export const Route = createFileRoute("/institutions/$slug")({
   loader: ({ params }) => loadInstitutionLd(params.slug).catch(() => null),
   head: ({ params, loaderData }) => {
     const pretty = params.slug.replace(/-/g, " ");
+    const title = loaderData?.name ?? pretty;
     return {
       meta: [
-        { title: `${pretty} — Institution profile — GeoAcademic Radar` },
+        { title: `${title} — Institution profile — GeoAcademic Radar` },
         {
           name: "description",
-          content: `${pretty}: departments, people, funded projects, publications, taught programmes and open geospatial positions.`,
+          content: `${title}: departments, people, funded projects, publications, taught programmes and open geospatial positions.`,
         },
-        { property: "og:title", content: `${pretty} — Institution profile` },
+        { property: "og:title", content: `${title} — Institution profile` },
         {
           property: "og:description",
-          content: `Departments, people, projects, publications and open positions at ${pretty}, each with source provenance.`,
+          content: `Departments, people, projects, publications and open positions at ${title}, each with source provenance.`,
         },
         { property: "og:type", content: "profile" },
         { name: "twitter:card", content: "summary_large_image" },

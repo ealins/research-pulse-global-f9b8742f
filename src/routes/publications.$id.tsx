@@ -13,14 +13,15 @@ export const Route = createFileRoute("/publications/$id")({
   loader: ({ params }) => loadPublicationLd(params.id).catch(() => null),
   head: ({ params, loaderData }) => {
     const ref = params.id.slice(0, 8);
+    const title = loaderData?.title ?? `Publication ${ref}`;
     return {
       meta: [
-        { title: `Publication ${ref} — GeoAcademic Radar` },
+        { title: `${title} — GeoAcademic Radar` },
         {
           name: "description",
-          content: `Publication record ${ref}: DOI, venue, year, authors, affiliations, citations and open-access status.`,
+          content: `${title}: DOI, venue, year, authors, affiliations, citations and open-access status.`,
         },
-        { property: "og:title", content: `Publication record ${ref}` },
+        { property: "og:title", content: title },
         {
           property: "og:description",
           content: `DOI, venue, authors and citation provenance for geospatial publication record ${ref}.`,

@@ -1,6 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { createClient } from "@supabase/supabase-js";
 import type {} from "@tanstack/react-start";
+import {
+  LIVE_OPPORTUNITY_STATUSES,
+  PUBLIC_CONFIDENCE_LEVELS,
+  PUBLIC_VERIFICATION_STATUSES,
+  canonicalCountry,
+  countrySlug,
+} from "@/lib/public-data";
 
 const BASE_URL = "https://geoacademic.app";
 
@@ -29,15 +36,6 @@ const STATIC_ENTRIES: SitemapEntry[] = [
   { path: "/countries", changefreq: "weekly", priority: "0.7" },
 ];
 
-function slugifyCountry(country: string): string {
-  return country
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
-}
-
 export const Route = createFileRoute("/sitemap.xml")({
   server: {
     handlers: {
@@ -62,14 +60,45 @@ export const Route = createFileRoute("/sitemap.xml")({
             projects,
             publications,
           ] = await Promise.all([
-            supabase.from("institutions").select("slug, country").eq("is_demo", false),
-            supabase.from("researchers").select("slug").eq("is_demo", false),
-            supabase.from("opportunities").select("slug").eq("is_demo", false),
-            supabase.from("events").select("slug").eq("is_demo", false),
-            supabase.from("research_topics").select("slug"),
-            supabase.from("courses").select("slug").eq("is_demo", false),
-            supabase.from("projects").select("slug").eq("is_demo", false),
-            supabase.from("publications").select("id").eq("is_demo", false),
+            supabase
+              .from("institutions")
+              .select("slug, country")
+              .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+            supabase
+              .from("researchers")
+              .select("slug, researcher_topics!inner(topic_id)")
+              .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+            supabase
+              .from("opportunities")
+              .select("slug, opportunity_topics!inner(topic_id)")
+              .eq("is_demo", false)
+              .in("status", LIVE_OPPORTUNITY_STATUSES)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+              .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+              .not("official_source_url", "is", null),
+            supabase
+              .from("events")
+              .select("slug, event_topics!inner(topic_id)")
+              .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+            supabase.from("research_topics").select("slug").eq("active", true),
+            supabase
+              .from("courses")
+              .select("slug, course_topics!inner(topic_id)")
+              .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+            supabase
+              .from("projects")
+              .select("slug, project_topics!inner(topic_id)")
+              .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+            supabase
+              .from("publications")
+              .select("id, publication_topics!inner(topic_id)")
+              .eq("is_demo", false)
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
           ]);
 
           const push = (
@@ -104,7 +133,9 @@ export const Route = createFileRoute("/sitemap.xml")({
             (institutions.data ?? [])
               .map((row) => row.country)
               .filter((c): c is string => Boolean(c))
-              .map(slugifyCountry),
+              .map(canonicalCountry)
+              .filter((c): c is string => Boolean(c))
+              .map(countrySlug),
           );
           for (const country of countries) {
             entries.push({ path: `/countries/${country}`, priority: "0.6", changefreq: "weekly" });

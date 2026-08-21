@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
@@ -33,6 +34,9 @@ export const Route = createFileRoute("/researchers/")({
 
 function ResearchersPage() {
   const { data, isLoading, error } = useQuery(researchersQuery);
+  const [visible, setVisible] = useState(36);
+  const rows = data ?? [];
+  const visibleRows = rows.slice(0, visible);
 
   return (
     <AppShell>
@@ -42,7 +46,9 @@ function ResearchersPage() {
         description="Names, positions and stated research focus, taken from official institutional profile pages. Positions change — each entry links back to the page it came from."
       />
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
-        {error ? <p className="text-sm text-destructive">Researchers could not be loaded.</p> : null}
+        {error ? (
+          <p className="text-sm text-destructive">Researchers could not be loaded.</p>
+        ) : null}
         {isLoading ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (
@@ -51,9 +57,13 @@ function ResearchersPage() {
           </div>
         ) : (
           <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {data?.map((r) => (
+            {visibleRows.map((r) => (
               <li key={r.id} className="panel panel-hover rise-in relative flex flex-col p-5">
-                <CardLink to="/researchers/$slug" params={{ slug: r.slug }} label={`${r.full_name}: open researcher profile`} />
+                <CardLink
+                  to="/researchers/$slug"
+                  params={{ slug: r.slug }}
+                  label={`${r.full_name}: open researcher profile`}
+                />
                 <p className="text-[0.65rem] uppercase tracking-[0.16em] text-primary">
                   {r.academic_title ?? "Title not stated"}
                 </p>
@@ -99,6 +109,17 @@ function ResearchersPage() {
             ))}
           </ul>
         )}
+        {!isLoading && rows.length > visibleRows.length ? (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setVisible((count) => count + 36)}
+              className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              Show 36 more · {rows.length - visibleRows.length} remaining
+            </button>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );

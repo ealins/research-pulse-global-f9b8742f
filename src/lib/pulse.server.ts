@@ -2,6 +2,42 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 type PulseEntityType = "opportunity" | "project" | "researcher" | "event" | "publication";
 
+async function topicIdsForEntity(entityType: PulseEntityType, entityId: string): Promise<string[]> {
+  if (entityType === "opportunity") {
+    const { data } = await supabaseAdmin
+      .from("opportunity_topics")
+      .select("topic_id")
+      .eq("opportunity_id", entityId);
+    return (data ?? []).map((row) => row.topic_id);
+  }
+  if (entityType === "project") {
+    const { data } = await supabaseAdmin
+      .from("project_topics")
+      .select("topic_id")
+      .eq("project_id", entityId);
+    return (data ?? []).map((row) => row.topic_id);
+  }
+  if (entityType === "researcher") {
+    const { data } = await supabaseAdmin
+      .from("researcher_topics")
+      .select("topic_id")
+      .eq("researcher_id", entityId);
+    return (data ?? []).map((row) => row.topic_id);
+  }
+  if (entityType === "event") {
+    const { data } = await supabaseAdmin
+      .from("event_topics")
+      .select("topic_id")
+      .eq("event_id", entityId);
+    return (data ?? []).map((row) => row.topic_id);
+  }
+  const { data } = await supabaseAdmin
+    .from("publication_topics")
+    .select("topic_id")
+    .eq("publication_id", entityId);
+  return (data ?? []).map((row) => row.topic_id);
+}
+
 type PulseRow = {
   category: "PHD" | "PROJECT" | "PAPER" | "EVENT" | "PEOPLE";
   title: string;
@@ -203,6 +239,10 @@ export async function ensurePulseForEntity(
 ): Promise<boolean> {
   const row = await buildPulseRow(entityType, entityId);
   if (!row) return false;
+  const topicIds = await topicIdsForEntity(entityType, entityId);
+  // The public pulse is a domain signal, not a generic news feed. Untagged
+  // records stay in the canonical tables until relevance has been established.
+  if (topicIds.length === 0) return false;
 
   const { data: existing } = await supabaseAdmin
     .from("pulse_events")
@@ -211,16 +251,30 @@ export async function ensurePulseForEntity(
     .eq("entity_id", row.entity_id)
     .maybeSingle();
 
-  if (existing?.id) {
+  let pulseId = existing?.id ?? null;
+  if (pulseId) {
     const { error } = await supabaseAdmin
       .from("pulse_events")
       .update(row as never)
-      .eq("id", existing.id);
-    return !error;
+      .eq("id", pulseId);
+    if (error) return false;
+  } else {
+    const { data: inserted, error } = await supabaseAdmin
+      .from("pulse_events")
+      .insert(row as never)
+      .select("id")
+      .maybeSingle();
+    if (error || !inserted) return false;
+    pulseId = inserted.id;
   }
 
-  const { error } = await supabaseAdmin.from("pulse_events").insert(row as never);
-  return !error;
+  const { error: topicError } = await supabaseAdmin
+    .from("pulse_event_topics")
+    .upsert(topicIds.map((topic_id) => ({ pulse_event_id: pulseId!, topic_id })) as never, {
+      onConflict: "pulse_event_id,topic_id",
+      ignoreDuplicates: true,
+    });
+  return !topicError;
 }
 
 /**

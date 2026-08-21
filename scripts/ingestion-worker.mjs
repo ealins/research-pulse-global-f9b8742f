@@ -521,12 +521,13 @@ async function mapConcurrent(items, concurrency, callback) {
 }
 
 async function runMaintenance() {
-  const [refresh, discovery] = await Promise.all([
+  const [refresh, discovery, insights] = await Promise.all([
     callHook("refresh-due", { limit: 80 }),
     callHook("enqueue-discovery", { limit: 8 }),
+    callHook("refresh-insights", { limit: 160 }),
   ]);
   console.log(
-    `${new Date().toISOString()} MAINTENANCE refresh_queued=${refresh.queued ?? 0} discovery_queued=${discovery.queued ?? 0}`,
+    `${new Date().toISOString()} MAINTENANCE refresh_queued=${refresh.queued ?? 0} discovery_queued=${discovery.queued ?? 0} pulse_projected=${insights.pulse?.projected ?? 0} momentum_topics=${insights.insights?.momentum_topics ?? "?"} collaboration_edges=${insights.insights?.collaboration?.edges ?? "?"}`,
   );
 }
 
