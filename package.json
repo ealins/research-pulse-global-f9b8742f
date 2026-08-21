@@ -11,6 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "worker:ingest": "node --env-file=.env scripts/ingestion-worker.mjs",
+    "worker:review": "node --env-file=.env scripts/job-review-worker.mjs",
+    "worker:review:test": "node scripts/job-review-worker.mjs --self-test",
     "nvidia:models": "node --env-file=.env scripts/nvidia-models.mjs",
     "worker:ingest:prod": "node scripts/ingestion-worker.mjs"
   },
