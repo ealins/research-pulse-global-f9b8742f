@@ -75,7 +75,11 @@ function CollaborationPage() {
       />
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <StatTile label="Institutions in graph" value={model?.nodes.length ?? "—"} tone="signal" />
+          <StatTile
+            label="Institutions in graph"
+            value={model?.nodes.length ?? "—"}
+            tone="signal"
+          />
           <StatTile label="Edges" value={data?.edges.length ?? "—"} />
           <StatTile
             label="Most connected"
@@ -98,6 +102,17 @@ function CollaborationPage() {
 
         {isLoading ? (
           <Skeleton className="mt-6 h-96 w-full" />
+        ) : model && model.edges.length === 0 ? (
+          <div className="panel mt-6 p-8 text-center">
+            <p className="text-sm font-medium text-foreground">
+              No evidence-backed collaboration links yet
+            </p>
+            <p className="mx-auto mt-2 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              Institutions still appear elsewhere in the atlas. This graph only draws a link when
+              two tracked institutions share a sourced project or publication; a shared topic by
+              itself is not treated as collaboration.
+            </p>
+          </div>
         ) : (
           <div className="mt-6 grid gap-4 lg:grid-cols-[1fr_24rem]">
             <div className="panel p-5">

@@ -161,7 +161,11 @@ export function PageHeader({
 }
 
 function isEmptyStat(value: string | number): boolean {
-  return value === "—" || value === 0 || value === "0";
+  // Zero is a valid, informative result (for example: no open CFPs or no
+  // evidence-backed collaboration edges). Treat only the explicit loading /
+  // unavailable sentinel as empty so the UI never disguises a real zero as a
+  // pipeline that is still "sourcing".
+  return value === "—";
 }
 
 export function StatTile({

@@ -33,6 +33,9 @@ export const Route = createFileRoute("/publications/")({
 
 function PublicationsPage() {
   const { data, isLoading, error } = useQuery(publicationsQuery);
+  const [visible, setVisible] = useState(40);
+  const rows = data ?? [];
+  const visibleRows = rows.slice(0, visible);
 
   return (
     <AppShell>
@@ -53,9 +56,13 @@ function PublicationsPage() {
           </div>
         ) : (
           <ul className="space-y-2.5">
-            {data?.map((p) => (
+            {visibleRows.map((p) => (
               <li key={p.id} className="panel panel-hover rise-in relative p-5">
-                <CardLink to="/publications/$id" params={{ id: p.id }} label={`${p.title}: open publication`} />
+                <CardLink
+                  to="/publications/$id"
+                  params={{ id: p.id }}
+                  label={`${p.title}: open publication`}
+                />
                 <div className="flex flex-wrap items-center gap-2 text-[0.65rem]">
                   <span className="mono-num rounded-md border border-border bg-muted/50 px-2 py-0.5 text-muted-foreground">
                     {p.year ?? "Year not stated"}
@@ -68,7 +75,8 @@ function PublicationsPage() {
                   ) : null}
                   {p.citation_count !== null ? (
                     <span className="mono-num inline-flex items-center gap-1 text-muted-foreground">
-                      <Quote className="h-3 w-3" /> {p.citation_count} · {p.citation_source ?? "source not stated"}
+                      <Quote className="h-3 w-3" /> {p.citation_count} ·{" "}
+                      {p.citation_source ?? "source not stated"}
                     </span>
                   ) : null}
                 </div>
@@ -119,6 +127,17 @@ function PublicationsPage() {
             ))}
           </ul>
         )}
+        {!isLoading && rows.length > visibleRows.length ? (
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={() => setVisible((count) => count + 40)}
+              className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+            >
+              Show 40 more · {rows.length - visibleRows.length} remaining
+            </button>
+          </div>
+        ) : null}
       </div>
     </AppShell>
   );

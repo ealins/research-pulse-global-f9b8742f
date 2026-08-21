@@ -343,7 +343,7 @@ export const programmeCatalogueQuery = queryOptions({
         `id, title, slug, degree_type, language, duration, website, summary,
          verification_status, is_demo,
          institutions ( name, slug, country, city, continent ),
-         course_topics ( research_topics ( name, slug ) )`,
+         course_topics!inner ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .order("is_demo", { ascending: true })

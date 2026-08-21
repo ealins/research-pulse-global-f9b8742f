@@ -3,7 +3,13 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { GraduationCap, Search } from "lucide-react";
 
-import { AppShell, PageHeader, ProvenanceChips, StatTile, TopicPills } from "@/components/layout/AppShell";
+import {
+  AppShell,
+  PageHeader,
+  ProvenanceChips,
+  StatTile,
+  TopicPills,
+} from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import {
   DEGREE_ORDER,
@@ -47,12 +53,14 @@ function ProgrammesPage() {
   const [country, setCountry] = useState("all");
   const [language, setLanguage] = useState("all");
   const [q, setQ] = useState("");
+  const [visible, setVisible] = useState(36);
 
-  const rows = data ?? [];
+  const rows = useMemo(() => data ?? [], [data]);
 
   const levelTabs = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const c of rows) counts.set(c.degree_type ?? "Other", (counts.get(c.degree_type ?? "Other") ?? 0) + 1);
+    for (const c of rows)
+      counts.set(c.degree_type ?? "Other", (counts.get(c.degree_type ?? "Other") ?? 0) + 1);
     const ordered = [...counts.entries()].sort(
       (a, b) => DEGREE_ORDER.indexOf(a[0]) - DEGREE_ORDER.indexOf(b[0]),
     );
@@ -88,7 +96,8 @@ function ProgrammesPage() {
 
   const languageTabs = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const c of rows) counts.set(c.language ?? "Not stated", (counts.get(c.language ?? "Not stated") ?? 0) + 1);
+    for (const c of rows)
+      counts.set(c.language ?? "Not stated", (counts.get(c.language ?? "Not stated") ?? 0) + 1);
     return [
       { key: "all", label: "Any language", count: rows.length },
       ...[...counts.entries()]
@@ -104,11 +113,14 @@ function ProgrammesPage() {
       (country === "all" || c.country === country) &&
       (language === "all" || (c.language ?? "Not stated") === language) &&
       (q.trim() === "" ||
-        `${c.title} ${c.institutions?.name ?? ""} ${c.country}`.toLowerCase().includes(q.toLowerCase())),
+        `${c.title} ${c.institutions?.name ?? ""} ${c.country}`
+          .toLowerCase()
+          .includes(q.toLowerCase())),
   );
 
-  const grouped = new Map<string, typeof filtered>();
-  for (const c of filtered) {
+  const visibleRows = filtered.slice(0, visible);
+  const grouped = new Map<string, typeof visibleRows>();
+  for (const c of visibleRows) {
     grouped.set(c.family, [...(grouped.get(c.family) ?? []), c]);
   }
 
@@ -145,7 +157,9 @@ function ProgrammesPage() {
           </div>
         </div>
 
-        {error ? <p className="mt-6 text-sm text-destructive">Programmes could not be loaded.</p> : null}
+        {error ? (
+          <p className="mt-6 text-sm text-destructive">Programmes could not be loaded.</p>
+        ) : null}
         {isLoading ? (
           <div className="mt-6 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 9 }).map((_, i) => (
@@ -163,7 +177,11 @@ function ProgrammesPage() {
                 <ul className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   {list.map((c) => (
                     <li key={c.id} className="panel panel-hover rise-in relative flex flex-col p-5">
-                      <CardLink to="/programmes/$slug" params={{ slug: c.slug }} label={`${c.title}: open programme synopsis`} />
+                      <CardLink
+                        to="/programmes/$slug"
+                        params={{ slug: c.slug }}
+                        label={`${c.title}: open programme synopsis`}
+                      />
                       <div className="flex items-start justify-between gap-3">
                         <Link
                           to="/programmes/$slug"
@@ -198,7 +216,8 @@ function ProgrammesPage() {
                         </Link>
                       </p>
                       <p className="mono-num mt-1 text-[0.68rem] text-muted-foreground">
-                        {c.language ?? "Language not stated"} · {c.duration ?? "Duration not stated"}
+                        {c.language ?? "Language not stated"} ·{" "}
+                        {c.duration ?? "Duration not stated"}
                       </p>
                       <div className="mt-3">
                         <TopicPills
@@ -217,6 +236,17 @@ function ProgrammesPage() {
               <p className="text-sm text-muted-foreground">
                 No programme matches these filters. Try widening the level or country.
               </p>
+            ) : null}
+            {filtered.length > visibleRows.length ? (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => setVisible((count) => count + 36)}
+                  className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+                >
+                  Show 36 more · {filtered.length - visibleRows.length} remaining
+                </button>
+              </div>
             ) : null}
           </div>
         )}

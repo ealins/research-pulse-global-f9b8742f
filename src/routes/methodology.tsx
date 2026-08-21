@@ -1,6 +1,14 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { ShieldCheck, Database, GitCompare, Gauge, AlertTriangle } from "lucide-react";
+import { useState } from "react";
+import {
+  ShieldCheck,
+  Database,
+  GitCompare,
+  Gauge,
+  AlertTriangle,
+  BrainCircuit,
+} from "lucide-react";
 
 import { AppShell, PageHeader } from "@/components/layout/AppShell";
 import { sourceRegistryQuery } from "@/lib/detail-queries";
@@ -50,14 +58,15 @@ const STATUSES: [string, string][] = [
 ];
 
 function MethodologyPage() {
-  const { data: sources, isLoading } = useQuery(sourceRegistryQuery);
+  const { data: sources, isLoading, error } = useQuery(sourceRegistryQuery);
+  const [visibleSources, setVisibleSources] = useState(50);
 
   return (
     <AppShell>
       <PageHeader
         eyebrow="How this works"
         title="Methodology & provenance"
-        description="This platform is only useful if you can check it. Nothing here is generated, inferred or estimated: every record traces to a registered source, and every computed number has a formula printed below."
+        description="This platform is only useful if you can check it. Models may extract structured fields, but no fact is published without source evidence; every record traces to a registered source, and every computed number has a documented formula."
       />
 
       <div className="mx-auto w-full max-w-4xl px-6 py-8">
@@ -103,6 +112,27 @@ function MethodologyPage() {
 
         <section className="mt-10">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <BrainCircuit className="h-4 w-4 text-primary" /> Model-assisted extraction
+          </h2>
+          <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
+            <li>
+              Structured metadata and deterministic parsers run first. A language model is used only
+              when a source page is ambiguous or needs fields mapped into the schema.
+            </li>
+            <li>
+              Extracted claims must be supported by text from the captured page. Validation,
+              relevance gates and deduplication run before a canonical record is written.
+            </li>
+            <li>
+              Model output is not a source and never substitutes for the official page. Failed or
+              low-confidence extraction is retried or held for review instead of being presented as
+              verified fact.
+            </li>
+          </ul>
+        </section>
+
+        <section className="mt-10">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
             <GitCompare className="h-4 w-4 text-primary" /> Deduplication
           </h2>
           <ul className="mt-3 space-y-2 text-sm leading-relaxed text-muted-foreground">
@@ -129,9 +159,9 @@ function MethodologyPage() {
             <Gauge className="h-4 w-4 text-primary" /> Momentum & trend signal
           </h2>
           <div className="panel mono-num mt-3 p-4 text-xs leading-relaxed text-muted-foreground">
-            growth_ratio = pubs_last_12m / max(pubs_prev_12m, 1)
+            growth_ratio = pubs_last_12m / pubs_prev_12m
             <br />
-            trend_signal = growth_ratio × log(1 + pubs_last_12m)
+            trend_signal = (pubs_last_12m − pubs_prev_12m) / max(pubs_prev_12m, 1)
             <br />
             &nbsp;&nbsp;+ 0.5 × active_projects + 0.5 × open_opportunities
           </div>
@@ -153,11 +183,15 @@ function MethodologyPage() {
             society, a funder). Lower levels are aggregators, which we use for discovery but not as
             the final word on a fact.
           </p>
-          {isLoading ? (
+          {error ? (
+            <p className="mt-3 text-sm text-destructive">
+              The source registry could not be loaded.
+            </p>
+          ) : isLoading ? (
             <Skeleton className="mt-3 h-40 w-full" />
           ) : (
             <div className="mt-3 space-y-2">
-              {(sources ?? []).map((s) => (
+              {(sources ?? []).slice(0, visibleSources).map((s) => (
                 <div key={s.id} className="panel flex flex-wrap items-center gap-3 p-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-foreground">
@@ -182,6 +216,17 @@ function MethodologyPage() {
                   </span>
                 </div>
               ))}
+              {(sources?.length ?? 0) > visibleSources ? (
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setVisibleSources((count) => count + 50)}
+                    className="rounded-md border border-border bg-muted/40 px-4 py-2 text-xs font-medium text-foreground hover:border-primary/40 hover:text-primary"
+                  >
+                    Show 50 more · {(sources?.length ?? 0) - visibleSources} remaining
+                  </button>
+                </div>
+              ) : null}
             </div>
           )}
         </section>

@@ -2612,6 +2612,9 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      public_surface_counts: { Args: never; Returns: Json }
+      refresh_collaboration_edges: { Args: never; Returns: Json }
+      refresh_public_insights: { Args: never; Returns: Json }
       refresh_topic_momentum: { Args: never; Returns: number }
       scheduler_status: { Args: never; Returns: Json }
       show_limit: { Args: never; Returns: number }

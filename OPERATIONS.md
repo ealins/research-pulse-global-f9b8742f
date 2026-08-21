@@ -35,9 +35,19 @@ The worker drains the conditional database queue; overlapping invocations are pr
 - `INGESTION_HOOK_SECRET`: exactly the same value configured in Lovable.
 - `NVIDIA_API_KEY`: optional. When omitted, deterministic review still runs and the already-configured Lovable backend performs only ambiguous Nemotron calls. Adding it moves those model calls into the GitHub worker as well.
 
-The workflow reviews vacancies first and only crawls when the vacancy-review backlog is below the server-enforced high-water mark. GitHub never receives the Supabase service-role key. The workflow can also be started manually from the repository Actions tab to accelerate a one-time backlog drain.
+The workflow reviews vacancies first and only crawls when the vacancy-review backlog is below the server-enforced high-water mark. The fetch worker also runs bounded cross-section maintenance: it projects topic-qualified records into Research Pulse, refreshes topic momentum, and rebuilds evidence-backed collaboration edges. Generic NORMALIZE work for projects, researchers, events and programmes remains handled by the authenticated Lovable drain. GitHub never receives the Supabase service-role key. The workflow can also be started manually from the repository Actions tab to accelerate a one-time backlog drain.
 
 This is scheduled burst processing, not an always-on daemon. If truly continuous ingestion is required without paid hosting, run the same scripts on an always-on self-hosted GitHub runner.
+
+## Cross-section migration
+
+Apply `supabase/migrations/20260821120000_cross_section_insights.sql` before relying on the combined insight refresh. It adds:
+
+- one relevance-gated public count RPC for the home dashboard;
+- scheduled momentum and collaboration refresh functions;
+- queue and current-event indexes used by the worker and public pages.
+
+The application includes a rolling-deploy fallback: before this migration is applied it will still refresh topic momentum, but collaboration edges and the single-query dashboard counts will remain on their compatibility paths.
 
 ## Trust lifecycle
 

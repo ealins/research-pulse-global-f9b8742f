@@ -14,6 +14,7 @@ type Body = {
     | "backfill-providers"
     | "drain-providers"
     | "sync-pulse"
+    | "refresh-insights"
     | "reseed-high-value"
     | "recover-detail-sources"
     | "worker-status"
@@ -152,6 +153,31 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             Math.min(250, Math.max(10, body.limit ?? 120)),
           );
           return json({ action, ...result });
+        }
+
+        if (action === "refresh-insights") {
+          const { backfillPulseEvents } = await import("@/lib/pulse.server");
+          const pulse = await backfillPulseEvents(
+            Math.min(250, Math.max(20, body.limit ?? 160)),
+          );
+          const { data: insights, error } = await supabaseAdmin.rpc(
+            "refresh_public_insights",
+          );
+          if (!error) return json({ action, pulse, insights });
+
+          // Compatibility path during a rolling deployment: momentum existed
+          // before the combined insight refresh migration. Keep it fresh while
+          // clearly reporting that collaboration refresh is not available yet.
+          const { data: momentum, error: momentumError } =
+            await supabaseAdmin.rpc("refresh_topic_momentum");
+          if (momentumError) return json({ error: error.message }, 500);
+          return json({
+            action,
+            pulse,
+            insights: { momentum_topics: momentum, collaboration: null },
+            partial: true,
+            migration_pending: true,
+          });
         }
 
         if (action === "reseed-high-value") {
