@@ -1968,6 +1968,7 @@ export type ExternalReviewCompletion = {
   lease_started_at: string;
   success: boolean;
   extraction?: unknown;
+  allow_server_model?: boolean;
   error?: string;
   model?: string;
   latency_ms?: number;
@@ -2343,11 +2344,15 @@ export async function completeExternalReview(
     } as never);
   }
 
-  const outcome = await normalizeSource(input.source_id, {
-    provided: true,
-    extraction,
-    model: input.model ?? null,
-  });
+  // If GitHub has no NVIDIA secret, it can still orchestrate the queue while
+  // the already-configured Lovable backend performs only the model request.
+  // Supplying an extraction keeps the entire expensive review outside Lovable.
+  const outcome = await normalizeSource(
+    input.source_id,
+    extraction || !input.allow_server_model
+      ? { provided: true, extraction, model: input.model ?? null }
+      : undefined,
+  );
   if (outcome.status === "FAILED") {
     const status = await retryExternalReviewTask(
       task,
@@ -3048,7 +3053,9 @@ export async function normalizeSource(
       original_title: raw.page_title,
       claim: "Vacancy page fetched from the institution's own website",
       verification_status: verificationStatus as never,
-      confidence: (deterministicEnough && usedStructured ? "high" : "medium") as never,
+      confidence: (deterministicEnough && usedStructured
+        ? "high"
+        : "medium") as never,
       is_primary: true,
       last_checked_at: new Date().toISOString(),
       last_verified_at: verifiedAt,
