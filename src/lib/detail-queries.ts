@@ -41,7 +41,7 @@ export function evidenceQuery(entityType: string, entityId: string | undefined) 
     queryFn: async () => {
       const [sources, history] = await Promise.all([
         supabase
-          .from("record_sources")
+          .from("public_record_sources")
           .select(
             `id, source_url, source_organization, source_type, original_title, claim,
              discovered_at, last_checked_at, last_verified_at, verification_status,
@@ -72,10 +72,10 @@ export const sourceRegistryQuery = queryOptions({
   queryKey: ["source-registry"],
   queryFn: async () => {
     const { data, error } = await supabase
-      .from("sources")
+      .from("public_source_registry")
       .select(
-        `id, name, url, organization, source_type, adapter_key, trust_level,
-         refresh_frequency_hours, active, notes, last_success_at`,
+        `id, name, url, organization, source_type, trust_level,
+         refresh_frequency_hours, active`,
       )
       .order("trust_level", { ascending: false })
       .order("name");

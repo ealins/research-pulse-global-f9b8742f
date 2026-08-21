@@ -2589,10 +2589,44 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      public_record_sources: {
+        Row: {
+          claim: string | null
+          confidence: Database["public"]["Enums"]["confidence_level"]
+          discovered_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          is_primary: boolean
+          last_checked_at: string | null
+          last_verified_at: string | null
+          original_title: string | null
+          source_organization: string | null
+          source_type: Database["public"]["Enums"]["source_type"]
+          source_url: string
+          verification_status: Database["public"]["Enums"]["verification_status"]
+        }
+        Relationships: []
+      }
+      public_source_registry: {
+        Row: {
+          active: boolean
+          id: string
+          name: string
+          organization: string | null
+          refresh_frequency_hours: number
+          source_type: Database["public"]["Enums"]["source_type"]
+          trust_level: number
+          url: string
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      claim_admin_if_unclaimed: { Args: never; Returns: boolean }
+      claim_admin_if_unclaimed: {
+        Args: { target_user_id: string }
+        Returns: boolean
+      }
       global_search: {
         Args: { max_results?: number; q: string }
         Returns: {
