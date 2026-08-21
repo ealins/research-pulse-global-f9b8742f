@@ -30,7 +30,7 @@ export type OpportunityRow = {
 };
 
 const NON_POSTING_TITLE =
-  /^(careers?|jobs?|vacancies|recruitment|work with us|join us|how we hire|search for your career)|privacy|cookie|job alerts?|applicant|candidate privacy|equal opportunity/i;
+  /^(careers?|jobs?|vacancies|recruitment|work(?:ing)? (?:with|for|at) us|working at|join us|how we hire|search for your career)|academy|careers? in|employee stor(?:y|ies)|learning (?:&|and) development|leadership track|u[.]?gro programme|talent community|graduate programme|programme careers?|privacy|cookie|job alerts?|applicant|candidate privacy|equal opportunity/i;
 const NON_POSTING_PATH =
   /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant)(\/|$)/i;
 
@@ -38,6 +38,9 @@ const NON_POSTING_PATH =
 export function isPlausibleOpportunity(row: OpportunityRow): boolean {
   if (!row.official_source_url || row.title.trim().length < 8) return false;
   if (["archived", "closed", "needs_review"].includes(row.verification_status)) return false;
+  // Accuracy wins over coverage: unverified, low-confidence discoveries stay
+  // in the review queue instead of appearing as live vacancies.
+  if (row.confidence === "low") return false;
   if (NON_POSTING_TITLE.test(row.title.trim())) return false;
   try {
     return !NON_POSTING_PATH.test(new URL(row.official_source_url).pathname);
@@ -119,6 +122,7 @@ export const countsQuery = queryOptions({
       .select("id", { count: "exact" })
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
+      .in("confidence", ["high", "medium"])
       .limit(1);
     if (publicOpportunityError) throw publicOpportunityError;
     return {
@@ -136,6 +140,7 @@ export const openJobCountQuery = queryOptions({
       .select("id", { count: "exact" })
       .in("status", ["open", "closing_soon", "rolling"])
       .in("verification_status", ["verified", "auto_discovered"])
+      .in("confidence", ["high", "medium"])
       .eq("is_demo", false)
       .limit(1);
     if (error) throw error;
