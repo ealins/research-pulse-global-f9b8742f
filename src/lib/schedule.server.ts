@@ -181,6 +181,7 @@ export async function sweepOpportunityDeadlines(): Promise<{
   closed: number;
   closing_soon: number;
   reopened: number;
+  stale: number;
 }> {
   const today = new Date();
   const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -189,7 +190,7 @@ export async function sweepOpportunityDeadlines(): Promise<{
   const closed = await supabaseAdmin
     .from("opportunities")
     .update(
-      { status: "closed" as never, last_checked_at: new Date().toISOString() },
+      { status: "closed" as never, verification_status: "closed" as never },
       { count: "exact" },
     )
     .in("status", ["open", "closing_soon", "possibly_open"])
@@ -199,7 +200,7 @@ export async function sweepOpportunityDeadlines(): Promise<{
   const closingSoon = await supabaseAdmin
     .from("opportunities")
     .update(
-      { status: "closing_soon" as never, last_checked_at: new Date().toISOString() },
+      { status: "closing_soon" as never },
       { count: "exact" },
     )
     .in("status", ["open", "possibly_open"])
@@ -210,17 +211,28 @@ export async function sweepOpportunityDeadlines(): Promise<{
   const reopened = await supabaseAdmin
     .from("opportunities")
     .update(
-      { status: "open" as never, last_checked_at: new Date().toISOString() },
+      { status: "open" as never },
       { count: "exact" },
     )
     .eq("status", "closing_soon")
     .not("application_deadline", "is", null)
     .gt("application_deadline", iso(soon));
 
+  // Date arithmetic must not pretend that a source was checked. Records whose
+  // official page has not been fetched recently are explicitly downgraded.
+  const staleCutoff = new Date(today.getTime() - 30 * 86_400_000).toISOString();
+  const stale = await supabaseAdmin
+    .from("opportunities")
+    .update({ verification_status: "possibly_outdated" as never }, { count: "exact" })
+    .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
+    .in("verification_status", ["verified", "auto_discovered", "unverified"])
+    .or(`last_checked_at.is.null,last_checked_at.lt.${staleCutoff}`);
+
   return {
     closed: closed.count ?? 0,
     closing_soon: closingSoon.count ?? 0,
     reopened: reopened.count ?? 0,
+    stale: stale.count ?? 0,
   };
 }
 

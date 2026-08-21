@@ -23,9 +23,18 @@ function json(payload: unknown, status = 200) {
   });
 }
 
+function safeEqual(left: string, right: string): boolean {
+  if (!left || left.length !== right.length) return false;
+  let mismatch = 0;
+  for (let index = 0; index < left.length; index += 1) {
+    mismatch |= left.charCodeAt(index) ^ right.charCodeAt(index);
+  }
+  return mismatch === 0;
+}
+
 /**
  * Batch ingestion driver for the institution backlog.
- * Auth: `apikey` header must match the project publishable/anon key.
+ * Auth: a dedicated server-only secret must be sent as a Bearer token.
  *   POST { action: "enqueue-discovery", limit } -> queues DISCOVER tasks for institutions without sources
  *   POST { action: "drain", limit }             -> processes queued FETCH/CLASSIFY/NORMALIZE work
  */
@@ -33,12 +42,16 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
   server: {
     handlers: {
       POST: async ({ request }) => {
-        const key = request.headers.get("apikey") ?? "";
-        const expected = [
-          process.env["SUPABASE_PUBLISHABLE_KEY"],
-          process.env["SUPABASE_ANON_KEY"],
-        ].filter((v): v is string => Boolean(v));
-        if (!key || !expected.includes(key)) {
+        const expected = process.env["INGESTION_HOOK_SECRET"] ?? "";
+        if (!expected) {
+          console.error("[ingestion-hook] INGESTION_HOOK_SECRET is not configured");
+          return json({ error: "Ingestion hook is not configured" }, 503);
+        }
+        const authorization = request.headers.get("authorization") ?? "";
+        const supplied = authorization.startsWith("Bearer ")
+          ? authorization.slice("Bearer ".length)
+          : request.headers.get("x-ingestion-secret") ?? "";
+        if (!safeEqual(supplied, expected)) {
           return json({ error: "Unauthorized" }, 401);
         }
 

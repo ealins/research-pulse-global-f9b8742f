@@ -269,7 +269,7 @@ async function assertAdmin(context: {
 
 export const runDiscovery = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { institutionSlug: string }) => input)
+  .validator((input: { institutionSlug: string }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -286,7 +286,7 @@ export const runDiscovery = createServerFn({ method: "POST" })
 
 export const runQueue = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { limit?: number }) => input)
+  .validator((input: { limit?: number }) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { runQueueBatch } = await import("./ingest.server");
@@ -446,7 +446,7 @@ export const getOperationsSummary = createServerFn({ method: "GET" })
 /** Lets an admin retune cadence without a code change. */
 export const updateScheduleConfig = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: Partial<OperationsSummary["config"]>) => input)
+  .validator((input: Partial<OperationsSummary["config"]>) => input)
   .handler(async ({ data, context }) => {
     await assertAdmin(context as never);
     const { saveSchedule } = await import("./schedule.server");
@@ -691,10 +691,21 @@ export const getAdminStatus = createServerFn({ method: "GET" })
     return { isAdmin: data === true, adminExists: (count ?? 0) > 0 };
   });
 
-/** One-time bootstrap: the first signed-in account may claim the admin role. */
+/** One-time bootstrap, restricted to an explicitly configured operator email. */
 export const claimAdminRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }): Promise<{ isAdmin: boolean }> => {
+    const allowed = (process.env["ADMIN_BOOTSTRAP_EMAILS"] ?? "")
+      .split(",")
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
+    const email = typeof context.claims.email === "string" ? context.claims.email.toLowerCase() : "";
+    if (allowed.length === 0) {
+      throw new Error("Admin bootstrap is disabled until ADMIN_BOOTSTRAP_EMAILS is configured");
+    }
+    if (!email || !allowed.includes(email)) {
+      throw new Error("This account is not allowed to claim the admin role");
+    }
     const { data, error } = await context.supabase.rpc("claim_admin_if_unclaimed");
     if (error) throw new Error(error.message);
     return { isAdmin: data === true };

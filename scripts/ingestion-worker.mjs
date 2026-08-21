@@ -5,19 +5,17 @@
  * Later, deploy this exact process to a persistent worker host (Render/Railway/
  * Fly/VPS). It calls the already-authenticated ingestion hook repeatedly; the
  * database's conditional task claiming prevents collisions with cron/manual runs.
+ * INGESTION_HOOK_SECRET must match the server-side deployment secret.
  */
 const BASE_URL = (process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app").replace(/\/$/, "");
-const API_KEY =
-  process.env.SUPABASE_PUBLISHABLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || "";
+const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
 const ACTIVE_DELAY_MS = Number(process.env.INGESTION_ACTIVE_DELAY_MS || 2000);
 const IDLE_DELAY_MS = Number(process.env.INGESTION_IDLE_DELAY_MS || 60000);
 const ERROR_DELAY_MS = Number(process.env.INGESTION_ERROR_DELAY_MS || 30000);
 const RESEED_INTERVAL_MS = Number(process.env.INGESTION_RESEED_INTERVAL_MS || 6 * 60 * 60 * 1000);
 
-if (!API_KEY) {
-  console.error(
-    "Missing SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) in environment.",
-  );
+if (!HOOK_SECRET) {
+  console.error("Missing INGESTION_HOOK_SECRET in environment.");
   process.exit(1);
 }
 
@@ -39,7 +37,7 @@ async function drainOnce() {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        apikey: API_KEY,
+        authorization: `Bearer ${HOOK_SECRET}`,
       },
       body: JSON.stringify({ action: "drain", limit: 50, trigger: "continuous-worker" }),
       signal: controller.signal,
@@ -64,7 +62,7 @@ async function syncPulse() {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      apikey: API_KEY,
+      authorization: `Bearer ${HOOK_SECRET}`,
     },
     body: JSON.stringify({ action: "sync-pulse", limit: 120, trigger: "continuous-worker" }),
   });
@@ -78,7 +76,7 @@ async function recoverExistingDetails() {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      apikey: API_KEY,
+      authorization: `Bearer ${HOOK_SECRET}`,
     },
     body: JSON.stringify({
       action: "recover-detail-sources",
@@ -96,7 +94,7 @@ async function reseedHighValue() {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      apikey: API_KEY,
+      authorization: `Bearer ${HOOK_SECRET}`,
     },
     body: JSON.stringify({
       action: "reseed-high-value",

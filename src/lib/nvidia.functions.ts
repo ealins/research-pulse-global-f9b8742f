@@ -167,7 +167,7 @@ export type VacancyTestRow = {
 /** Controlled precision test: runs stored pages through the full decision path. */
 export const runVacancyExtractionTest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { limit?: number }) => input)
+  .validator((input: { limit?: number }) => input)
   .handler(async ({ data, context }): Promise<{ rows: VacancyTestRow[] }> => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -270,7 +270,7 @@ export type EntityKind = "PROJECT" | "PROGRAMME" | "RESEARCHER" | "EVENT";
  */
 export const runEntityExtractionTest = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { entity: EntityKind; limit?: number }) => input)
+  .validator((input: { entity: EntityKind; limit?: number }) => input)
   .handler(async ({ data, context }): Promise<{ rows: EntityTestRow[] }> => {
     await assertAdmin(context as never);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

@@ -51,6 +51,9 @@ function createSupabaseClient() {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
       persistSession: true,
       autoRefreshToken: true,
+      // The dedicated callback route performs the PKCE code exchange exactly once.
+      detectSessionInUrl: false,
+      flowType: 'pkce',
     }
   });
 }
@@ -65,4 +68,3 @@ export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>,
     return Reflect.get(_supabase, prop, receiver);
   },
 });
-
