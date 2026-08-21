@@ -1491,7 +1491,8 @@ export async function getExternalWorkerStatus(): Promise<ExternalWorkerStatus> {
   const now = new Date().toISOString();
   const [
     { count: dueFetch, error: fetchError },
-    { data: reviewRows, error: reviewError },
+    { count: dueReview, error: reviewError },
+    { count: processingReview, error: processingError },
   ] = await Promise.all([
     supabaseAdmin
       .from("ingestion_tasks")
@@ -1501,28 +1502,27 @@ export async function getExternalWorkerStatus(): Promise<ExternalWorkerStatus> {
       .lte("run_after", now),
     supabaseAdmin
       .from("ingestion_tasks")
-      .select("status, run_after, payload")
+      .select("id", { count: "exact", head: true })
       .eq("task_type", "NORMALIZE")
-      .in("status", ["QUEUED", "RETRY", "PROCESSING"])
-      .limit(2_000),
+      .in("status", ["QUEUED", "RETRY"])
+      .lte("run_after", now)
+      .contains("payload", { classification: "VACANCY" }),
+    supabaseAdmin
+      .from("ingestion_tasks")
+      .select("id", { count: "exact", head: true })
+      .eq("task_type", "NORMALIZE")
+      .eq("status", "PROCESSING")
+      .contains("payload", { classification: "VACANCY" }),
   ]);
   if (fetchError) throw fetchError;
   if (reviewError) throw reviewError;
-  const vacancyRows = (reviewRows ?? []).filter(
-    (row) => queuedClassification(row) === "VACANCY",
-  );
-  const dueReview = vacancyRows.filter(
-    (row) => row.status !== "PROCESSING" && row.run_after <= now,
-  ).length;
-  const processingReview = vacancyRows.filter(
-    (row) => row.status === "PROCESSING",
-  ).length;
+  if (processingError) throw processingError;
+  const reviewBacklog = (dueReview ?? 0) + (processingReview ?? 0);
   return {
     due_fetch: dueFetch ?? 0,
-    due_vacancy_review: dueReview,
-    processing_vacancy_review: processingReview,
-    fetch_paused:
-      dueReview + processingReview >= REVIEW_BACKPRESSURE_HIGH_WATER,
+    due_vacancy_review: dueReview ?? 0,
+    processing_vacancy_review: processingReview ?? 0,
+    fetch_paused: reviewBacklog >= REVIEW_BACKPRESSURE_HIGH_WATER,
     review_high_water: REVIEW_BACKPRESSURE_HIGH_WATER,
   };
 }
@@ -2018,12 +2018,11 @@ export async function leaseExternalReviewTasks(
     .select("id, attempts, max_attempts, started_at, payload")
     .eq("task_type", "NORMALIZE")
     .eq("status", "PROCESSING")
+    .contains("payload", { classification: "VACANCY" })
     .lt("started_at", staleBefore)
     .limit(500);
   if (staleError) throw staleError;
-  for (const task of (processing ?? []).filter(
-    (row) => queuedClassification(row) === "VACANCY",
-  )) {
+  for (const task of processing ?? []) {
     const dead = task.attempts >= task.max_attempts;
     await supabaseAdmin
       .from("ingestion_tasks")
@@ -2044,9 +2043,10 @@ export async function leaseExternalReviewTasks(
     .select("id, source_id, attempts, max_attempts, payload")
     .eq("task_type", "NORMALIZE")
     .in("status", ["QUEUED", "RETRY"])
+    .contains("payload", { classification: "VACANCY" })
     .lte("run_after", now.toISOString())
     .order("run_after")
-    .limit(Math.max(100, requested * 20));
+    .limit(requested * 4);
   if (error) throw error;
 
   const claimed: {
@@ -2056,9 +2056,7 @@ export async function leaseExternalReviewTasks(
     attempts: number;
     max_attempts: number;
   }[] = [];
-  for (const task of (candidates ?? []).filter(
-    (row) => queuedClassification(row) === "VACANCY",
-  )) {
+  for (const task of candidates ?? []) {
     if (claimed.length >= requested) break;
     if (!task.source_id) continue;
     const startedAt = new Date().toISOString();
