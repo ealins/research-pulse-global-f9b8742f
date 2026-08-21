@@ -121,6 +121,7 @@ export const countsQuery = queryOptions({
       .from("opportunities")
       .select("id", { count: "exact" })
       .eq("is_demo", false)
+      .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .in("confidence", ["high", "medium"])
       .limit(1);
