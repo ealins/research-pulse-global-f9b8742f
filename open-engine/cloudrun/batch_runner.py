@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import json
 import os
 import pathlib
 import sys
@@ -14,6 +15,23 @@ DB_SCHEMA = os.getenv("DB_SCHEMA", "geoacademic_engine")
 DB_SEARCH_PATH = f"{DB_SCHEMA},extensions,public"
 
 
+async def init_connection(conn: asyncpg.Connection) -> None:
+    await conn.set_type_codec(
+        "json",
+        schema="pg_catalog",
+        encoder=json.dumps,
+        decoder=json.loads,
+        format="text",
+    )
+    await conn.set_type_codec(
+        "jsonb",
+        schema="pg_catalog",
+        encoder=json.dumps,
+        decoder=json.loads,
+        format="text",
+    )
+
+
 def pool_kwargs(max_size: int) -> dict:
     return {
         "dsn": DATABASE_URL,
@@ -21,6 +39,7 @@ def pool_kwargs(max_size: int) -> dict:
         "max_size": max_size,
         "command_timeout": 60,
         "server_settings": {"search_path": DB_SEARCH_PATH},
+        "init": init_connection,
     }
 
 
