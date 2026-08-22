@@ -6,10 +6,14 @@ on:
     branches: [main]
     paths:
       - "open-engine/**"
+      - "src/**"
+      - "package.json"
       - ".github/workflows/geoacademic-*.yml"
   pull_request:
     paths:
       - "open-engine/**"
+      - "src/**"
+      - "package.json"
       - ".github/workflows/geoacademic-*.yml"
 
 permissions:
@@ -18,7 +22,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -43,13 +47,19 @@ jobs:
             open-engine/cloudrun/migrate.py \
             open-engine/cloudrun/import_legacy_sources.py \
             open-engine/cloudrun/batch_runner.py \
-            open-engine/cloudrun/qa.py
+            open-engine/cloudrun/qa.py \
+            open-engine/cloudrun/qa_slugs.py
 
       - name: Test deterministic extraction and date normalization
         run: |
           python -m pip install beautifulsoup4==4.13.4
           cd open-engine/worker
           python -m unittest -v test_deterministic_extractors.py test_date_normalization.py
+
+      - name: Build frontend
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
 
       - name: Validate shell entrypoints
         run: |
