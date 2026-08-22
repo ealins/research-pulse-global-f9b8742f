@@ -57,6 +57,7 @@ jobs:
           bash -n open-engine/deploy.sh
           bash -n open-engine/oci/bootstrap-cloud-shell.sh
           bash -n open-engine/cloudrun/bootstrap-cloud-shell.sh
+          bash -n open-engine/cloudrun/redeploy-api.sh
 
       - name: Validate Oracle compose file
         run: |
