@@ -30,6 +30,7 @@ jobs:
             open-engine/backend/main.py \
             open-engine/backend/internal.py \
             open-engine/worker/worker.py \
+            open-engine/worker/minio.py \
             open-engine/worker/processor.py \
             open-engine/worker/scheduler.py \
             open-engine/worker/verifier.py \
