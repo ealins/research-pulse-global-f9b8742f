@@ -1,21 +1,22 @@
 import asyncio
 import gzip
 import hashlib
-import io
 import json
 import os
 import socket
-from datetime import datetime, timezone
 
 import asyncpg
 from bs4 import BeautifulSoup
 from minio import Minio
+
+from ai_router import extract_with_ai
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 WORKER_ID = f"process-{socket.gethostname()}"
 S3_ENDPOINT = os.environ["S3_ENDPOINT"].replace("http://", "").replace("https://", "")
 S3_SECURE = os.environ["S3_ENDPOINT"].startswith("https://")
 S3_BUCKET = os.environ["S3_BUCKET"]
+AI_FALLBACK_ENABLED = os.getenv("AI_FALLBACK_ENABLED", "true").lower() in {"1", "true", "yes", "on"}
 
 minio = Minio(
     S3_ENDPOINT,
@@ -106,6 +107,7 @@ def extract_candidates(html: str, source_url: str):
                 "country": country if isinstance(country, str) else None,
                 "confidence": confidence,
                 "source_url": source_url,
+                "verification_status": "auto_discovered",
                 "data": node,
             })
     return candidates[:40]
@@ -174,10 +176,15 @@ async def materialize(pool, task):
             raise RuntimeError("snapshot body unavailable")
         html = await read_object(snapshot["object_key"])
         candidates = extract_candidates(html, snapshot["source_url"])
+        extraction_path = "structured"
+        if not candidates and AI_FALLBACK_ENABLED:
+            candidates = await extract_with_ai(html, snapshot["source_url"])
+            extraction_path = "ai" if candidates else "none"
 
         async with pool.acquire() as conn:
             async with conn.transaction():
                 for candidate in candidates:
+                    verification_status = candidate.get("verification_status", "auto_discovered")
                     existing = await conn.fetchrow(
                         "SELECT id, data FROM canonical_entities WHERE entity_type=$1 AND external_key=$2",
                         candidate["entity_type"], candidate["external_key"],
@@ -187,11 +194,15 @@ async def materialize(pool, task):
                         INSERT INTO canonical_entities(
                             entity_type, external_key, title, country, verification_status,
                             confidence, source_url, published_at, data
-                        ) VALUES($1,$2,$3,$4,'auto_discovered',$5,$6,now(),$7::jsonb)
+                        ) VALUES($1,$2,$3,$4,$5,$6,$7,now(),$8::jsonb)
                         ON CONFLICT (entity_type, external_key) WHERE external_key IS NOT NULL
                         DO UPDATE SET
                             title=excluded.title,
                             country=coalesce(excluded.country, canonical_entities.country),
+                            verification_status=CASE
+                                WHEN canonical_entities.verification_status='verified' THEN 'verified'
+                                ELSE excluded.verification_status
+                            END,
                             confidence=greatest(canonical_entities.confidence, excluded.confidence),
                             source_url=excluded.source_url,
                             last_seen_at=now(),
@@ -201,15 +212,22 @@ async def materialize(pool, task):
                         RETURNING id
                         """,
                         candidate["entity_type"], candidate["external_key"], candidate["title"],
-                        candidate["country"], candidate["confidence"], candidate["source_url"],
-                        json.dumps(candidate["data"]),
+                        candidate["country"], verification_status, candidate["confidence"],
+                        candidate["source_url"], json.dumps(candidate["data"]),
                     )
                     await conn.execute(
                         """
-                        INSERT INTO record_sources(entity_id, source_url, content_hash, last_checked_at, verification_status, confidence, is_primary)
-                        VALUES($1,$2,$3,now(),'auto_discovered',$4,true)
+                        INSERT INTO record_sources(
+                            entity_id, source_url, content_hash, last_checked_at,
+                            verification_status, confidence, is_primary, evidence
+                        ) VALUES($1,$2,$3,now(),$4,$5,true,$6::jsonb)
                         """,
-                        entity_id, candidate["source_url"], snapshot["content_hash"], candidate["confidence"],
+                        entity_id, candidate["source_url"], snapshot["content_hash"],
+                        verification_status, candidate["confidence"],
+                        json.dumps({
+                            "extraction_path": extraction_path,
+                            "evidence": candidate.get("data", {}).get("evidence") if isinstance(candidate.get("data"), dict) else None,
+                        }),
                     )
                     changed = existing is None or existing["data"] != candidate["data"]
                     if changed:
@@ -220,18 +238,18 @@ async def materialize(pool, task):
                             INSERT INTO signals(
                                 signal_type, entity_id, entity_type, title, country,
                                 importance_score, confidence, verification_status, source_url, data
-                            ) VALUES($1,$2,$3,$4,$5,$6,$7,'auto_discovered',$8,$9::jsonb)
+                            ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
                             """,
                             signal_type, entity_id, candidate["entity_type"], candidate["title"],
                             candidate["country"], 55 if existing is None else 35,
-                            candidate["confidence"], candidate["source_url"],
-                            json.dumps({"snapshot_id": snapshot_id}),
+                            candidate["confidence"], verification_status, candidate["source_url"],
+                            json.dumps({"snapshot_id": snapshot_id, "extraction_path": extraction_path}),
                         )
                 await conn.execute(
                     "UPDATE ingestion_tasks SET status='DONE', error=NULL, updated_at=now() WHERE id=$1",
                     task["id"],
                 )
-        print(f"EXTRACT task={task['id']} candidates={len(candidates)}")
+        print(f"EXTRACT task={task['id']} path={extraction_path} candidates={len(candidates)}")
     except Exception as exc:
         await fail(pool, task["id"], exc)
         print(f"EXTRACT_FAILED task={task['id']} error={exc}")
