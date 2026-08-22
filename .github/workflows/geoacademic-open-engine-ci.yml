@@ -40,7 +40,8 @@ jobs:
             open-engine/worker/reprocess.py \
             open-engine/cloudrun/migrate.py \
             open-engine/cloudrun/import_legacy_sources.py \
-            open-engine/cloudrun/batch_runner.py
+            open-engine/cloudrun/batch_runner.py \
+            open-engine/cloudrun/qa.py
 
       - name: Test deterministic extractors
         run: |
