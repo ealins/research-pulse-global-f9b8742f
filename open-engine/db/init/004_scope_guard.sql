@@ -15,19 +15,9 @@ DECLARE
   in_scope boolean;
 BEGIN
   IF NEW.entity_type = 'opportunity'
-     AND coalesce(NEW.source_url, '') ~* '^https?://(www\.)?egu\.eu/g/jobs/?'
+     AND coalesce(NEW.source_url, '') ~* '^https?://(www[.])?egu[.]eu/g/jobs/?'
      AND NEW.verification_status <> 'verified' THEN
     in_scope := geoacademic_scope_text_matches(NEW.title, NEW.data);
-    NEW.data := jsonb_set(
-      coalesce(NEW.data, '{}'::jsonb),
-      '{scope_relevance}',
-      jsonb_build_object(
-        'policy', 'geoacademic_job_scope_v1',
-        'source_class', 'broad_academic_job_board',
-        'matched', in_scope
-      ),
-      true
-    );
     IF NOT in_scope THEN
       NEW.verification_status := 'needs_review';
       NEW.confidence := least(coalesce(NEW.confidence, 0.5), 0.69);
@@ -49,7 +39,7 @@ EXECUTE FUNCTION geoacademic_apply_scope_guard();
 UPDATE canonical_entities
 SET updated_at = now()
 WHERE entity_type = 'opportunity'
-  AND coalesce(source_url, '') ~* '^https?://(www\.)?egu\.eu/g/jobs/?'
+  AND coalesce(source_url, '') ~* '^https?://(www[.])?egu[.]eu/g/jobs/?'
   AND verification_status <> 'verified';
 
 CREATE OR REPLACE FUNCTION geoacademic_sync_child_verification()
@@ -98,7 +88,7 @@ FROM canonical_entities e
 WHERE rs.entity_id = e.id
   AND e.entity_type = 'opportunity'
   AND e.verification_status = 'needs_review'
-  AND coalesce(e.source_url, '') ~* '^https?://(www\.)?egu\.eu/g/jobs/?';
+  AND coalesce(e.source_url, '') ~* '^https?://(www[.])?egu[.]eu/g/jobs/?';
 
 UPDATE signals s
 SET verification_status = 'needs_review',
@@ -107,4 +97,4 @@ FROM canonical_entities e
 WHERE s.entity_id = e.id
   AND e.entity_type = 'opportunity'
   AND e.verification_status = 'needs_review'
-  AND coalesce(e.source_url, '') ~* '^https?://(www\.)?egu\.eu/g/jobs/?';
+  AND coalesce(e.source_url, '') ~* '^https?://(www[.])?egu[.]eu/g/jobs/?';
