@@ -1,9 +1,9 @@
 import asyncio
 import gzip
 import hashlib
-import io
 import ipaddress
 import os
+import re
 import socket
 import urllib.parse
 import urllib.robotparser
@@ -11,31 +11,49 @@ import uuid
 from datetime import datetime, timezone
 
 import asyncpg
+import boto3
 import httpx
-from minio import Minio
+from botocore.config import Config
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 WORKER_CONCURRENCY = max(1, min(32, int(os.getenv("WORKER_CONCURRENCY", "4"))))
 FETCH_TIMEOUT = float(os.getenv("FETCH_TIMEOUT_SECONDS", "25"))
 USER_AGENT = "GeoAcademicBot/1.0 (+https://geoacademic.app)"
 WORKER_ID = f"fetch-{socket.gethostname()}"
-S3_ENDPOINT = os.environ["S3_ENDPOINT"].replace("http://", "").replace("https://", "")
-S3_SECURE = os.environ["S3_ENDPOINT"].startswith("https://")
+S3_ENDPOINT = os.environ["S3_ENDPOINT"].rstrip("/")
 S3_BUCKET = os.environ["S3_BUCKET"]
 
-minio = Minio(
-    S3_ENDPOINT,
-    access_key=os.environ["S3_ACCESS_KEY"],
-    secret_key=os.environ["S3_SECRET_KEY"],
-    secure=S3_SECURE,
+
+def infer_s3_region() -> str:
+    explicit = os.getenv("S3_REGION")
+    if explicit:
+        return explicit
+    db_host = urllib.parse.urlsplit(DATABASE_URL).hostname or ""
+    match = re.match(r"^aws-\d+-(.+?)\.pooler\.supabase\.com$", db_host)
+    if match:
+        return match.group(1)
+    return "us-east-1"
+
+
+S3_REGION = infer_s3_region()
+s3 = boto3.client(
+    "s3",
+    endpoint_url=S3_ENDPOINT,
+    aws_access_key_id=os.environ["S3_ACCESS_KEY"],
+    aws_secret_access_key=os.environ["S3_SECRET_KEY"],
+    region_name=S3_REGION,
+    config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
 )
 robots_cache: dict[str, urllib.robotparser.RobotFileParser] = {}
 
 
 async def ensure_bucket():
-    exists = await asyncio.to_thread(minio.bucket_exists, S3_BUCKET)
-    if not exists:
-        await asyncio.to_thread(minio.make_bucket, S3_BUCKET)
+    try:
+        await asyncio.to_thread(s3.head_bucket, Bucket=S3_BUCKET)
+    except Exception as exc:
+        raise RuntimeError(
+            f"S3 bucket check failed for {S3_BUCKET!r} in region {S3_REGION}: {exc}"
+        ) from exc
 
 
 async def assert_public_url(url: str):
@@ -101,12 +119,11 @@ async def store_snapshot(body: bytes, content_hash: str) -> str:
     key = f"raw/{now:%Y/%m/%d}/{content_hash}.html.gz"
     compressed = gzip.compress(body, compresslevel=6)
     await asyncio.to_thread(
-        minio.put_object,
-        S3_BUCKET,
-        key,
-        io.BytesIO(compressed),
-        len(compressed),
-        content_type="application/gzip",
+        s3.put_object,
+        Bucket=S3_BUCKET,
+        Key=key,
+        Body=compressed,
+        ContentType="application/gzip",
     )
     return key
 
