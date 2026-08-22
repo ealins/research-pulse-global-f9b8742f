@@ -38,7 +38,7 @@ async function publicSnapshot(signal?: AbortSignal): Promise<PublicSnapshot> {
   }
   if (!snapshotPromise) {
     snapshotPromise = fetch(OPEN_ENGINE_SNAPSHOT_URL, {
-      signal,
+      signal: signal ?? null,
       headers: { accept: "application/json" },
     }).then(async (response) => {
       if (!response.ok) {
@@ -63,10 +63,10 @@ async function snapshotFallback<T>(path: string, signal?: AbortSignal): Promise<
   }
   const latestMatch = path.match(/^\/v1\/latest\/([^?]+)/);
   if (latestMatch) {
-    const entityType = decodeURIComponent(latestMatch[1]);
+    const entityType = decodeURIComponent(latestMatch[1] ?? "");
     return {
       entity_type: entityType,
-      items: snapshot.latest[entityType] || [],
+      items: snapshot.latest[entityType] ?? [],
       snapshot_generated_at: snapshot.generated_at,
     } as T;
   }
@@ -79,7 +79,7 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   }
   try {
     const response = await fetch(`${OPEN_ENGINE_URL}${path}`, {
-      signal,
+      signal: signal ?? null,
       headers: { accept: "application/json" },
     });
     if (!response.ok) {
