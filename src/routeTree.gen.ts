@@ -39,6 +39,7 @@ import { Route as ResearchersSlugRouteImport } from './routes/researchers.$slug'
 import { Route as TopicsIndexRouteImport } from './routes/topics.index'
 import { Route as TopicsSlugRouteImport } from './routes/topics.$slug'
 import { Route as AuthenticatedAdminPipelineHealthRouteImport } from './routes/_authenticated/admin.pipeline-health'
+import { Route as ApiPublicDataHealthRouteImport } from './routes/api/public/data-health'
 import { Route as ApiPublicHooksIngestBatchRouteImport } from './routes/api/public/hooks/ingest-batch'
 
 const IndexRoute = IndexRouteImport.update({
@@ -191,6 +192,11 @@ const AuthenticatedAdminPipelineHealthRoute =
     path: '/admin/pipeline-health',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicDataHealthRoute = ApiPublicDataHealthRouteImport.update({
+  id: '/api/public/data-health',
+  path: '/api/public/data-health',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicHooksIngestBatchRoute =
   ApiPublicHooksIngestBatchRouteImport.update({
     id: '/api/public/hooks/ingest-batch',
@@ -228,6 +234,7 @@ export interface FileRoutesByFullPath {
   '/researchers/': typeof ResearchersIndexRoute
   '/topics/': typeof TopicsIndexRoute
   '/admin/pipeline-health': typeof AuthenticatedAdminPipelineHealthRoute
+  '/api/public/data-health': typeof ApiPublicDataHealthRoute
   '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRoutesByTo {
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/researchers': typeof ResearchersIndexRoute
   '/topics': typeof TopicsIndexRoute
   '/admin/pipeline-health': typeof AuthenticatedAdminPipelineHealthRoute
+  '/api/public/data-health': typeof ApiPublicDataHealthRoute
   '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRoutesById {
@@ -294,6 +302,7 @@ export interface FileRoutesById {
   '/researchers/': typeof ResearchersIndexRoute
   '/topics/': typeof TopicsIndexRoute
   '/_authenticated/admin/pipeline-health': typeof AuthenticatedAdminPipelineHealthRoute
+  '/api/public/data-health': typeof ApiPublicDataHealthRoute
   '/api/public/hooks/ingest-batch': typeof ApiPublicHooksIngestBatchRoute
 }
 export interface FileRouteTypes {
@@ -328,6 +337,7 @@ export interface FileRouteTypes {
     | '/researchers/'
     | '/topics/'
     | '/admin/pipeline-health'
+    | '/api/public/data-health'
     | '/api/public/hooks/ingest-batch'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -360,6 +370,7 @@ export interface FileRouteTypes {
     | '/researchers'
     | '/topics'
     | '/admin/pipeline-health'
+    | '/api/public/data-health'
     | '/api/public/hooks/ingest-batch'
   id:
     | '__root__'
@@ -393,6 +404,7 @@ export interface FileRouteTypes {
     | '/researchers/'
     | '/topics/'
     | '/_authenticated/admin/pipeline-health'
+    | '/api/public/data-health'
     | '/api/public/hooks/ingest-batch'
   fileRoutesById: FileRoutesById
 }
@@ -426,6 +438,7 @@ export interface RootRouteChildren {
   PublicationsIndexRoute: typeof PublicationsIndexRoute
   ResearchersIndexRoute: typeof ResearchersIndexRoute
   TopicsIndexRoute: typeof TopicsIndexRoute
+  ApiPublicDataHealthRoute: typeof ApiPublicDataHealthRoute
   ApiPublicHooksIngestBatchRoute: typeof ApiPublicHooksIngestBatchRoute
 }
 
@@ -641,6 +654,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPipelineHealthRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/data-health': {
+      id: '/api/public/data-health'
+      path: '/api/public/data-health'
+      fullPath: '/api/public/data-health'
+      preLoaderRoute: typeof ApiPublicDataHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/hooks/ingest-batch': {
       id: '/api/public/hooks/ingest-batch'
       path: '/api/public/hooks/ingest-batch'
@@ -692,6 +712,7 @@ const rootRouteChildren: RootRouteChildren = {
   PublicationsIndexRoute: PublicationsIndexRoute,
   ResearchersIndexRoute: ResearchersIndexRoute,
   TopicsIndexRoute: TopicsIndexRoute,
+  ApiPublicDataHealthRoute: ApiPublicDataHealthRoute,
   ApiPublicHooksIngestBatchRoute: ApiPublicHooksIngestBatchRoute,
 }
 export const routeTree = rootRouteImport

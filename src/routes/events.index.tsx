@@ -174,7 +174,7 @@ function EventsPage() {
                   <span>{e.location ?? "Location not stated"}</span>
                 </div>
                 <div className="mt-3">
-                  <TopicPills topics={(e.event_topics ?? []).map((t) => t.research_topics?.name)} />
+                  <TopicPills topics={(e.event_topics ?? []).map((t: any) => t.research_topics?.name)} />
                 </div>
                 <div className="mt-auto pt-4">
                   <ProvenanceChips verification={e.verification_status} isDemo={e.is_demo} />

@@ -201,7 +201,7 @@ function MethodologyPage() {
                       ) : null}
                     </p>
                     <a
-                      href={s.url}
+                      href={s.url ?? undefined}
                       target="_blank"
                       rel="noreferrer noopener"
                       className="mt-0.5 block truncate text-[0.65rem] text-primary hover:underline"
@@ -211,7 +211,7 @@ function MethodologyPage() {
                   </div>
                   <span className="mono-num text-[0.62rem] text-muted-foreground">
                     trust {s.trust_level} · every {s.refresh_frequency_hours}h ·{" "}
-                    {s.source_type.replace(/_/g, " ")}
+                    {(s.source_type ?? "").replace(/_/g, " ")}
                     {s.active ? "" : " · paused"}
                   </span>
                 </div>

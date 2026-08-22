@@ -1,7 +1,15 @@
-const OPEN_ENGINE_URL = (import.meta.env["VITE_GEOACADEMIC_API_URL"] || "").replace(/\/$/, "");
+// Public Cloud Run deployment of the GeoAcademic open engine. Safe to ship in the
+// browser bundle; VITE_GEOACADEMIC_API_URL always wins when it is provided.
+const DEFAULT_OPEN_ENGINE_URL = "https://geoacademic-api-xjh4s3mvyq-ey.a.run.app";
+
+const OPEN_ENGINE_URL = (
+  import.meta.env["VITE_GEOACADEMIC_API_URL"] ||
+  DEFAULT_OPEN_ENGINE_URL
+).replace(/\/$/, "");
 const OPEN_ENGINE_SNAPSHOT_URL = import.meta.env["VITE_GEOACADEMIC_SNAPSHOT_URL"] || "";
 
 export const openEngineConfigured = Boolean(OPEN_ENGINE_URL);
+
 
 export type OpenEngineFeed<T = Record<string, unknown>> = {
   entity_type: string;
@@ -30,7 +38,7 @@ async function publicSnapshot(signal?: AbortSignal): Promise<PublicSnapshot> {
   }
   if (!snapshotPromise) {
     snapshotPromise = fetch(OPEN_ENGINE_SNAPSHOT_URL, {
-      signal,
+      signal: signal ?? null,
       headers: { accept: "application/json" },
     }).then(async (response) => {
       if (!response.ok) {
@@ -55,10 +63,10 @@ async function snapshotFallback<T>(path: string, signal?: AbortSignal): Promise<
   }
   const latestMatch = path.match(/^\/v1\/latest\/([^?]+)/);
   if (latestMatch) {
-    const entityType = decodeURIComponent(latestMatch[1]);
+    const entityType = decodeURIComponent(latestMatch[1] ?? "");
     return {
       entity_type: entityType,
-      items: snapshot.latest[entityType] || [],
+      items: snapshot.latest[entityType] ?? [],
       snapshot_generated_at: snapshot.generated_at,
     } as T;
   }
@@ -71,7 +79,7 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   }
   try {
     const response = await fetch(`${OPEN_ENGINE_URL}${path}`, {
-      signal,
+      signal: signal ?? null,
       headers: { accept: "application/json" },
     });
     if (!response.ok) {
