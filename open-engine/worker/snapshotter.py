@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import os
+import uuid
 from datetime import datetime, timezone
 
 import asyncpg
@@ -37,6 +38,8 @@ def serializable(row):
     for key, item in list(value.items()):
         if hasattr(item, "isoformat"):
             value[key] = item.isoformat()
+        elif isinstance(item, uuid.UUID):
+            value[key] = str(item)
     return value
 
 
