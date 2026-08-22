@@ -1,0 +1,39 @@
+name: GeoAcademic seed sources
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install database dependency
+        run: pip install asyncpg==0.30.0
+
+      - name: Seed initial geospatial academic sources
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+          DB_SCHEMA: geoacademic_engine
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          python open-engine/worker/seed.py \
+            https://www.isprs.org/job_opportunities/default.aspx \
+            https://www.isprs.org/calendar/2026.aspx \
+            https://www.isprs.org/calendar/2027.aspx \
+            https://www.egu.eu/g/jobs/ \
+            https://earthobservations.org/about-us/events
+
+      - name: Next step
+        run: |
+          echo "Sources are now registered and FETCH tasks are queued."
+          echo "Run the GeoAcademic Cloud ingestion workflow next."
