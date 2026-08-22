@@ -17,15 +17,15 @@ export const Route = createFileRoute("/events/$slug")({
     const title = loaderData?.name ?? pretty;
     return {
       meta: [
-        { title: `${title} — Event synopsis | GeoAcademic Radar` },
+        { title: `${title} — Event details | GeoAcademic Radar` },
         {
           name: "description",
           content: `Dates, deadlines, location, topics and related open positions for ${title}, in photogrammetry, remote sensing and geoinformatics.`,
         },
-        { property: "og:title", content: `${title} — Event synopsis` },
+        { property: "og:title", content: `${title} — Event details` },
         {
           property: "og:description",
-          content: `One-page synopsis of ${title}: dates, submission deadlines, topics and nearby open calls.`,
+          content: `Event details for ${title}: published dates, submission deadlines, topics and related open calls.`,
         },
         { property: "og:type", content: "website" },
         { name: "twitter:card", content: "summary_large_image" },
@@ -116,7 +116,7 @@ function EventDetail() {
               params={{ slug: countrySlug(event.country) }}
               className="text-primary hover:underline"
             >
-              {event.country} synopsis
+              {event.country} profile
             </Link>
           ) : null}
           <span className="inline-flex items-center gap-1.5">
