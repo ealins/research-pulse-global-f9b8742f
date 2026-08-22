@@ -5,6 +5,7 @@ REGION="${GCP_REGION:-europe-west3}"
 SERVICE="${GCP_SERVICE:-geoacademic-api}"
 RUNTIME_SA_NAME="${GCP_RUNTIME_SA:-geoacademic-run}"
 DB_SCHEMA="${DB_SCHEMA:-geoacademic_engine}"
+MAX_INSTANCES="${GCP_MAX_INSTANCES:-5}"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 log() { printf '\n==> %s\n' "$*"; }
@@ -14,6 +15,7 @@ command -v gcloud >/dev/null || die "gcloud is required. Run this in Google Clou
 command -v python3 >/dev/null || die "python3 is required."
 command -v curl >/dev/null || die "curl is required."
 command -v openssl >/dev/null || die "openssl is required."
+[[ "$MAX_INSTANCES" =~ ^[1-9][0-9]*$ ]] || die "GCP_MAX_INSTANCES must be a positive integer."
 
 PROJECT_ID="${GOOGLE_CLOUD_PROJECT:-$(gcloud config get-value project 2>/dev/null)}"
 [ -n "$PROJECT_ID" ] && [ "$PROJECT_ID" != "(unset)" ] || die "Select or create a Google Cloud project first."
@@ -24,6 +26,7 @@ cat <<EOF
 GeoAcademic Google Cloud Run bootstrap
 Project: $PROJECT_ID
 Region:  $REGION
+Max instances: $MAX_INSTANCES
 
 Use the Supabase SESSION POOLER connection string from Supabase -> Connect.
 It normally uses port 5432 and works over IPv4 while supporting prepared statements.
@@ -101,7 +104,7 @@ gcloud run deploy "$SERVICE" \
   --concurrency=40 \
   --timeout=60s \
   --min=0 \
-  --max=2 \
+  --max="$MAX_INSTANCES" \
   --quiet
 
 SERVICE_URL="$(gcloud run services describe "$SERVICE" \
