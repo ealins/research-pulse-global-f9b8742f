@@ -1,7 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-const PUBLIC_STATUSES = ["verified", "auto_discovered", "possibly_outdated"] as const;
-
 function json(payload: unknown, status = 200) {
   return new Response(JSON.stringify(payload), {
     status,
@@ -19,66 +17,54 @@ export const Route = createFileRoute("/api/public/data-health")({
         try {
           const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-          const tables = [
-            "institutions",
-            "researchers",
-            "opportunities",
-            "publications",
-            "projects",
-            "events",
-            "pulse_events",
+          const [
+            institutions,
+            researchers,
+            opportunities,
+            publications,
+            projects,
+            events,
+            pulseEvents,
+            publicSurface,
+          ] = await Promise.all([
+            supabaseAdmin.from("institutions").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.from("researchers").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.from("opportunities").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.from("publications").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.from("projects").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.from("events").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.from("pulse_events").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin.rpc("public_surface_counts"),
+          ]);
+
+          const checks = [
+            ["institutions", institutions],
+            ["researchers", researchers],
+            ["opportunities", opportunities],
+            ["publications", publications],
+            ["projects", projects],
+            ["events", events],
+            ["pulse_events", pulseEvents],
           ] as const;
 
-          const totals = Object.fromEntries(
-            await Promise.all(
-              tables.map(async (table) => {
-                const { count, error } = await supabaseAdmin
-                  .from(table)
-                  .select("id", { count: "exact" })
-                  .eq("is_demo", false)
-                  .limit(1);
-                if (error) throw new Error(`${table}: ${error.message}`);
-                return [table, count ?? 0] as const;
-              }),
-            ),
-          );
-
-          const publicCounts = Object.fromEntries(
-            await Promise.all(
-              [
-                "institutions",
-                "researchers",
-                "opportunities",
-                "publications",
-                "projects",
-                "events",
-              ].map(async (table) => {
-                let query = supabaseAdmin
-                  .from(table as "institutions")
-                  .select("id", { count: "exact" })
-                  .eq("is_demo", false)
-                  .in("verification_status", PUBLIC_STATUSES)
-                  .limit(1);
-
-                if (table === "opportunities") {
-                  query = query
-                    .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
-                    .in("confidence", ["high", "medium"])
-                    .not("official_source_url", "is", null);
-                }
-
-                const { count, error } = await query;
-                if (error) throw new Error(`${table}: ${error.message}`);
-                return [table, count ?? 0] as const;
-              }),
-            ),
-          );
+          for (const [name, result] of checks) {
+            if (result.error) throw new Error(`${name}: ${result.error.message}`);
+          }
 
           return json({
             ok: true,
             checked_at: new Date().toISOString(),
-            non_demo_totals: totals,
-            public_candidate_counts: publicCounts,
+            non_demo_totals: {
+              institutions: institutions.count ?? 0,
+              researchers: researchers.count ?? 0,
+              opportunities: opportunities.count ?? 0,
+              publications: publications.count ?? 0,
+              projects: projects.count ?? 0,
+              events: events.count ?? 0,
+              pulse_events: pulseEvents.count ?? 0,
+            },
+            public_surface_counts: publicSurface.error ? null : publicSurface.data,
+            public_surface_rpc_error: publicSurface.error ? publicSurface.error.message : null,
           });
         } catch (error) {
           console.error("[data-health]", error);
