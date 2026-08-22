@@ -24,7 +24,7 @@ async def main() -> None:
             SELECT count(*)
             FROM latest_public_entities
             WHERE entity_type='opportunity'
-              AND coalesce(source_url, '') ~* '^https?://(www\\.)?egu\\.eu/g/jobs/?'
+              AND coalesce(source_url, '') ~* '^https?://(www[.])?egu[.]eu/g/jobs/?'
               AND NOT geoacademic_scope_text_matches(title, data)
             """
         )
@@ -33,7 +33,7 @@ async def main() -> None:
             SELECT count(*)
             FROM canonical_entities
             WHERE entity_type='opportunity'
-              AND coalesce(source_url, '') ~* '^https?://(www\\.)?egu\\.eu/g/jobs/?'
+              AND coalesce(source_url, '') ~* '^https?://(www[.])?egu[.]eu/g/jobs/?'
               AND verification_status='needs_review'
             """
         )
