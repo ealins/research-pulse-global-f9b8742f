@@ -4,7 +4,7 @@ import { ExternalLink, Timer, MapPin, UserRound, AlertTriangle, CalendarPlus } f
 
 import { AppShell, PageHeader, StatTile, TopicPills } from "@/components/layout/AppShell";
 import { EvidenceDrawer, staleness } from "@/components/EvidenceDrawer";
-import { opportunityDetailQuery } from "@/lib/detail-queries";
+import { hybridOpportunityDetailQuery as opportunityDetailQuery } from "@/lib/open-engine-radar";
 import { STATUS_LABEL, TYPE_LABEL, daysUntil, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadJobLd, jobJsonLd } from "@/lib/jsonld";
@@ -114,21 +114,27 @@ function OpportunityDetail() {
         description={
           o.institutions
             ? `${o.institutions.name}${o.departments?.name ? " · " + o.departments.name : ""}`
-            : "Institution not recorded"
+            : o.employer_name ?? "Institution not recorded"
         }
         actions={
-          <div className="flex flex-col items-end gap-2">
-            <EvidenceDrawer
-              entityType="opportunity"
-              entityId={o.id}
-              title={o.title}
-              verification={o.verification_status}
-              confidence={o.confidence}
-              lastVerified={o.last_verified_at ?? o.last_checked_at}
-              isDemo={o.is_demo}
-            />
-            <span className={`text-[0.68rem] ${fresh.tone}`}>{fresh.label}</span>
-          </div>
+          o.open_engine ? (
+            <span className="rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[0.68rem] uppercase tracking-wider text-muted-foreground">
+              Open engine · {String(o.verification_status).replace(/_/g, " ")}
+            </span>
+          ) : (
+            <div className="flex flex-col items-end gap-2">
+              <EvidenceDrawer
+                entityType="opportunity"
+                entityId={o.id}
+                title={o.title}
+                verification={o.verification_status}
+                confidence={o.confidence}
+                lastVerified={o.last_verified_at ?? o.last_checked_at}
+                isDemo={o.is_demo}
+              />
+              <span className={`text-[0.68rem] ${fresh.tone}`}>{fresh.label}</span>
+            </div>
+          )
         }
       />
 
