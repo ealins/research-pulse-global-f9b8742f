@@ -1,0 +1,58 @@
+name: Deploy GeoAcademic open engine to Oracle
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "open-engine/**"
+
+concurrency:
+  group: geoacademic-open-engine-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ORACLE_HOST: ${{ secrets.ORACLE_HOST }}
+      ORACLE_USER: ${{ secrets.ORACLE_USER }}
+      ORACLE_SSH_PRIVATE_KEY: ${{ secrets.ORACLE_SSH_PRIVATE_KEY }}
+      ORACLE_SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
+      ORACLE_DEPLOY_PATH: ${{ secrets.ORACLE_DEPLOY_PATH }}
+    steps:
+      - name: Check deployment configuration
+        id: config
+        shell: bash
+        run: |
+          if [ -z "$ORACLE_HOST" ] || [ -z "$ORACLE_USER" ] || [ -z "$ORACLE_SSH_PRIVATE_KEY" ] || [ -z "$ORACLE_SSH_KNOWN_HOSTS" ] || [ -z "$ORACLE_DEPLOY_PATH" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Oracle deployment secrets are not configured yet; no deployment attempted."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Configure SSH
+        if: steps.config.outputs.configured == 'true'
+        shell: bash
+        run: |
+          install -d -m 700 "$HOME/.ssh"
+          printf '%s\n' "$ORACLE_SSH_PRIVATE_KEY" > "$HOME/.ssh/geoacademic_oracle"
+          chmod 600 "$HOME/.ssh/geoacademic_oracle"
+          printf '%s\n' "$ORACLE_SSH_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+
+      - name: Deploy current main on Oracle
+        if: steps.config.outputs.configured == 'true'
+        shell: bash
+        run: |
+          ssh -i "$HOME/.ssh/geoacademic_oracle" "$ORACLE_USER@$ORACLE_HOST" \
+            "set -euo pipefail; cd '$ORACLE_DEPLOY_PATH'; git fetch origin main; git checkout main; git reset --hard origin/main; cd open-engine; chmod +x deploy-oracle.sh; ./deploy-oracle.sh"
+
+      - name: Verify public API
+        if: steps.config.outputs.configured == 'true'
+        run: curl --fail --silent --show-error --max-time 30 https://api.geoacademic.app/health
