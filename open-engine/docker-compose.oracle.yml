@@ -1,0 +1,109 @@
+services:
+  postgres:
+    build: ./db/oracle
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    networks: [backend]
+
+  api:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      PUBLIC_CORS_ORIGINS: ${PUBLIC_CORS_ORIGINS}
+      INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      DB_POOL_MAX: ${DB_POOL_MAX:-12}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+    networks: [backend, edge]
+
+  fetch-worker:
+    build: ./worker
+    restart: unless-stopped
+    command: ["python", "worker.py"]
+    environment: &worker-env
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      S3_ENDPOINT: ${S3_ENDPOINT}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      FETCH_TIMEOUT_SECONDS: ${FETCH_TIMEOUT_SECONDS:-25}
+      AI_FALLBACK_ENABLED: ${AI_FALLBACK_ENABLED:-true}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  processor:
+    build: ./worker
+    restart: unless-stopped
+    command: ["python", "processor.py"]
+    environment: *worker-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  scheduler:
+    build: ./worker
+    restart: unless-stopped
+    command: ["python", "scheduler.py"]
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      SCHEDULER_INTERVAL_SECONDS: ${SCHEDULER_INTERVAL_SECONDS:-300}
+      SCHEDULER_ENQUEUE_LIMIT: ${SCHEDULER_ENQUEUE_LIMIT:-500}
+      TASK_STALE_AFTER_MINUTES: ${TASK_STALE_AFTER_MINUTES:-30}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [edge]
+
+networks:
+  backend:
+    internal: true
+  edge:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
