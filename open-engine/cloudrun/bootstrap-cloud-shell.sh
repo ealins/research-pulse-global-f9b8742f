@@ -83,6 +83,10 @@ python3 -m venv "$VENV"
 DATABASE_URL="$DATABASE_URL" DB_SCHEMA="$DB_SCHEMA" \
   "$VENV/bin/python" "$REPO_ROOT/open-engine/cloudrun/migrate.py"
 
+log "Copying existing public sources into the isolated registry"
+DATABASE_URL="$DATABASE_URL" DB_SCHEMA="$DB_SCHEMA" \
+  "$VENV/bin/python" "$REPO_ROOT/open-engine/cloudrun/import_legacy_sources.py"
+
 log "Deploying FastAPI service to Cloud Run"
 gcloud run deploy "$SERVICE" \
   --source "$REPO_ROOT/open-engine/backend" \
@@ -120,7 +124,7 @@ Cloud Run API:
 Lovable environment variable after you choose to switch traffic:
   VITE_GEOACADEMIC_API_URL=$SERVICE_URL
 
-Do NOT switch Lovable yet if you still want to seed/test the open engine first.
+Do NOT switch Lovable yet if you still want to test the open engine first.
 
 Next, configure these GitHub repository secrets for scheduled ingestion:
   GEOACADEMIC_DATABASE_URL       (same Supabase Session Pooler URL)
