@@ -1,7 +1,15 @@
-const OPEN_ENGINE_URL = (import.meta.env["VITE_GEOACADEMIC_API_URL"] || "").replace(/\/$/, "");
+// Public Cloud Run deployment of the GeoAcademic open engine. Safe to ship in the
+// browser bundle; VITE_GEOACADEMIC_API_URL always wins when it is provided.
+const DEFAULT_OPEN_ENGINE_URL = "https://geoacademic-api-xjh4s3mvyq-ey.a.run.app";
+
+const OPEN_ENGINE_URL = (
+  import.meta.env["VITE_GEOACADEMIC_API_URL"] ||
+  DEFAULT_OPEN_ENGINE_URL
+).replace(/\/$/, "");
 const OPEN_ENGINE_SNAPSHOT_URL = import.meta.env["VITE_GEOACADEMIC_SNAPSHOT_URL"] || "";
 
 export const openEngineConfigured = Boolean(OPEN_ENGINE_URL);
+
 
 export type OpenEngineFeed<T = Record<string, unknown>> = {
   entity_type: string;
