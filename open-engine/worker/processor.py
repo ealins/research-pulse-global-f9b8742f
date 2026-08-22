@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from minio import Minio
 
 from ai_router import extract_with_ai
+from date_normalization import normalize_candidate_dates
 from deterministic_extractors import extract_deterministic_candidates
 
 DATABASE_URL = os.environ["DATABASE_URL"]
@@ -187,6 +188,8 @@ async def materialize(pool, task):
             candidates = await extract_with_ai(html, snapshot["source_url"])
             extraction_path = "ai" if candidates else "none"
 
+        candidates = [normalize_candidate_dates(candidate) for candidate in candidates]
+
         async with pool.acquire() as conn:
             async with conn.transaction():
                 for candidate in candidates:
@@ -223,10 +226,33 @@ async def materialize(pool, task):
                     )
                     await conn.execute(
                         """
+                        WITH updated AS (
+                            UPDATE record_sources
+                            SET content_hash=$3,
+                                last_checked_at=now(),
+                                verification_status=CASE
+                                    WHEN verification_status='verified' THEN 'verified'
+                                    ELSE $4
+                                END,
+                                confidence=greatest(confidence, $5),
+                                evidence=$6::jsonb
+                            WHERE id = (
+                                SELECT id
+                                FROM record_sources
+                                WHERE entity_id=$1
+                                  AND source_url=$2
+                                  AND is_primary=true
+                                ORDER BY discovered_at, id
+                                LIMIT 1
+                            )
+                            RETURNING id
+                        )
                         INSERT INTO record_sources(
                             entity_id, source_url, content_hash, last_checked_at,
                             verification_status, confidence, is_primary, evidence
-                        ) VALUES($1,$2,$3,now(),$4,$5,true,$6::jsonb)
+                        )
+                        SELECT $1,$2,$3,now(),$4,$5,true,$6::jsonb
+                        WHERE NOT EXISTS (SELECT 1 FROM updated)
                         """,
                         entity_id, candidate["source_url"], snapshot["content_hash"],
                         verification_status, candidate["confidence"],
@@ -239,6 +265,15 @@ async def materialize(pool, task):
                     if changed:
                         prefix = "NEW" if existing is None else "UPDATED"
                         signal_type = f"{prefix}_{candidate['entity_type'].upper()}"
+                        signal_data = {
+                            "snapshot_id": snapshot_id,
+                            "extraction_path": extraction_path,
+                        }
+                        candidate_data = candidate.get("data")
+                        if isinstance(candidate_data, dict):
+                            for key in ("start_date", "end_date", "posted_date", "deadline_date"):
+                                if candidate_data.get(key):
+                                    signal_data[key] = candidate_data[key]
                         await conn.execute(
                             """
                             INSERT INTO signals(
@@ -249,7 +284,7 @@ async def materialize(pool, task):
                             signal_type, entity_id, candidate["entity_type"], candidate["title"],
                             candidate["country"], 55 if existing is None else 35,
                             candidate["confidence"], verification_status, candidate["source_url"],
-                            json.dumps({"snapshot_id": snapshot_id, "extraction_path": extraction_path}),
+                            json.dumps(signal_data),
                         )
                 await conn.execute(
                     "UPDATE ingestion_tasks SET status='DONE', error=NULL, updated_at=now() WHERE id=$1",

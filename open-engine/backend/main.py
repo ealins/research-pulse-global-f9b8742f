@@ -1,3 +1,4 @@
+import json
 import os
 from contextlib import asynccontextmanager
 
@@ -21,6 +22,7 @@ ALLOWED_ENTITY_TYPES = {
     "event",
     "topic",
 }
+NORMALIZED_DATE_FIELDS = ("start_date", "end_date", "posted_date", "deadline_date")
 
 
 def row_dict(row):
@@ -30,6 +32,17 @@ def row_dict(row):
     for key, item in list(value.items()):
         if hasattr(item, "isoformat"):
             value[key] = item.isoformat()
+        elif key == "data" and isinstance(item, str):
+            try:
+                value[key] = json.loads(item)
+            except json.JSONDecodeError:
+                pass
+
+    data = value.get("data")
+    if isinstance(data, dict):
+        for key in NORMALIZED_DATE_FIELDS:
+            if data.get(key):
+                value[key] = data[key]
     return value
 
 
@@ -50,7 +63,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GeoAcademic Open Engine",
-    version="0.3.0",
+    version="0.4.0",
     default_response_class=ORJSONResponse,
     lifespan=lifespan,
 )
@@ -147,13 +160,56 @@ async def latest_entities(
         args.append(country)
         filters.append(f"country = ${len(args)}")
     args.append(limit)
+
+    if entity_type == "event":
+        order_sql = """
+            CASE
+                WHEN data->>'end_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                 AND (data->>'end_date')::date >= current_date THEN 0
+                WHEN data->>'end_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN 2
+                ELSE 1
+            END ASC,
+            CASE
+                WHEN data->>'start_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                 AND data->>'end_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                 AND (data->>'end_date')::date >= current_date
+                THEN (data->>'start_date')::date
+            END ASC NULLS LAST,
+            CASE
+                WHEN data->>'start_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                THEN (data->>'start_date')::date
+            END DESC NULLS LAST,
+            coalesce(published_at, last_changed_at) DESC
+        """
+    elif entity_type == "opportunity":
+        order_sql = """
+            CASE
+                WHEN data->>'deadline_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                 AND (data->>'deadline_date')::date >= current_date THEN 0
+                WHEN data->>'deadline_date' ~ '^\\d{4}-\\d{2}-\\d{2}$' THEN 2
+                ELSE 1
+            END ASC,
+            CASE
+                WHEN data->>'deadline_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                 AND (data->>'deadline_date')::date >= current_date
+                THEN (data->>'deadline_date')::date
+            END ASC NULLS LAST,
+            CASE
+                WHEN data->>'posted_date' ~ '^\\d{4}-\\d{2}-\\d{2}$'
+                THEN (data->>'posted_date')::date
+            END DESC NULLS LAST,
+            coalesce(published_at, last_changed_at) DESC
+        """
+    else:
+        order_sql = "coalesce(published_at, last_changed_at) DESC"
+
     sql = f"""
         SELECT id, entity_type, external_key, slug, title, subtitle, country,
                latitude, longitude, verification_status, confidence, source_url,
                published_at, first_seen_at, last_seen_at, last_changed_at, data
         FROM latest_public_entities
         WHERE {' AND '.join(filters)}
-        ORDER BY coalesce(published_at, last_changed_at) DESC
+        ORDER BY {order_sql}
         LIMIT ${len(args)}
     """
     async with app.state.db.acquire() as conn:
@@ -192,7 +248,7 @@ async def search(q: str = Query(..., min_length=2, max_length=160), limit: int =
         rows = await conn.fetch(
             """
             SELECT id, entity_type, slug, title, subtitle, country,
-                   verification_status, confidence, source_url,
+                   verification_status, confidence, source_url, data,
                    greatest(similarity(title, $1), CASE WHEN title ILIKE '%' || $1 || '%' THEN 0.8 ELSE 0 END) AS score
             FROM latest_public_entities
             WHERE title ILIKE '%' || $1 || '%' OR similarity(title, $1) > 0.25
