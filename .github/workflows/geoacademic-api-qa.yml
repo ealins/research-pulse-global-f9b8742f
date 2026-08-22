@@ -41,3 +41,4 @@ jobs:
           test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
           export GEOACADEMIC_API_URL="${MANUAL_API_URL:-${REPO_API_URL:-https://geoacademic-api-xjh4s3mvyq-ey.a.run.app}}"
           python open-engine/cloudrun/qa.py
+          python open-engine/cloudrun/qa_slugs.py
