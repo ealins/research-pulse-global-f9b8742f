@@ -97,6 +97,11 @@ export const openEngine = {
     request<Record<string, unknown>>(`/v1/pulse/summary?hours=${hours}`, signal),
   latest: (entityType: string, limit = 50, signal?: AbortSignal) =>
     request<OpenEngineFeed>(`/v1/latest/${encodeURIComponent(entityType)}?limit=${limit}`, signal),
+  entity: (entityType: string, slug: string, signal?: AbortSignal) =>
+    request<Record<string, unknown>>(
+      `/v1/entities/${encodeURIComponent(entityType)}/${encodeURIComponent(slug)}`,
+      signal,
+    ),
   search: (query: string, limit = 20, signal?: AbortSignal) =>
     request<{ query: string; items: Record<string, unknown>[] }>(
       `/v1/search?q=${encodeURIComponent(query)}&limit=${limit}`,

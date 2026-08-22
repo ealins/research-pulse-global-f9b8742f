@@ -11,7 +11,8 @@ import {
   TopicPills,
 } from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
-import { eventsQuery, formatDate, daysUntil } from "@/lib/radar-queries";
+import { formatDate, daysUntil } from "@/lib/radar-queries";
+import { hybridEventsQuery as eventsQuery } from "@/lib/open-engine-radar";
 import { KIND_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardLink } from "@/components/CardLink";

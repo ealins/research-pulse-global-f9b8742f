@@ -6,7 +6,7 @@ import { ArrowUpRight, ExternalLink } from "lucide-react";
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
 import { EmptyState } from "@/components/EmptyState";
 import { CardExternalLink } from "@/components/CardLink";
-import { countsQuery, pulseQuery } from "@/lib/radar-queries";
+import { hybridCountsQuery as countsQuery, hybridPulseQuery as pulseQuery } from "@/lib/open-engine-radar";
 import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
 import { PulseHub, type Cluster } from "@/components/PulseHub";
 import type { GlobeArc, GlobePoint } from "@/components/Globe";

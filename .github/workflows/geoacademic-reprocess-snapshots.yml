@@ -20,6 +20,14 @@ jobs:
       - name: Install database dependency
         run: pip install asyncpg==0.30.0
 
+      - name: Apply open-engine migrations
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+          DB_SCHEMA: geoacademic_engine
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          python open-engine/cloudrun/migrate.py
+
       - name: Queue latest stored snapshots for extraction
         env:
           DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
@@ -30,5 +38,5 @@ jobs:
 
       - name: Next step
         run: |
-          echo "Latest stored snapshots are queued for extraction."
+          echo "Open-engine migrations are applied and latest stored snapshots are queued for extraction."
           echo "Run the GeoAcademic Cloud ingestion workflow next."
