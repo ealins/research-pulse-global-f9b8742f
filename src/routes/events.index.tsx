@@ -140,7 +140,7 @@ function EventsPage() {
                 <CardLink
                   to="/events/$slug"
                   params={{ slug: e.slug }}
-                  label={`${e.title}: open event synopsis`}
+                  label={`${e.title}: view event details`}
                 />
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="rounded-full border border-primary/40 bg-primary/12 px-2.5 py-0.5 text-[0.65rem] uppercase tracking-wider text-primary">
@@ -184,7 +184,7 @@ function EventsPage() {
                       params={{ slug: e.slug }}
                       className="text-[0.7rem] font-medium text-primary underline-offset-4 hover:underline"
                     >
-                      Open synopsis
+                      View details
                     </Link>
                     {e.website ? (
                       <a

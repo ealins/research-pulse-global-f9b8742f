@@ -41,7 +41,6 @@ const hubGlobeQuery = queryOptions({
   },
 });
 
-
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
@@ -158,7 +157,7 @@ function AcademicPulse() {
       <PageHeader
         eyebrow="Global research & industry intelligence"
         title="Research Pulse"
-        description="What moved in photogrammetry, remote sensing and geoinformatics: new academic and industry positions, publications, projects and events. Every signal keeps its source link and verification status — nothing is inferred or invented."
+        description="What moved in photogrammetry, remote sensing and geoinformatics: new academic and industry positions, publications, projects and events. Every signal keeps its source link and verification status; derived display labels are based on sourced fields rather than invented facts."
         actions={
           <Link
             to="/jobs"
@@ -173,8 +172,7 @@ function AcademicPulse() {
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         <section className="panel signal-wash p-6 text-center">
           <p className="text-sm leading-relaxed text-muted-foreground md:text-base">
-            Every record links back to an official source and carries a verification status.
-            Nothing here is inferred.
+            Every record links back to an official source and carries a verification status. Some display labels, such as “closing soon”, are computed from sourced dates.
           </p>
         </section>
 
@@ -220,14 +218,13 @@ function AcademicPulse() {
           <StatTile label="Events" value={counts?.events ?? "—"} tone="signal" to="/events" />
         </section>
 
-
         <section className="mt-10">
           <div className="flex items-center justify-between">
             <h2 className="font-display text-sm font-semibold uppercase tracking-[0.18em] text-muted-foreground">
               Latest signals
             </h2>
             <span className="mono-num text-xs text-muted-foreground">
-              {(events?.length ?? 0) > 0 ? `${events?.length} entries` : <EmptyState variant="badge" />}
+              {(events?.length ?? 0) > 0 ? `Latest ${events?.length}` : <EmptyState variant="badge" />}
             </span>
           </div>
 

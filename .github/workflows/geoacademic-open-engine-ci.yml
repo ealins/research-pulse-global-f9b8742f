@@ -48,7 +48,8 @@ jobs:
             open-engine/cloudrun/import_legacy_sources.py \
             open-engine/cloudrun/batch_runner.py \
             open-engine/cloudrun/qa.py \
-            open-engine/cloudrun/qa_slugs.py
+            open-engine/cloudrun/qa_slugs.py \
+            open-engine/cloudrun/qa_scope.py
 
       - name: Test deterministic extraction and date normalization
         run: |
