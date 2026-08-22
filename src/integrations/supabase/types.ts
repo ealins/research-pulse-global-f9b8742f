@@ -56,6 +56,13 @@ export type Database = {
             foreignKeyName: "academic_changes_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "public_source_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "academic_changes_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -714,6 +721,13 @@ export type Database = {
             foreignKeyName: "ingestion_tasks_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "public_source_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ingestion_tasks_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -909,6 +923,13 @@ export type Database = {
             columns: ["raw_page_id"]
             isOneToOne: false
             referencedRelation: "raw_records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "llm_processing_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "public_source_registry"
             referencedColumns: ["id"]
           },
           {
@@ -1860,6 +1881,13 @@ export type Database = {
             foreignKeyName: "raw_records_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "public_source_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "raw_records_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -1924,6 +1952,13 @@ export type Database = {
           verification_status?: Database["public"]["Enums"]["verification_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "record_sources_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "public_source_registry"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "record_sources_source_id_fkey"
             columns: ["source_id"]
@@ -2398,6 +2433,13 @@ export type Database = {
             foreignKeyName: "sync_runs_source_id_fkey"
             columns: ["source_id"]
             isOneToOne: false
+            referencedRelation: "public_source_registry"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sync_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
             referencedRelation: "sources"
             referencedColumns: ["id"]
           },
@@ -2592,41 +2634,98 @@ export type Database = {
       public_record_sources: {
         Row: {
           claim: string | null
-          confidence: Database["public"]["Enums"]["confidence_level"]
-          discovered_at: string
-          entity_id: string
-          entity_type: string
-          id: string
-          is_primary: boolean
+          confidence: Database["public"]["Enums"]["confidence_level"] | null
+          discovered_at: string | null
+          entity_id: string | null
+          entity_type: string | null
+          id: string | null
+          is_primary: boolean | null
           last_checked_at: string | null
           last_verified_at: string | null
           original_title: string | null
           source_organization: string | null
-          source_type: Database["public"]["Enums"]["source_type"]
-          source_url: string
-          verification_status: Database["public"]["Enums"]["verification_status"]
+          source_type: Database["public"]["Enums"]["source_type"] | null
+          source_url: string | null
+          verification_status:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Insert: {
+          claim?: string | null
+          confidence?: Database["public"]["Enums"]["confidence_level"] | null
+          discovered_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          last_checked_at?: string | null
+          last_verified_at?: string | null
+          original_title?: string | null
+          source_organization?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"] | null
+          source_url?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
+        }
+        Update: {
+          claim?: string | null
+          confidence?: Database["public"]["Enums"]["confidence_level"] | null
+          discovered_at?: string | null
+          entity_id?: string | null
+          entity_type?: string | null
+          id?: string | null
+          is_primary?: boolean | null
+          last_checked_at?: string | null
+          last_verified_at?: string | null
+          original_title?: string | null
+          source_organization?: string | null
+          source_type?: Database["public"]["Enums"]["source_type"] | null
+          source_url?: string | null
+          verification_status?:
+            | Database["public"]["Enums"]["verification_status"]
+            | null
         }
         Relationships: []
       }
       public_source_registry: {
         Row: {
-          active: boolean
-          id: string
-          name: string
+          active: boolean | null
+          id: string | null
+          name: string | null
           organization: string | null
-          refresh_frequency_hours: number
-          source_type: Database["public"]["Enums"]["source_type"]
-          trust_level: number
-          url: string
+          refresh_frequency_hours: number | null
+          source_type: Database["public"]["Enums"]["source_type"] | null
+          trust_level: number | null
+          url: string | null
+        }
+        Insert: {
+          active?: boolean | null
+          id?: string | null
+          name?: string | null
+          organization?: string | null
+          refresh_frequency_hours?: number | null
+          source_type?: Database["public"]["Enums"]["source_type"] | null
+          trust_level?: number | null
+          url?: string | null
+        }
+        Update: {
+          active?: boolean | null
+          id?: string | null
+          name?: string | null
+          organization?: string | null
+          refresh_frequency_hours?: number | null
+          source_type?: Database["public"]["Enums"]["source_type"] | null
+          trust_level?: number | null
+          url?: string | null
         }
         Relationships: []
       }
     }
     Functions: {
-      claim_admin_if_unclaimed: {
-        Args: { target_user_id: string }
-        Returns: boolean
-      }
+      claim_admin_if_unclaimed:
+        | { Args: never; Returns: boolean }
+        | { Args: { target_user_id: string }; Returns: boolean }
       global_search: {
         Args: { max_results?: number; q: string }
         Returns: {
