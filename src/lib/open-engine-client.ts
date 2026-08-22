@@ -20,6 +20,8 @@ type PublicSnapshot = {
   latest: Record<string, Record<string, unknown>[]>;
 };
 
+class NonFallbackApiError extends Error {}
+
 let snapshotPromise: Promise<PublicSnapshot> | null = null;
 
 async function publicSnapshot(signal?: AbortSignal): Promise<PublicSnapshot> {
@@ -36,7 +38,7 @@ async function publicSnapshot(signal?: AbortSignal): Promise<PublicSnapshot> {
       }
       return (await response.json()) as PublicSnapshot;
     });
-    window.setTimeout(() => {
+    globalThis.setTimeout(() => {
       snapshotPromise = null;
     }, 5 * 60 * 1000);
   }
@@ -74,13 +76,13 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
     });
     if (!response.ok) {
       if (response.status < 500) {
-        throw new Error(`GeoAcademic API ${response.status}: ${path}`);
+        throw new NonFallbackApiError(`GeoAcademic API ${response.status}: ${path}`);
       }
       return await snapshotFallback<T>(path, signal);
     }
     return (await response.json()) as T;
   } catch (error) {
-    if (signal?.aborted || !OPEN_ENGINE_SNAPSHOT_URL) {
+    if (error instanceof NonFallbackApiError || signal?.aborted || !OPEN_ENGINE_SNAPSHOT_URL) {
       throw error;
     }
     return snapshotFallback<T>(path, signal);
