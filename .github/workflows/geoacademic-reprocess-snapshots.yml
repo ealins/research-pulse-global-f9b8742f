@@ -1,0 +1,34 @@
+name: GeoAcademic reprocess snapshots
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reprocess:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install database dependency
+        run: pip install asyncpg==0.30.0
+
+      - name: Queue latest stored snapshots for extraction
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+          DB_SCHEMA: geoacademic_engine
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          python open-engine/worker/reprocess.py
+
+      - name: Next step
+        run: |
+          echo "Latest stored snapshots are queued for extraction."
+          echo "Run the GeoAcademic Cloud ingestion workflow next."
