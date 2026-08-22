@@ -54,13 +54,17 @@ async def main(urls: list[str]):
                 """
                 INSERT INTO ingestion_tasks(task_type, priority, payload)
                 SELECT 'FETCH', 10,
-                       jsonb_build_object('url',$1,'source_id',$2,'priority',10)
+                       jsonb_build_object(
+                           'url', $1::text,
+                           'source_id', $2::uuid,
+                           'priority', 10
+                       )
                 WHERE NOT EXISTS (
                     SELECT 1
                     FROM ingestion_tasks
                     WHERE task_type='FETCH'
                       AND status IN ('QUEUED','RETRY','PROCESSING')
-                      AND payload->>'url'=$1
+                      AND payload->>'url' = $1::text
                 )
                 RETURNING id
                 """,
