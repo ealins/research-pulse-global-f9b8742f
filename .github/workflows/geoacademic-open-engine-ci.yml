@@ -30,6 +30,7 @@ jobs:
             open-engine/worker/worker.py \
             open-engine/worker/processor.py \
             open-engine/worker/scheduler.py \
+            open-engine/worker/verifier.py \
             open-engine/worker/ai_router.py \
             open-engine/worker/snapshotter.py \
             open-engine/worker/seed.py
