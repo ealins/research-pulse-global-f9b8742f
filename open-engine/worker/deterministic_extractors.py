@@ -246,9 +246,17 @@ def extract_job_table_candidates(html: str, source_url: str) -> list[dict]:
             date_text = _clean(cells[date_idx].get_text(" ", strip=True))
             contact = _clean(cells[contact_idx].get_text(" ", strip=True))[:240] or None
             job_text = _clean(cells[job_idx].get_text(" ", strip=True))
-            deadline_match = re.search(r"\bDeadline:\s*([^|]{3,80})", job_text, re.IGNORECASE)
+            deadline_match = re.search(
+                r"\bDeadline:\s*(.*?)(?=\s+Location:|\s+For enquiries\b|$)",
+                job_text,
+                re.IGNORECASE,
+            )
             deadline = _clean(deadline_match.group(1))[:80] if deadline_match else None
-            location_match = re.search(r"\bLocation:\s*([^.;]{2,160})", job_text, re.IGNORECASE)
+            location_match = re.search(
+                r"\bLocation:\s*(.*?)(?=\s+Deadline:|\s+For enquiries\b|$)",
+                job_text,
+                re.IGNORECASE,
+            )
             location = _clean(location_match.group(1))[:160] if location_match else None
             country = _country_from_location(location)
             key = title.lower()
