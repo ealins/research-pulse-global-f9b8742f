@@ -1,0 +1,52 @@
+name: GeoAcademic open-engine CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "open-engine/**"
+      - ".github/workflows/geoacademic-open-engine-*.yml"
+  pull_request:
+    paths:
+      - "open-engine/**"
+      - ".github/workflows/geoacademic-open-engine-*.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile Python entrypoints
+        run: |
+          python -m py_compile \
+            open-engine/backend/main.py \
+            open-engine/backend/internal.py \
+            open-engine/worker/worker.py \
+            open-engine/worker/processor.py \
+            open-engine/worker/scheduler.py \
+            open-engine/worker/verifier.py \
+            open-engine/worker/ai_router.py \
+            open-engine/worker/snapshotter.py \
+            open-engine/worker/seed.py
+
+      - name: Validate Oracle compose file
+        run: |
+          cp open-engine/.env.oracle.example open-engine/.env.oracle.ci
+          docker compose \
+            --env-file open-engine/.env.oracle.ci \
+            -f open-engine/docker-compose.oracle.yml \
+            config >/dev/null
+
+      - name: Validate portable compose file
+        run: |
+          cp open-engine/.env.prod.example open-engine/.env.prod.ci
+          docker compose \
+            --env-file open-engine/.env.prod.ci \
+            -f open-engine/docker-compose.prod.yml \
+            config >/dev/null

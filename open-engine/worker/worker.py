@@ -202,6 +202,10 @@ async def process_fetch(pool: asyncpg.Pool, client: httpx.AsyncClient, task: dic
                     "UPDATE source_registry SET last_checked_at=now(), next_check_at=now() + refresh_interval_minutes * interval '1 minute', updated_at=now() WHERE id=$1",
                     source_id,
                 )
+            await conn.execute(
+                "UPDATE record_sources SET last_checked_at=now() WHERE source_url=$1",
+                url,
+            )
             if changed:
                 await conn.execute(
                     """

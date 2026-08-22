@@ -2,10 +2,11 @@ import os
 from contextlib import asynccontextmanager
 
 import asyncpg
-import orjson
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import ORJSONResponse
+
+from internal import register_internal_routes
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 ALLOWED_ENTITY_TYPES = {
@@ -46,7 +47,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GeoAcademic Open Engine",
-    version="0.1.0",
+    version="0.2.0",
     default_response_class=ORJSONResponse,
     lifespan=lifespan,
 )
@@ -63,6 +64,8 @@ app.add_middleware(
     allow_methods=["GET", "OPTIONS"],
     allow_headers=["*"],
 )
+
+register_internal_routes(app)
 
 
 @app.get("/health")
