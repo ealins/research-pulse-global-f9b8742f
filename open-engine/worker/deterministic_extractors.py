@@ -78,7 +78,9 @@ def extract_event_list_candidates(html: str, source_url: str) -> list[dict]:
     results: list[dict] = []
     seen: set[str] = set()
 
-    for heading in root.find_all(["h2", "h3", "h4"]):
+    # Some official event-list sites (including GEO) use h1 for each event card,
+    # so scan h1 as well as lower-level headings and filter generic page headings.
+    for heading in root.find_all(["h1", "h2", "h3", "h4"]):
         title = _clean(heading.get_text(" ", strip=True))
         if len(title) < 4 or title.lower() in GENERIC_EVENT_HEADINGS:
             continue
@@ -123,7 +125,7 @@ def extract_event_list_candidates(html: str, source_url: str) -> list[dict]:
                 "verification_status": "auto_discovered",
                 "data": {
                     "deterministic_extracted": True,
-                    "extractor": "dated_event_list_v1",
+                    "extractor": "dated_event_list_v2",
                     "location": location,
                     "date_text": date_text,
                     "evidence": " | ".join(evidence_parts)[:240],
