@@ -9,6 +9,8 @@ from fastapi.responses import ORJSONResponse
 from internal import register_internal_routes
 
 DATABASE_URL = os.environ["DATABASE_URL"]
+DB_SCHEMA = os.getenv("DB_SCHEMA", "public")
+DB_SEARCH_PATH = f"{DB_SCHEMA},extensions,public" if DB_SCHEMA != "public" else "public,extensions"
 ALLOWED_ENTITY_TYPES = {
     "institution",
     "researcher",
@@ -35,9 +37,10 @@ def row_dict(row):
 async def lifespan(app: FastAPI):
     app.state.db = await asyncpg.create_pool(
         DATABASE_URL,
-        min_size=2,
-        max_size=int(os.getenv("DB_POOL_MAX", "20")),
+        min_size=max(0, int(os.getenv("DB_POOL_MIN", "2"))),
+        max_size=max(1, int(os.getenv("DB_POOL_MAX", "20"))),
         command_timeout=30,
+        server_settings={"search_path": DB_SEARCH_PATH},
     )
     try:
         yield
@@ -47,7 +50,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GeoAcademic Open Engine",
-    version="0.2.0",
+    version="0.3.0",
     default_response_class=ORJSONResponse,
     lifespan=lifespan,
 )
@@ -72,7 +75,12 @@ register_internal_routes(app)
 async def health():
     async with app.state.db.acquire() as conn:
         now = await conn.fetchval("SELECT now()")
-    return {"ok": True, "service": "geoacademic-open-engine", "database_time": now}
+    return {
+        "ok": True,
+        "service": "geoacademic-open-engine",
+        "database_time": now,
+        "database_schema": DB_SCHEMA,
+    }
 
 
 @app.get("/v1/pulse/latest")
