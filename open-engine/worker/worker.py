@@ -7,6 +7,7 @@ import os
 import socket
 import urllib.parse
 import urllib.robotparser
+import uuid
 from datetime import datetime, timezone
 
 import asyncpg
@@ -135,7 +136,8 @@ async def complete_task(pool: asyncpg.Pool, task_id: int, *, success: bool, erro
 async def process_fetch(pool: asyncpg.Pool, client: httpx.AsyncClient, task: dict):
     payload = task["payload"] or {}
     url = str(payload.get("url") or "").strip()
-    source_id = payload.get("source_id")
+    raw_source_id = payload.get("source_id")
+    source_id = uuid.UUID(str(raw_source_id)) if raw_source_id else None
     if not url:
         await complete_task(pool, task["id"], success=False, error="FETCH task has no url")
         return
@@ -144,22 +146,42 @@ async def process_fetch(pool: asyncpg.Pool, client: httpx.AsyncClient, task: dic
         await assert_public_url(url)
         if not await robots_allowed(client, url):
             raise RuntimeError("disallowed by robots.txt")
-        response = await client.get(url, headers={"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml,text/plain;q=0.8"})
-        response.raise_for_status()
-        body = response.content
-        if not body:
-            raise RuntimeError("empty response")
-        if len(body) > 8_000_000:
-            raise RuntimeError("response exceeds 8 MB limit")
 
-        content_hash = hashlib.sha256(body).hexdigest()
         async with pool.acquire() as conn:
-            previous_hash = await conn.fetchval(
-                "SELECT content_hash FROM source_snapshots WHERE source_url=$1 ORDER BY fetched_at DESC LIMIT 1",
+            previous = await conn.fetchrow(
+                """
+                SELECT content_hash, etag, last_modified
+                FROM source_snapshots
+                WHERE source_url=$1
+                ORDER BY fetched_at DESC
+                LIMIT 1
+                """,
                 url,
             )
-        changed = previous_hash != content_hash
-        object_key = await store_snapshot(body, content_hash) if changed else None
+
+        headers = {"User-Agent": USER_AGENT, "Accept": "text/html,application/xhtml+xml,text/plain;q=0.8"}
+        if previous and previous["etag"]:
+            headers["If-None-Match"] = previous["etag"]
+        if previous and previous["last_modified"]:
+            headers["If-Modified-Since"] = previous["last_modified"]
+
+        response = await client.get(url, headers=headers)
+        if response.status_code == 304 and previous:
+            content_hash = previous["content_hash"]
+            changed = False
+            object_key = None
+            body_size = 0
+        else:
+            response.raise_for_status()
+            body = response.content
+            if not body:
+                raise RuntimeError("empty response")
+            if len(body) > 8_000_000:
+                raise RuntimeError("response exceeds 8 MB limit")
+            content_hash = hashlib.sha256(body).hexdigest()
+            changed = previous is None or previous["content_hash"] != content_hash
+            object_key = await store_snapshot(body, content_hash) if changed else None
+            body_size = len(body)
 
         async with pool.acquire() as conn:
             snapshot_id = await conn.fetchval(
@@ -171,8 +193,9 @@ async def process_fetch(pool: asyncpg.Pool, client: httpx.AsyncClient, task: dic
                 RETURNING id
                 """,
                 source_id, url, object_key, content_hash,
-                response.headers.get("etag"), response.headers.get("last-modified"),
-                response.status_code, len(body), changed,
+                response.headers.get("etag") or (previous["etag"] if previous else None),
+                response.headers.get("last-modified") or (previous["last_modified"] if previous else None),
+                response.status_code, body_size, changed,
             )
             if source_id:
                 await conn.execute(
@@ -188,7 +211,7 @@ async def process_fetch(pool: asyncpg.Pool, client: httpx.AsyncClient, task: dic
                     int(payload.get("priority", 0)), snapshot_id, url, source_id,
                 )
         await complete_task(pool, task["id"], success=True)
-        print(f"FETCH task={task['id']} changed={changed} url={url}")
+        print(f"FETCH task={task['id']} status={response.status_code} changed={changed} url={url}")
     except Exception as exc:
         await complete_task(pool, task["id"], success=False, error=str(exc))
         print(f"FETCH_FAILED task={task['id']} url={url} error={exc}")
