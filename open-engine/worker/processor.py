@@ -226,10 +226,33 @@ async def materialize(pool, task):
                     )
                     await conn.execute(
                         """
+                        WITH updated AS (
+                            UPDATE record_sources
+                            SET content_hash=$3,
+                                last_checked_at=now(),
+                                verification_status=CASE
+                                    WHEN verification_status='verified' THEN 'verified'
+                                    ELSE $4
+                                END,
+                                confidence=greatest(confidence, $5),
+                                evidence=$6::jsonb
+                            WHERE id = (
+                                SELECT id
+                                FROM record_sources
+                                WHERE entity_id=$1
+                                  AND source_url=$2
+                                  AND is_primary=true
+                                ORDER BY discovered_at, id
+                                LIMIT 1
+                            )
+                            RETURNING id
+                        )
                         INSERT INTO record_sources(
                             entity_id, source_url, content_hash, last_checked_at,
                             verification_status, confidence, is_primary, evidence
-                        ) VALUES($1,$2,$3,now(),$4,$5,true,$6::jsonb)
+                        )
+                        SELECT $1,$2,$3,now(),$4,$5,true,$6::jsonb
+                        WHERE NOT EXISTS (SELECT 1 FROM updated)
                         """,
                         entity_id, candidate["source_url"], snapshot["content_hash"],
                         verification_status, candidate["confidence"],
