@@ -31,6 +31,7 @@ jobs:
             open-engine/worker/minio.py \
             open-engine/worker/processor.py \
             open-engine/worker/deterministic_extractors.py \
+            open-engine/worker/test_deterministic_extractors.py \
             open-engine/worker/scheduler.py \
             open-engine/worker/verifier.py \
             open-engine/worker/ai_router.py \
@@ -40,6 +41,12 @@ jobs:
             open-engine/cloudrun/migrate.py \
             open-engine/cloudrun/import_legacy_sources.py \
             open-engine/cloudrun/batch_runner.py
+
+      - name: Test deterministic extractors
+        run: |
+          python -m pip install beautifulsoup4==4.13.4
+          cd open-engine/worker
+          python -m unittest -v test_deterministic_extractors.py
 
       - name: Validate shell entrypoints
         run: |
