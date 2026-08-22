@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 from minio import Minio
 
 from ai_router import extract_with_ai
+from deterministic_extractors import extract_event_list_candidates
 
 DATABASE_URL = os.environ["DATABASE_URL"]
 WORKER_ID = f"process-{socket.gethostname()}"
@@ -177,6 +178,11 @@ async def materialize(pool, task):
         html = await read_object(snapshot["object_key"])
         candidates = extract_candidates(html, snapshot["source_url"])
         extraction_path = "structured"
+
+        if not candidates:
+            candidates = extract_event_list_candidates(html, snapshot["source_url"])
+            extraction_path = "deterministic" if candidates else "none"
+
         if not candidates and AI_FALLBACK_ENABLED:
             candidates = await extract_with_ai(html, snapshot["source_url"])
             extraction_path = "ai" if candidates else "none"

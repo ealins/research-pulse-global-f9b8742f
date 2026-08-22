@@ -6,13 +6,11 @@ on:
     branches: [main]
     paths:
       - "open-engine/**"
-      - ".github/workflows/geoacademic-open-engine-*.yml"
-      - ".github/workflows/geoacademic-cloudrun-*.yml"
+      - ".github/workflows/geoacademic-*.yml"
   pull_request:
     paths:
       - "open-engine/**"
-      - ".github/workflows/geoacademic-open-engine-*.yml"
-      - ".github/workflows/geoacademic-cloudrun-*.yml"
+      - ".github/workflows/geoacademic-*.yml"
 
 permissions:
   contents: read
@@ -32,11 +30,13 @@ jobs:
             open-engine/worker/worker.py \
             open-engine/worker/minio.py \
             open-engine/worker/processor.py \
+            open-engine/worker/deterministic_extractors.py \
             open-engine/worker/scheduler.py \
             open-engine/worker/verifier.py \
             open-engine/worker/ai_router.py \
             open-engine/worker/snapshotter.py \
             open-engine/worker/seed.py \
+            open-engine/worker/reprocess.py \
             open-engine/cloudrun/migrate.py \
             open-engine/cloudrun/import_legacy_sources.py \
             open-engine/cloudrun/batch_runner.py
