@@ -35,6 +35,12 @@ jobs:
             open-engine/worker/snapshotter.py \
             open-engine/worker/seed.py
 
+      - name: Validate shell entrypoints
+        run: |
+          bash -n open-engine/deploy-oracle.sh
+          bash -n open-engine/deploy.sh
+          bash -n open-engine/oci/bootstrap-cloud-shell.sh
+
       - name: Validate Oracle compose file
         run: |
           cp open-engine/.env.oracle.example open-engine/.env.oracle.ci
