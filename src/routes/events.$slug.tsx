@@ -47,7 +47,7 @@ export const Route = createFileRoute("/events/$slug")({
 
 function EventDetail() {
   const { slug } = Route.useParams();
-  const { data, isLoading } = useQuery(eventDetailQuery(slug));
+  const { data, isLoading } = useQuery<any>(eventDetailQuery(slug));
 
   if (isLoading) {
     return (
