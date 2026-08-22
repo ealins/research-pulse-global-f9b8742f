@@ -37,6 +37,7 @@ jobs:
             open-engine/worker/snapshotter.py \
             open-engine/worker/seed.py \
             open-engine/cloudrun/migrate.py \
+            open-engine/cloudrun/import_legacy_sources.py \
             open-engine/cloudrun/batch_runner.py
 
       - name: Validate shell entrypoints
