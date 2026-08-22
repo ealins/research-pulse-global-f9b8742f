@@ -9,8 +9,8 @@ import {
   TYPE_LABEL,
   daysUntil,
   formatDate,
-  opportunitiesQuery,
 } from "@/lib/radar-queries";
+import { hybridOpportunitiesQuery as opportunitiesQuery } from "@/lib/open-engine-radar";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { SECTOR_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
