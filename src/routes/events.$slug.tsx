@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { CalendarDays, ExternalLink, MapPin } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
-import { eventDetailQuery, KIND_LABEL, SECTOR_LABEL } from "@/lib/relevance-queries";
+import { KIND_LABEL, SECTOR_LABEL } from "@/lib/relevance-queries";
+import { hybridEventDetailQuery as eventDetailQuery } from "@/lib/open-engine-radar";
 import { countrySlug } from "@/lib/category-queries";
 import { daysUntil, formatDate, STATUS_LABEL } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -145,7 +146,7 @@ function EventDetail() {
               Topics in scope
             </h2>
             <div className="mt-3 flex flex-wrap gap-1.5">
-              {(event.event_topics ?? []).map((t) =>
+              {(event.event_topics ?? []).map((t: any) =>
                 t.research_topics ? (
                   <Link
                     key={t.research_topics.slug}
@@ -167,7 +168,7 @@ function EventDetail() {
               Live positions in the host country
             </h2>
             <ul className="mt-3 grid gap-2 lg:grid-cols-2">
-              {data.calls.map((c) => (
+              {data.calls.map((c: any) => (
                 <li key={c.id} className="panel panel-hover p-4">
                   <Link
                     to="/jobs/$slug"
@@ -191,7 +192,7 @@ function EventDetail() {
             Other events in the calendar
           </h2>
           <ul className="mt-3 grid gap-2 lg:grid-cols-2">
-            {data.siblings.map((s) => (
+            {data.siblings.map((s: any) => (
               <li key={s.id} className="panel panel-hover p-4">
                 <Link
                   to="/events/$slug"
