@@ -1,0 +1,59 @@
+name: GeoAcademic open-engine maintenance
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 * * * *"
+
+concurrency:
+  group: geoacademic-open-engine-maintenance
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      OPEN_ENGINE_BASE_URL: ${{ secrets.OPEN_ENGINE_BASE_URL }}
+      OPEN_ENGINE_INTERNAL_TOKEN: ${{ secrets.OPEN_ENGINE_INTERNAL_TOKEN }}
+    steps:
+      - name: Skip until open engine is configured
+        id: config
+        shell: bash
+        run: |
+          if [ -z "$OPEN_ENGINE_BASE_URL" ] || [ -z "$OPEN_ENGINE_INTERNAL_TOKEN" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Open engine secrets are not configured yet; leaving current production unchanged."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check public API health
+        if: steps.config.outputs.configured == 'true'
+        run: curl --fail --silent --show-error --max-time 20 "$OPEN_ENGINE_BASE_URL/health"
+
+      - name: Recover stale processing leases
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            -X POST \
+            -H "Authorization: Bearer $OPEN_ENGINE_INTERNAL_TOKEN" \
+            "$OPEN_ENGINE_BASE_URL/internal/maintenance/recover-stale?minutes=30"
+
+      - name: Enqueue due sources
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            -X POST \
+            -H "Authorization: Bearer $OPEN_ENGINE_INTERNAL_TOKEN" \
+            "$OPEN_ENGINE_BASE_URL/internal/maintenance/enqueue-due?limit=1000"
+
+      - name: Report queue state
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          curl --fail --silent --show-error --max-time 30 \
+            -H "Authorization: Bearer $OPEN_ENGINE_INTERNAL_TOKEN" \
+            "$OPEN_ENGINE_BASE_URL/internal/maintenance/status"
