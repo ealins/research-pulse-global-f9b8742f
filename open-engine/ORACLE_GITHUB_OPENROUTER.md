@@ -5,8 +5,8 @@ This is the target architecture for running GeoAcademic with Lovable, GitHub, Or
 ## Responsibility split
 
 - **Lovable / `geoacademic.app`**: React/TanStack presentation and publishing. No database service-role key and no AI provider key belongs in browser code.
-- **Oracle / `api.geoacademic.app`**: always-on FastAPI, PostgreSQL/PostGIS, source scheduler, fetch workers, processors and Pulse generation.
-- **Oracle Object Storage**: changed-source evidence and the public degraded-mode snapshot.
+- **Oracle / `api.geoacademic.app`**: always-on FastAPI, PostgreSQL/PostGIS, source scheduler, fetch workers, processors, verifier and Pulse generation.
+- **Oracle Object Storage**: changed-source evidence plus the degraded-mode public snapshot object.
 - **GitHub**: source of truth, CI, controlled deployment to Oracle and an hourly recovery/maintenance path.
 - **OpenRouter**: primary optional AI path for ambiguous pages only.
 - **NVIDIA API**: independent optional fallback when an OpenRouter attempt fails. Model IDs are environment variables, never hard-coded into product logic.
@@ -28,6 +28,8 @@ sources/APIs
   -> AI fallback only when deterministic extraction produces no candidate
   -> validation / confidence gate
   -> canonical entities + signals
+  -> repeat source rechecks
+  -> verification promotion
   -> latest feeds + Pulse
 ```
 
@@ -35,7 +37,13 @@ sources/APIs
 
 Deterministic structured candidates enter as `auto_discovered` with source evidence. AI extraction is bounded and schema-checked. AI candidates are capped below perfect confidence; records below the AI publication threshold or without evidence become `needs_review`, so they are retained for review but excluded from `latest_public_entities` and `live_public_signals`.
 
-No AI provider failure should cause a bad record to be published. If OpenRouter is unavailable, the router can try the direct NVIDIA endpoint. If both fail, the extraction task completes with zero candidates and can be revisited later after source/model changes.
+Every successful source fetch updates provenance `last_checked_at`, including HTTP 304/unchanged rechecks. The verifier can promote sufficiently confident `auto_discovered` entities to `verified` only after the source has been successfully checked again after the configured minimum age. The default is six hours, but actual promotion also depends on the source's own refresh interval.
+
+No AI provider failure should cause a bad record to be published. If OpenRouter is unavailable, the router can try the direct NVIDIA endpoint. If both fail, no AI candidate is accepted.
+
+## Queue idempotency
+
+Oracle's scheduler and GitHub's recovery workflow are allowed to run at the same time. `002_queue_dedup.sql` collapses duplicate active fetch tasks and creates a partial unique index on active `(FETCH, source_id)` work. This keeps scheduling idempotent even if both controllers enqueue the same due source concurrently.
 
 ## Public degraded mode
 
@@ -51,9 +59,9 @@ The `snapshotter` service writes `public/latest.json` to the configured S3-compa
 - latest researchers,
 - latest institutions.
 
-Set `VITE_GEOACADEMIC_SNAPSHOT_URL` in Lovable to the public Object Storage URL for this object. `src/lib/open-engine-client.ts` still uses the live API first and falls back to this snapshot only when the API is unavailable.
+Set `VITE_GEOACADEMIC_SNAPSHOT_URL` in Lovable to a browser-readable URL for this single snapshot object. `src/lib/open-engine-client.ts` still uses the live API first and falls back to this snapshot only on network/server failure; valid 4xx API errors are not hidden by stale data.
 
-The Object Storage bucket or `public/` prefix must permit public GET for the snapshot object while raw evidence remains private.
+Keep the evidence bucket private. Prefer an Oracle Object Storage pre-authenticated request (or another narrowly scoped public object mechanism) for `public/latest.json`, with browser CORS permitting `https://geoacademic.app`. Do not make raw evidence public merely to expose the fallback snapshot.
 
 ## Oracle deployment
 
@@ -70,7 +78,7 @@ chmod +x deploy-oracle.sh
 ./deploy-oracle.sh
 ```
 
-`docker-compose.oracle.yml` exposes only Caddy on ports 80/443. PostgreSQL and workers remain on the internal Docker network.
+`docker-compose.oracle.yml` exposes only Caddy on ports 80/443. PostgreSQL, scheduler, verifier and workers remain on the internal Docker network. AI credentials are passed only to the processor container; the fetch worker never receives them.
 
 ## Required Oracle environment values
 
@@ -140,11 +148,12 @@ Do not turn everything on at once.
 3. Deploy and verify `/health`.
 4. Point `api.geoacademic.app` to Oracle and verify HTTPS.
 5. Seed a small official source set and verify fetch -> extraction -> canonical -> Pulse end to end.
-6. Add OpenRouter and/or NVIDIA backend secrets and verify ambiguous extraction.
-7. Make only `public/latest.json` publicly readable and set its CORS policy for `https://geoacademic.app`.
-8. Add `VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app` and `VITE_GEOACADEMIC_SNAPSHOT_URL=<public snapshot URL>` in Lovable.
-9. Migrate one frontend section at a time to the open-engine client.
-10. Configure GitHub maintenance and Oracle deployment secrets.
-11. Increase source coverage and worker concurrency gradually while monitoring queue depth and error rates.
+6. Let at least one source complete a later recheck and verify automatic promotion behavior.
+7. Add OpenRouter and/or NVIDIA backend secrets and verify ambiguous extraction.
+8. Create a narrowly scoped browser-readable URL for `public/latest.json`; keep raw evidence private.
+9. Add `VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app` and `VITE_GEOACADEMIC_SNAPSHOT_URL=<snapshot URL>` in Lovable.
+10. Migrate one frontend section at a time to the open-engine client.
+11. Configure GitHub maintenance and Oracle deployment secrets.
+12. Increase source coverage and worker concurrency gradually while monitoring queue depth and error rates.
 
 The existing Lovable/Supabase ingestion path can remain available during this migration. The Oracle engine is intentionally additive until each public surface has been verified against live data.
