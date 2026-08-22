@@ -1,0 +1,43 @@
+name: GeoAcademic API QA
+
+on:
+  workflow_dispatch:
+    inputs:
+      api_url:
+        description: Optional API URL override
+        required: false
+        default: ""
+  workflow_run:
+    workflows: ["GeoAcademic Cloud ingestion"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: open-engine/worker/requirements.txt
+
+      - name: Install QA dependencies
+        run: pip install asyncpg==0.30.0 httpx==0.28.1
+
+      - name: Run API and data quality checks
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+          DB_SCHEMA: geoacademic_engine
+          MANUAL_API_URL: ${{ github.event.inputs.api_url || '' }}
+          REPO_API_URL: ${{ vars.GEOACADEMIC_API_URL }}
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          export GEOACADEMIC_API_URL="${MANUAL_API_URL:-${REPO_API_URL:-https://geoacademic-api-xjh4s3mvyq-ey.a.run.app}}"
+          python open-engine/cloudrun/qa.py
