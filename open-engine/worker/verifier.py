@@ -29,8 +29,8 @@ async def promote(pool: asyncpg.Pool) -> int:
                         AND r.last_checked_at >= r.discovered_at + ($2 * interval '1 hour')
                   )
                 ORDER BY e.first_seen_at
-                LIMIT $3
                 FOR UPDATE SKIP LOCKED
+                LIMIT $3
                 """,
                 VERIFY_MIN_CONFIDENCE,
                 VERIFY_MIN_AGE_HOURS,
