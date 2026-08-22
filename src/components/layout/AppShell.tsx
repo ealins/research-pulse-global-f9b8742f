@@ -65,7 +65,6 @@ const NAV_GROUPS = [
 export function AppShell({ children }: { children: ReactNode }) {
   const { data: openJobs } = useQuery(openJobCountQuery);
 
-
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16.5rem_1fr]">
       <aside className="border-b border-sidebar-border bg-sidebar/80 backdrop-blur lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto lg:border-b-0 lg:border-r">
@@ -83,7 +82,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </p>
           </div>
         </div>
-
 
         <div className="px-3 pb-3">
           <CommandPalette />
@@ -116,8 +114,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
-
-
       </aside>
 
       <div className="min-w-0">{children}</div>
@@ -161,10 +157,6 @@ export function PageHeader({
 }
 
 function isEmptyStat(value: string | number): boolean {
-  // Zero is a valid, informative result (for example: no open CFPs or no
-  // evidence-backed collaboration edges). Treat only the explicit loading /
-  // unavailable sentinel as empty so the UI never disguises a real zero as a
-  // pipeline that is still "sourcing".
   return value === "—";
 }
 
@@ -212,6 +204,18 @@ export function StatTile({
   );
 }
 
+const VERIFICATION_LABELS: Record<string, string> = {
+  verified: "Verified",
+  auto_discovered: "Automatically discovered",
+  needs_review: "Needs review",
+  possibly_outdated: "Possibly outdated",
+  rejected: "Rejected",
+};
+
+export function verificationLabel(value: string): string {
+  return VERIFICATION_LABELS[value] ?? value.replace(/_/g, " ");
+}
+
 export function ProvenanceChips({
   verification,
   isDemo,
@@ -224,7 +228,7 @@ export function ProvenanceChips({
   return (
     <span className="flex flex-wrap items-center gap-1.5">
       <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[0.62rem] uppercase tracking-wider text-muted-foreground">
-        {verification === "verified" ? "Verified" : "Not verified"}
+        {verificationLabel(verification)}
       </span>
       {confidence ? (
         <span className="rounded-full border border-border bg-muted/60 px-2 py-0.5 text-[0.62rem] uppercase tracking-wider text-muted-foreground">
