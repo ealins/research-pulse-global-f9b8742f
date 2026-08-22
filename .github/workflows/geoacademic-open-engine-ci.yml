@@ -7,10 +7,12 @@ on:
     paths:
       - "open-engine/**"
       - ".github/workflows/geoacademic-open-engine-*.yml"
+      - ".github/workflows/geoacademic-cloudrun-*.yml"
   pull_request:
     paths:
       - "open-engine/**"
       - ".github/workflows/geoacademic-open-engine-*.yml"
+      - ".github/workflows/geoacademic-cloudrun-*.yml"
 
 permissions:
   contents: read
@@ -33,13 +35,16 @@ jobs:
             open-engine/worker/verifier.py \
             open-engine/worker/ai_router.py \
             open-engine/worker/snapshotter.py \
-            open-engine/worker/seed.py
+            open-engine/worker/seed.py \
+            open-engine/cloudrun/migrate.py \
+            open-engine/cloudrun/batch_runner.py
 
       - name: Validate shell entrypoints
         run: |
           bash -n open-engine/deploy-oracle.sh
           bash -n open-engine/deploy.sh
           bash -n open-engine/oci/bootstrap-cloud-shell.sh
+          bash -n open-engine/cloudrun/bootstrap-cloud-shell.sh
 
       - name: Validate Oracle compose file
         run: |
