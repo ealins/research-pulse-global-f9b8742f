@@ -31,4 +31,19 @@ if [ -z "${USER_OCID:-}" ]; then
   exit 2
 fi
 
+# Oracle Cloud Shell may run with FIPS restrictions that reject ED25519 keys.
+# Pre-create the deployment key as RSA-3072 so the main bootstrap can reuse it.
+STATE_DIR="${HOME}/.geoacademic"
+SSH_KEY="${STATE_DIR}/geoacademic_oracle"
+mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
+
+if [ ! -s "$SSH_KEY" ] || [ ! -s "${SSH_KEY}.pub" ]; then
+  rm -f "$SSH_KEY" "${SSH_KEY}.pub"
+  echo "==> Generating FIPS-compatible RSA deployment SSH key"
+  ssh-keygen -q -t rsa -b 3072 -N '' -f "$SSH_KEY" -C geoacademic-oracle
+  chmod 600 "$SSH_KEY"
+  chmod 644 "${SSH_KEY}.pub"
+fi
+
 exec bash "$(dirname "$0")/bootstrap-cloud-shell.sh" "$@"
