@@ -227,7 +227,15 @@ async def process_fetch(pool: asyncpg.Pool, client: httpx.AsyncClient, task: dic
                 await conn.execute(
                     """
                     INSERT INTO ingestion_tasks(task_type, priority, payload)
-                    VALUES('EXTRACT', $1, jsonb_build_object('snapshot_id',$2,'source_url',$3,'source_id',$4))
+                    VALUES(
+                        'EXTRACT',
+                        $1,
+                        jsonb_build_object(
+                            'snapshot_id', $2::bigint,
+                            'source_url', $3::text,
+                            'source_id', $4::uuid
+                        )
+                    )
                     """,
                     int(payload.get("priority", 0)), snapshot_id, url, source_id,
                 )
