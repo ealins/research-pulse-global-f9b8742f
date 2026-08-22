@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, Timer, MapPin, UserRound, AlertTriangle, CalendarPlus } from "lucide-react";
 
-import { AppShell, PageHeader, StatTile, TopicPills } from "@/components/layout/AppShell";
+import { AppShell, PageHeader, ProvenanceChips, StatTile, TopicPills } from "@/components/layout/AppShell";
 import { EvidenceDrawer, staleness } from "@/components/EvidenceDrawer";
 import { hybridOpportunityDetailQuery as opportunityDetailQuery } from "@/lib/open-engine-radar";
 import { STATUS_LABEL, TYPE_LABEL, daysUntil, formatDate } from "@/lib/radar-queries";
@@ -118,9 +118,11 @@ function OpportunityDetail() {
         }
         actions={
           o.open_engine ? (
-            <span className="rounded-md border border-border bg-muted/50 px-2.5 py-1.5 text-[0.68rem] uppercase tracking-wider text-muted-foreground">
-              Open engine · {String(o.verification_status).replace(/_/g, " ")}
-            </span>
+            <ProvenanceChips
+              verification={o.verification_status}
+              confidence={o.confidence}
+              isDemo={o.is_demo}
+            />
           ) : (
             <div className="flex flex-col items-end gap-2">
               <EvidenceDrawer
