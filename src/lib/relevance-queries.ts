@@ -43,6 +43,11 @@ export function eventDetailQuery(slug: string) {
         .maybeSingle();
       if (error) throw error;
       if (!event) return null;
+      
+      // Exclude expired events
+      const today = new Date().toISOString().slice(0, 10);
+      if (event.end_date && event.end_date < today) return null;
+      if (!event.end_date && event.start_date && event.start_date < today) return null;
 
       const topicIds = (event.event_topics ?? [])
         .map((t) => t.research_topics?.slug)
@@ -51,7 +56,7 @@ export function eventDetailQuery(slug: string) {
       const [siblings, calls] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, slug, start_date, location, event_kind, event_topics!inner(topic_id)")
+          .select("id, title, slug, start_date, end_date, location, event_kind, event_topics!inner(topic_id)")
           .neq("slug", slug)
           .eq("is_demo", false)
           .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
@@ -82,10 +87,18 @@ export function eventDetailQuery(slug: string) {
 
       if (siblings.error) throw siblings.error;
       if (calls.error) throw calls.error;
+      
+      // Post-filter siblings for expired events
+      const liveSiblings = (siblings.data ?? []).filter((e: any) => {
+        if (e.end_date && e.end_date < today) return false;
+        if (!e.end_date && e.start_date && e.start_date < today) return false;
+        return true;
+      });
+      
       return {
         event: { ...event, country: canonicalCountry(event.country) },
         topicIds,
-        siblings: siblings.data ?? [],
+        siblings: liveSiblings,
         calls: calls.data ?? [],
       };
     },

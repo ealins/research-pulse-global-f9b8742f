@@ -150,6 +150,7 @@ export function institutionDetailQuery(slug: string) {
             .eq("institution_id", id)
             .eq("is_demo", false)
             .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+            .in("status", ["planned", "active"])
             .order("start_date", { ascending: false, nullsFirst: false }),
           supabase
             .from("publications")
@@ -169,6 +170,7 @@ export function institutionDetailQuery(slug: string) {
             .eq("institution_id", id)
             .eq("is_demo", false)
             .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+            .neq("confidence", "low")
             .order("title"),
         ]);
 

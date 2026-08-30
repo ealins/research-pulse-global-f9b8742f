@@ -253,12 +253,21 @@ export const eventsQuery = queryOptions({
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .order("is_demo", { ascending: true })
-      .order("start_date", { ascending: true, nullsFirst: false });
+      .order("start_date", { ascending: true, nullsFirst: false })
+      .limit(500);
     if (error) throw error;
-    return (data ?? []).map((event) => ({
-      ...event,
-      country: canonicalCountry(event.country),
-    }));
+    // Filter client-side: exclude past events
+    const today = new Date().toISOString().slice(0, 10);
+    return ((data ?? []) as any[])
+      .filter((e) => {
+        if (e.end_date && e.end_date < today) return false;
+        if (!e.end_date && e.start_date && e.start_date < today) return false;
+        return true;
+      })
+      .map((event) => ({
+        ...event,
+        country: canonicalCountry(event.country),
+      }));
   },
 });
 
@@ -318,6 +327,7 @@ export const projectsQuery = queryOptions({
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
+      .in("status", ["planned", "active"])
       .order("is_demo", { ascending: true })
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
@@ -332,12 +342,13 @@ export const coursesQuery = queryOptions({
       .from("courses")
       .select(
         `id, title, slug, degree_type, language, duration, website, summary,
-         verification_status, is_demo,
+         verification_status, confidence, is_demo,
          institutions ( name, slug, country ),
          course_topics!inner ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
+      .neq("confidence", "low")
       .order("is_demo", { ascending: true })
       .order("title");
     if (error) throw error;

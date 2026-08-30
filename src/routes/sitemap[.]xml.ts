@@ -87,7 +87,8 @@ export const Route = createFileRoute("/sitemap.xml")({
               .from("events")
               .select("slug, event_topics!inner(topic_id)")
               .eq("is_demo", false)
-              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+              .limit(500),
             supabase.from("research_topics").select("slug").eq("active", true),
             supabase
               .from("courses")
@@ -98,7 +99,8 @@ export const Route = createFileRoute("/sitemap.xml")({
               .from("projects")
               .select("slug, project_topics!inner(topic_id)")
               .eq("is_demo", false)
-              .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+              .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+              .in("status", ["planned", "active"]),
             supabase
               .from("publications")
               .select("id, publication_topics!inner(topic_id)")
@@ -121,7 +123,14 @@ export const Route = createFileRoute("/sitemap.xml")({
           push("/institutions", institutions.data, "0.7", "weekly");
           push("/researchers", researchers.data, "0.6", "weekly");
           push("/jobs", opportunities.data, "0.8", "daily");
-          push("/events", events.data, "0.6", "weekly");
+          // Filter out past events client-side
+          const today = new Date().toISOString().slice(0, 10);
+          const liveEvents = (events.data ?? []).filter((e: any) => {
+            if (e.end_date && e.end_date < today) return false;
+            if (!e.end_date && e.start_date && e.start_date < today) return false;
+            return true;
+          });
+          push("/events", liveEvents, "0.6", "weekly");
           push("/topics", topics.data, "0.7", "weekly");
           push("/programmes", courses.data, "0.7", "weekly");
           push("/projects", projects.data, "0.6", "weekly");
