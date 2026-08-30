@@ -39,6 +39,22 @@ class DeterministicExtractorTests(unittest.TestCase):
         self.assertEqual("Germany", candidates[0]["country"])
         self.assertEqual("calendar_table_v1", candidates[0]["data"]["extractor"])
 
+    def test_event_range_with_em_dash(self):
+        html = """
+        <html><head><title>Events</title></head><body><main>
+          <article>
+            <h1>Earth Observation Symposium</h1>
+            <p>Berlin, Germany</p>
+            <p>30 Nov — 05 Dec 2026 Upcoming</p>
+          </article>
+        </main></body></html>
+        """
+        candidates = extract_deterministic_candidates(
+            html, "https://example.org/events"
+        )
+        self.assertEqual(1, len(candidates))
+        self.assertEqual("30 Nov — 05 Dec 2026", candidates[0]["data"]["date_text"])
+
     def test_isprs_job_table(self):
         html = """
         <html><head><title>ISPRS Employment Opportunities Archive</title></head><body>

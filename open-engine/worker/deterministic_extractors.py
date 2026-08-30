@@ -9,8 +9,8 @@ MONTHS = (
     "Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?"
 )
 DATE_RE = re.compile(
-    rf"\b(?:\d{{1,2}}(?:\s*[-–]\s*\d{{1,2}})?\s+)?(?:{MONTHS})"
-    rf"(?:\s*[-–]\s*\d{{1,2}}\s+(?:{MONTHS}))?\s+20\d{{2}}\b",
+    rf"\b(?:\d{{1,2}}(?:\s*[-–—]\s*\d{{1,2}})?\s+)?(?:{MONTHS})"
+    rf"(?:\s*[-–—]\s*\d{{1,2}}\s+(?:{MONTHS}))?\s+20\d{{2}}\b",
     re.IGNORECASE,
 )
 STATUS_RE = re.compile(r"\b(?:upcoming|past|ongoing|cancelled|canceled)\b", re.IGNORECASE)

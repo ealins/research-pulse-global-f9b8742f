@@ -1327,11 +1327,17 @@ export async function runQueueBatch(
           if (!promoted.matched) {
             detail = `PUBLICATIONS ${promoted.institution}: waiting for verified ROR (${promoted.reason ?? "no match"})`;
           } else {
-            const r = await importInstitutionPublications(task.institution_id);
+            const r = await importInstitutionPublications(task.institution_id, {
+              sinceYear: new Date().getUTCFullYear() - 1,
+              minCitations: 5,
+            });
             detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via ${r.provider}`;
           }
         } else {
-          const r = await importInstitutionPublications(task.institution_id);
+          const r = await importInstitutionPublications(task.institution_id, {
+            sinceYear: new Date().getUTCFullYear() - 1,
+            minCitations: 5,
+          });
           detail = `PUBLICATIONS ${r.institution}: +${r.inserted} new, ${r.updated} updated, ${r.seen} seen via ${r.provider}`;
         }
       } else if (task.task_type === "IMPORT_PROJECTS" && task.institution_id) {
@@ -2903,6 +2909,18 @@ export async function normalizeSource(
     structuredDeadline ??
     ex?.application_deadline ??
     null;
+
+  // Date-only deadlines stay active for the full advertised UTC calendar day.
+  // Comparing Date objects would incorrectly expire a job at midnight.
+  const today = new Date().toISOString().slice(0, 10);
+  if (deadline && !rolling && deadline < today) {
+    await mark("SKIPPED", "job application deadline has passed");
+    return {
+      status: "SKIPPED",
+      reason: "job application deadline has passed",
+    };
+  }
+
   const status = deriveStatus(deadline, rolling);
   const usedModel = !deterministicEnough && Boolean(ex);
   const usedStructured = Boolean(structuredJob);

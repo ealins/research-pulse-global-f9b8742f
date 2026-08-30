@@ -519,7 +519,12 @@ export type PublicationImportResult = {
 
 export async function importInstitutionPublications(
   institutionId: string,
-  opts: { queries?: number; perQuery?: number; sinceYear?: number } = {},
+  opts: {
+    queries?: number;
+    perQuery?: number;
+    sinceYear?: number;
+    minCitations?: number;
+  } = {},
 ): Promise<PublicationImportResult> {
   const { data: inst } = await supabaseAdmin
     .from("institutions")
@@ -552,7 +557,10 @@ export async function importInstitutionPublications(
   }
 
   const perQuery = Math.min(50, opts.perQuery ?? 25);
-  const since = opts.sinceYear ?? new Date().getUTCFullYear() - 4;
+  // Default to last 12 months for lean ingestion; allow override via sinceYear
+  const since = opts.sinceYear ?? new Date().getUTCFullYear() - 1;
+  // Minimum citation threshold for high-value filtering (default: 5 citations)
+  const minCitations = opts.minCitations ?? 5;
   const queries = DOMAIN_QUERIES.slice(
     0,
     Math.max(1, Math.min(DOMAIN_QUERIES.length, opts.queries ?? 3)),
@@ -574,6 +582,11 @@ export async function importInstitutionPublications(
     for (const work of works) {
       out.seen += 1;
       if (!work.title) {
+        out.skipped += 1;
+        continue;
+      }
+      // Lean filter: unknown citation counts are not evidence of impact.
+      if (work.cited_by_count === null || work.cited_by_count < minCitations) {
         out.skipped += 1;
         continue;
       }

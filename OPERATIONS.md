@@ -9,6 +9,65 @@
 
 Never prefix server secrets with `VITE_`.
 
+The web deployment and local tools must target the Supabase project linked in
+`supabase/config.toml`. After changing the linked project, configure that
+project's matching service-role key in the deployment and apply every migration
+under `supabase/migrations/`. A project that exposes base tables but not
+`ingestion_tasks`, `pipeline_runs`, `llm_processing_runs`, or the ingestion RPCs
+is not migration-complete and cannot run the worker.
+
+A quick production connectivity check is:
+
+```bash
+curl https://geoacademic.app/api/public/data-health
+```
+
+It must return HTTP 200 with `"ok":true` before starting an ingestion burst.
+The check covers both public data tables and the queue/run tables and count RPC
+needed by ingestion, so a base-only schema remains unhealthy.
+
+Before any production migration, pause every worker that writes to this project
+and confirm a usable restore point in **Supabase Dashboard → Database → Backups**.
+Pro, Team, and Enterprise projects have managed backups; PITR is available only
+when that add-on is enabled. For an additional off-site logical backup, use the
+linked CLI after authentication (store `backups/` outside source control):
+
+```bash
+mkdir -p backups
+bunx supabase@2.116.0 db dump --linked --role-only --file backups/roles.sql
+bunx supabase@2.116.0 db dump --linked --file backups/schema.sql
+bunx supabase@2.116.0 db dump --linked --data-only --use-copy --file backups/data.sql
+```
+
+Apply pending migrations from an authenticated operator environment:
+
+```bash
+bunx supabase@2.116.0 login
+bunx supabase@2.116.0 link --project-ref rqalvagtdcqurubrsdnc
+bunx supabase@2.116.0 migration list --linked
+bunx supabase@2.116.0 db push --linked --dry-run
+bunx supabase@2.116.0 db push --linked
+```
+
+Inspect the migration list and dry-run before the push. Do not use
+`db reset --linked`, blindly add `--include-all`, or mark an existing migration
+as applied merely to bypass a SQL error. Reconcile migration drift only after
+verifying that the remote objects corresponding to each history entry already
+exist. After the push, run the health check again before redeploying or
+triggering the legacy ingestion workflow.
+
+## Local production preview
+
+`bun run build` emits the Cloudflare Nitro bundle under `.output/`. Preview that
+bundle with Wrangler (the script pins a supported local compatibility date):
+
+```bash
+bun run preview
+```
+
+Do not replace this with `vite preview`: TanStack's generic preview middleware
+looks for `dist/server/server.js`, which this Nitro target does not emit.
+
 ## Supabase Auth redirects
 
 Add these exact URLs to the Supabase Auth redirect allowlist:
@@ -23,7 +82,7 @@ Lovable hosts the web application but does not keep `scripts/ingestion-worker.mj
 Run locally with:
 
 ```bash
-npm run worker:ingest
+bun run worker:ingest
 ```
 
 The worker drains the conditional database queue; overlapping invocations are protected by task claiming.

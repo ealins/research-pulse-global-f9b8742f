@@ -15,6 +15,17 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+output.txt
+backups/
+
+# Bun is the canonical JavaScript package manager.
+package-lock.json
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
 .env
 .env.*
 !.env.example

@@ -412,12 +412,28 @@ export async function normalizeNonVacancy(
         };
       }
 
+      // Lean filter: retain only explicitly dated events starting between today
+      // and three calendar months from today (UTC).
+      if (!ex.start_date) {
+        return { status: "SKIPPED", reason: "event has no start date" };
+      }
+      const today = new Date().toISOString().slice(0, 10);
+      if (ex.start_date < today) {
+        return { status: "SKIPPED", reason: "event has already started" };
+      }
+      const horizon = new Date(`${today}T00:00:00Z`);
+      horizon.setUTCMonth(horizon.getUTCMonth() + 3);
+      if (ex.start_date > horizon.toISOString().slice(0, 10)) {
+        return { status: "SKIPPED", reason: "event is too far in the future" };
+      }
+
       const { data: existing } = await supabaseAdmin
         .from("events")
         .select("id")
         .eq("website", url)
         .maybeSingle();
       const slug = await uniqueSlug("events", slugify(ex.title), url, existing?.id);
+
       const payload = {
         title: ex.title.slice(0, 300),
         slug,

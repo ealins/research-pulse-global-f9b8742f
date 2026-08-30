@@ -78,8 +78,9 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         const action = body.action ?? "drain";
         const limit = Math.min(50, Math.max(1, body.limit ?? 8));
 
-        const { supabaseAdmin } =
-          await import("@/integrations/supabase/client.server");
+        try {
+          const { supabaseAdmin } =
+            await import("@/integrations/supabase/client.server");
         const { enqueue, runQueueBatch } = await import("@/lib/ingest.server");
 
         if (action === "enqueue-discovery") {
@@ -477,6 +478,18 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
               .eq("id", run.id);
           }
           return json({ error: message }, 500);
+        }
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.error(`[ingestion-hook] ${action} failed`, error);
+          return json(
+            {
+              action,
+              error: "Ingestion action failed",
+              message: message.slice(0, 1000),
+            },
+            500,
+          );
         }
       },
     },

@@ -25,15 +25,49 @@ export const Route = createFileRoute("/api/public/data-health")({
             projects,
             events,
             pulseEvents,
+            ingestionTasks,
+            pipelineRuns,
+            llmProcessingRuns,
             publicSurface,
           ] = await Promise.all([
-            supabaseAdmin.from("institutions").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
-            supabaseAdmin.from("researchers").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
-            supabaseAdmin.from("opportunities").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
-            supabaseAdmin.from("publications").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
-            supabaseAdmin.from("projects").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
-            supabaseAdmin.from("events").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
-            supabaseAdmin.from("pulse_events").select("id", { count: "exact" }).eq("is_demo", false).limit(1),
+            supabaseAdmin
+              .from("institutions")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin
+              .from("researchers")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin
+              .from("opportunities")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin
+              .from("publications")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin
+              .from("projects")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin
+              .from("events")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin
+              .from("pulse_events")
+              .select("id", { count: "exact" })
+              .eq("is_demo", false)
+              .limit(1),
+            supabaseAdmin.from("ingestion_tasks").select("id").limit(1),
+            supabaseAdmin.from("pipeline_runs").select("id").limit(1),
+            supabaseAdmin.from("llm_processing_runs").select("id").limit(1),
             supabaseAdmin.rpc("public_surface_counts"),
           ]);
 
@@ -45,6 +79,10 @@ export const Route = createFileRoute("/api/public/data-health")({
             ["projects", projects],
             ["events", events],
             ["pulse_events", pulseEvents],
+            ["ingestion_tasks", ingestionTasks],
+            ["pipeline_runs", pipelineRuns],
+            ["llm_processing_runs", llmProcessingRuns],
+            ["public_surface_counts", publicSurface],
           ] as const;
 
           for (const [name, result] of checks) {
@@ -63,8 +101,7 @@ export const Route = createFileRoute("/api/public/data-health")({
               events: events.count ?? 0,
               pulse_events: pulseEvents.count ?? 0,
             },
-            public_surface_counts: publicSurface.error ? null : publicSurface.data,
-            public_surface_rpc_error: publicSurface.error ? publicSurface.error.message : null,
+            public_surface_counts: publicSurface.data,
           });
         } catch (error) {
           console.error("[data-health]", error);
