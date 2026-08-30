@@ -17,6 +17,8 @@ dist-ssr
 *.local
 output.txt
 backups/
+*.backup
+supabase/.temp/
 
 # Bun is the canonical JavaScript package manager.
 package-lock.json

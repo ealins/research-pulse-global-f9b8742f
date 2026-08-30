@@ -1,0 +1,33 @@
+app = "geoacademic-web"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  NODE_ENV = "production"
+  PORT = "8080"
+  SUPABASE_PROJECT_ID = "rqalvagtdcqurubrsdnc"
+  SUPABASE_URL = "https://rqalvagtdcqurubrsdnc.supabase.co"
+  SUPABASE_PUBLISHABLE_KEY = "sb_publishable_8yJVc87WDX7VcPgmttVAPw_RgGNPqzY"
+  EXTERNAL_FETCH_WORKER_ENABLED = "true"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+  [[http_service.checks]]
+    grace_period = "20s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/public/data-health"
+    timeout = "15s"
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

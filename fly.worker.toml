@@ -1,0 +1,18 @@
+app = "geoacademic-ingestion"
+primary_region = "ams"
+
+[build]
+  dockerfile = "Dockerfile.worker"
+
+[env]
+  GEOACADEMIC_BASE_URL = "https://geoacademic-web.fly.dev"
+  INGESTION_FETCH_CONCURRENCY = "3"
+  INGESTION_LEASE_LIMIT = "8"
+  INGESTION_WORKER_TRIGGER = "fly-fetch-worker"
+  INGESTION_RESEED_INTERVAL_MS = "21600000"
+  INGESTION_MAINTENANCE_INTERVAL_MS = "600000"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1

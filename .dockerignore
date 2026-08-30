@@ -1,0 +1,15 @@
+.git
+.github
+.lovable
+.output
+.tanstack
+.wrangler
+backups
+node_modules
+open-engine
+supabase/.temp
+.env
+.env.*
+!.env.example
+*.backup
+*.log
