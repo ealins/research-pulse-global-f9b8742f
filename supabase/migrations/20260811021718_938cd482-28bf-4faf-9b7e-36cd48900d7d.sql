@@ -8,7 +8,7 @@ RETURNS TABLE (
   subtitle text,
   score real
 )
-LANGUAGE sql STABLE SET search_path = public AS $$
+LANGUAGE sql STABLE SET search_path = public, extensions, extensions AS $$
   WITH needle AS (SELECT btrim(q) AS n)
   SELECT * FROM (
     SELECT 'institution'::text, i.id, i.slug, i.name,
@@ -54,7 +54,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.global_search(text, integer) TO anon, authenticated, service_role;
 
 CREATE OR REPLACE FUNCTION public.refresh_topic_momentum()
-RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+RETURNS integer LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions, extensions AS $$
 DECLARE affected integer;
 BEGIN
   INSERT INTO public.topic_momentum (topic_id, pubs_last_12m, pubs_prev_12m, pubs_last_36m, active_projects, open_opportunities, institutions_active, growth_ratio, trend_signal, computed_at)
@@ -94,3 +94,5 @@ BEGIN
 END; $$;
 REVOKE EXECUTE ON FUNCTION public.refresh_topic_momentum() FROM anon, authenticated, public;
 GRANT EXECUTE ON FUNCTION public.refresh_topic_momentum() TO service_role;
+
+

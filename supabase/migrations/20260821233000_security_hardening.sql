@@ -55,7 +55,7 @@ RETURNS boolean
 LANGUAGE sql
 STABLE
 SECURITY INVOKER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT
     auth.role() = 'service_role'
@@ -86,7 +86,7 @@ CREATE OR REPLACE FUNCTION public.claim_admin_if_unclaimed(target_user_id uuid)
 RETURNS boolean
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   caller_email text;
@@ -146,3 +146,4 @@ REVOKE ALL ON FUNCTION public.claim_admin_if_unclaimed(uuid) FROM PUBLIC, anon, 
 GRANT EXECUTE ON FUNCTION public.claim_admin_if_unclaimed(uuid) TO service_role;
 
 COMMIT;
+

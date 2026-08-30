@@ -35,7 +35,7 @@ RETURNS jsonb
 LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
-SET search_path = public, cron
+SET search_path = public, extensions, cron
 AS $$
 DECLARE result jsonb;
 BEGIN
@@ -63,3 +63,4 @@ $$;
 
 REVOKE ALL ON FUNCTION public.scheduler_status() FROM public;
 GRANT EXECUTE ON FUNCTION public.scheduler_status() TO authenticated;
+

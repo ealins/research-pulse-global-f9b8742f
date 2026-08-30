@@ -8,7 +8,7 @@ CREATE OR REPLACE FUNCTION public.refresh_collaboration_edges()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   project_edges integer := 0;
@@ -133,7 +133,7 @@ CREATE OR REPLACE FUNCTION public.refresh_topic_momentum()
 RETURNS integer
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   affected integer;
@@ -245,7 +245,7 @@ CREATE OR REPLACE FUNCTION public.refresh_public_insights()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   momentum_topics integer;
@@ -268,7 +268,7 @@ RETURNS jsonb
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   SELECT jsonb_build_object(
     'institutions', (
@@ -335,7 +335,7 @@ RETURNS TABLE (
 )
 LANGUAGE sql
 STABLE
-SET search_path = public
+SET search_path = public, extensions
 AS $$
   WITH needle AS (SELECT btrim(q) AS n)
   SELECT * FROM (
@@ -459,3 +459,4 @@ CREATE INDEX IF NOT EXISTS events_public_start_idx
   WHERE is_demo = false;
 CREATE INDEX IF NOT EXISTS topics_active_name_idx
   ON public.research_topics (active, name);
+

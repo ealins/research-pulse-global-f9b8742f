@@ -13,7 +13,7 @@ CREATE TYPE public.pulse_category AS ENUM ('PHD','PROJECT','PAPER','DATASET','DI
 CREATE TYPE public.org_type AS ENUM ('funder','industry','society','government','ngo','other');
 
 CREATE OR REPLACE FUNCTION public.touch_updated_at()
-RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public AS $$
+RETURNS TRIGGER LANGUAGE plpgsql SET search_path = public, extensions AS $$
 BEGIN NEW.updated_at = now(); RETURN NEW; END; $$;
 
 CREATE TABLE public.user_roles (
@@ -28,7 +28,7 @@ GRANT ALL ON public.user_roles TO service_role;
 ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
 
 CREATE OR REPLACE FUNCTION public.has_role(_user_id uuid, _role public.app_role)
-RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, extensions AS $$
   SELECT EXISTS (SELECT 1 FROM public.user_roles WHERE user_id = _user_id AND role = _role);
 $$;
 
@@ -36,7 +36,7 @@ CREATE POLICY "users read own roles" ON public.user_roles FOR SELECT TO authenti
 CREATE POLICY "admins manage roles" ON public.user_roles FOR ALL TO authenticated USING (public.has_role(auth.uid(),'admin')) WITH CHECK (public.has_role(auth.uid(),'admin'));
 
 CREATE OR REPLACE FUNCTION public.is_admin()
-RETURNS boolean LANGUAGE sql STABLE SET search_path = public AS $$
+RETURNS boolean LANGUAGE sql STABLE SET search_path = public, extensions AS $$
   SELECT public.has_role(auth.uid(),'admin');
 $$;
 
@@ -188,3 +188,4 @@ BEGIN
     EXECUTE format('CREATE TRIGGER touch_%1$s BEFORE UPDATE ON public.%1$I FOR EACH ROW EXECUTE FUNCTION public.touch_updated_at()', t);
   END LOOP;
 END $$;
+

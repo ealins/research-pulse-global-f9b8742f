@@ -7,7 +7,7 @@ create or replace function public.claim_admin_if_unclaimed()
 returns boolean
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   uid uuid := auth.uid();
