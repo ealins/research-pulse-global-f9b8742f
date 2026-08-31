@@ -9,7 +9,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 
 const BASE_URL = (
-  process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
+  process.env.GEOACADEMIC_BASE_URL || "https://geoacademic-web.fly.dev"
 ).replace(/\/$/, "");
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
 const CONCURRENCY = clamp(process.env.INGESTION_FETCH_CONCURRENCY, 1, 5, 3);

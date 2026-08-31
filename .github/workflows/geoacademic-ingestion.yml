@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 6
     env:
-      GEOACADEMIC_BASE_URL: https://geoacademic.app
+      GEOACADEMIC_BASE_URL: https://geoacademic-web.fly.dev
       INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
       NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
       REVIEW_RUNTIME_MS: "210000"
