@@ -20,12 +20,18 @@ jobs:
       - name: Install database dependency
         run: pip install asyncpg==0.30.0
 
-      - name: Seed initial geospatial academic sources
+      - name: Seed public institution catalog and web-ingestion queue
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          python open-engine/cloudrun/seed_public_catalog.py
+
+      - name: Seed open-engine source registry
         env:
           DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
           DB_SCHEMA: geoacademic_engine
         run: |
-          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
           python open-engine/worker/seed.py \
             https://www.isprs.org/job_opportunities/default.aspx \
             https://www.isprs.org/calendar/2026.aspx \
@@ -35,5 +41,5 @@ jobs:
 
       - name: Next step
         run: |
-          echo "Sources are now registered and FETCH tasks are queued."
-          echo "Run the GeoAcademic Cloud ingestion workflow next."
+          echo "Public institutions and both ingestion queues are seeded."
+          echo "Run GeoAcademic Cloud ingestion, then GeoAcademic ingestion burst."
