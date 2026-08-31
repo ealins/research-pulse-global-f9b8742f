@@ -7,7 +7,7 @@
  */
 
 const BASE_URL = (
-  process.env.GEOACADEMIC_BASE_URL || "https://geoacademic-web.fly.dev"
+  process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
 ).replace(/\/$/, "");
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.Nvidia || "";
