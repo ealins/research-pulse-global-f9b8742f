@@ -31,13 +31,17 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
+  // Vite variables are available in browser and SSR builds. Node/Fly may also
+  // provide process.env, but process is not guaranteed to exist in browsers or
+  // Cloudflare Workers, so guard it before reading server-only overrides.
+  const serverEnv = typeof process !== "undefined" ? process.env : undefined;
   const SUPABASE_URL =
-    import.meta.env["VITE_SUPABASE_URL"] || process.env["SUPABASE_URL"] || PUBLIC_SUPABASE_URL;
+    import.meta.env["VITE_SUPABASE_URL"] ||
+    serverEnv?.["SUPABASE_URL"] ||
+    PUBLIC_SUPABASE_URL;
   const SUPABASE_PUBLISHABLE_KEY =
     import.meta.env["VITE_SUPABASE_PUBLISHABLE_KEY"] ||
-    process.env["SUPABASE_PUBLISHABLE_KEY"] ||
+    serverEnv?.["SUPABASE_PUBLISHABLE_KEY"] ||
     PUBLIC_SUPABASE_PUBLISHABLE_KEY;
 
   if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
@@ -45,7 +49,7 @@ function createSupabaseClient() {
       ...(!SUPABASE_URL ? ["SUPABASE_URL"] : []),
       ...(!SUPABASE_PUBLISHABLE_KEY ? ["SUPABASE_PUBLISHABLE_KEY"] : []),
     ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}. Connect Supabase in Lovable Cloud.`;
+    const message = `Missing Supabase environment variable(s): ${missing.join(", ")}.`;
     console.error(`[Supabase] ${message}`);
     throw new Error(message);
   }
