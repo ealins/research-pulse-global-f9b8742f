@@ -1,3 +1,5 @@
+import { supabase } from "@/integrations/supabase/client";
+
 // Public Cloud Run deployment of the GeoAcademic open engine. Safe to ship in the
 // browser bundle; VITE_GEOACADEMIC_API_URL is tried first when it is provided.
 const DEFAULT_OPEN_ENGINE_URL = "https://geoacademic-api-xjh4s3mvyq-ey.a.run.app";
@@ -78,9 +80,111 @@ function apiFetch(baseUrl: string, path: string, signal?: AbortSignal) {
   });
 }
 
+function queryParams(path: string): URLSearchParams {
+  const index = path.indexOf("?");
+  return new URLSearchParams(index >= 0 ? path.slice(index + 1) : "");
+}
+
+async function rpcFallback<T>(path: string): Promise<T> {
+  const params = queryParams(path);
+  const rpc = (supabase as any).rpc.bind(supabase);
+
+  if (path === "/health") {
+    const { data, error } = await rpc("geoacademic_open_engine_latest", {
+      p_entity_type: "event",
+      p_limit: 1,
+      p_country: null,
+    });
+    if (error) throw error;
+    return {
+      ok: true,
+      service: "geoacademic-open-engine-supabase-fallback",
+      fallback: "supabase",
+      sample_items: Array.isArray(data?.items) ? data.items.length : 0,
+    } as T;
+  }
+
+  const latestMatch = path.match(/^\/v1\/latest\/([^?]+)/);
+  if (latestMatch) {
+    const { data, error } = await rpc("geoacademic_open_engine_latest", {
+      p_entity_type: decodeURIComponent(latestMatch[1] ?? ""),
+      p_limit: Number(params.get("limit") || 50),
+      p_country: params.get("country"),
+    });
+    if (error) throw error;
+    return data as T;
+  }
+
+  if (path.startsWith("/v1/pulse/latest")) {
+    const { data, error } = await rpc("geoacademic_open_engine_pulse", {
+      p_hours: Number(params.get("hours") || 24),
+      p_limit: Number(params.get("limit") || 50),
+      p_country: params.get("country"),
+      p_topic: params.get("topic"),
+    });
+    if (error) throw error;
+    return data as T;
+  }
+
+  if (path.startsWith("/v1/pulse/summary")) {
+    const hours = Number(params.get("hours") || 24);
+    const { data, error } = await rpc("geoacademic_open_engine_pulse", {
+      p_hours: hours,
+      p_limit: 200,
+      p_country: null,
+      p_topic: null,
+    });
+    if (error) throw error;
+    const items = Array.isArray(data?.items) ? data.items : [];
+    const byType = new Map<string, number>();
+    for (const item of items) {
+      const type = typeof item?.signal_type === "string" ? item.signal_type : "unknown";
+      byType.set(type, (byType.get(type) ?? 0) + 1);
+    }
+    return {
+      window_hours: hours,
+      total: items.length,
+      by_type: [...byType.entries()].map(([signal_type, count]) => ({ signal_type, count })),
+      fallback: "supabase",
+    } as T;
+  }
+
+  const entityMatch = path.match(/^\/v1\/entities\/([^/]+)\/([^?]+)/);
+  if (entityMatch) {
+    const { data, error } = await rpc("geoacademic_open_engine_entity", {
+      p_entity_type: decodeURIComponent(entityMatch[1] ?? ""),
+      p_slug: decodeURIComponent(entityMatch[2] ?? ""),
+    });
+    if (error) throw error;
+    if (!data) throw new NonFallbackApiError(`GeoAcademic entity not found: ${path}`);
+    return data as T;
+  }
+
+  if (path.startsWith("/v1/search")) {
+    const { data, error } = await rpc("geoacademic_open_engine_search", {
+      p_query: params.get("q") || "",
+      p_limit: Number(params.get("limit") || 20),
+    });
+    if (error) throw error;
+    return data as T;
+  }
+
+  throw new Error(`No Supabase Open Engine fallback for ${path}`);
+}
+
+async function fallback<T>(path: string, signal?: AbortSignal): Promise<T> {
+  try {
+    return await rpcFallback<T>(path);
+  } catch (rpcError) {
+    if (rpcError instanceof NonFallbackApiError || signal?.aborted) throw rpcError;
+    if (!OPEN_ENGINE_SNAPSHOT_URL) throw rpcError;
+    return snapshotFallback<T>(path, signal);
+  }
+}
+
 async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (!OPEN_ENGINE_URL) {
-    throw new Error("VITE_GEOACADEMIC_API_URL is not configured");
+    return fallback<T>(path, signal);
   }
   try {
     let response = await apiFetch(OPEN_ENGINE_URL, path, signal);
@@ -100,14 +204,14 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
       if (response.status < 500) {
         throw new NonFallbackApiError(`GeoAcademic API ${response.status}: ${path}`);
       }
-      return await snapshotFallback<T>(path, signal);
+      return fallback<T>(path, signal);
     }
     return (await response.json()) as T;
   } catch (error) {
-    if (error instanceof NonFallbackApiError || signal?.aborted || !OPEN_ENGINE_SNAPSHOT_URL) {
+    if (error instanceof NonFallbackApiError || signal?.aborted) {
       throw error;
     }
-    return snapshotFallback<T>(path, signal);
+    return fallback<T>(path, signal);
   }
 }
 
