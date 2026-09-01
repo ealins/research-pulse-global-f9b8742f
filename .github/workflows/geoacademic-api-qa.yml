@@ -37,9 +37,36 @@ jobs:
           DB_SCHEMA: geoacademic_engine
           MANUAL_API_URL: ${{ github.event.inputs.api_url || '' }}
           REPO_API_URL: ${{ vars.GEOACADEMIC_API_URL }}
+          DEFAULT_API_URL: https://geoacademic-api-xjh4s3mvyq-ey.a.run.app
         run: |
           test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
-          export GEOACADEMIC_API_URL="${MANUAL_API_URL:-${REPO_API_URL:-https://geoacademic-api-xjh4s3mvyq-ey.a.run.app}}"
+
+          # GEOACADEMIC_API_URL has historically been used for both the website and
+          # the open-engine API. A frontend URL returns 404 for /health and /v1/*.
+          # Only trust an override that actually exposes the API health endpoint.
+          CANDIDATE_API_URL="${MANUAL_API_URL:-${REPO_API_URL:-$DEFAULT_API_URL}}"
+          if python - "$CANDIDATE_API_URL" <<'PY'
+          import sys
+          import httpx
+
+          base = sys.argv[1].rstrip("/")
+          try:
+              response = httpx.get(f"{base}/health", timeout=10.0, follow_redirects=True)
+              response.raise_for_status()
+              payload = response.json()
+              if payload.get("ok") is not True:
+                  raise RuntimeError("health payload is not ok")
+          except Exception as exc:
+              print(f"API URL validation failed for {base}: {type(exc).__name__}: {exc}")
+              raise SystemExit(1)
+          PY
+          then
+            export GEOACADEMIC_API_URL="${CANDIDATE_API_URL%/}"
+          else
+            echo "Configured GEOACADEMIC_API_URL is not the open-engine API; falling back to $DEFAULT_API_URL"
+            export GEOACADEMIC_API_URL="$DEFAULT_API_URL"
+          fi
+
           python open-engine/cloudrun/qa.py
           python open-engine/cloudrun/qa_slugs.py
           python open-engine/cloudrun/qa_scope.py
