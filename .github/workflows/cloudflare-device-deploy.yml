@@ -1,10 +1,6 @@
-# Triggered only for the production route repair.
-name: One-time Cloudflare device deploy
+name: Manual Cloudflare device deploy
 
 on:
-  push:
-    paths:
-      - ".github/workflows/cloudflare-device-deploy.yml"
   workflow_dispatch:
 
 permissions:
