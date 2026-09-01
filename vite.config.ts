@@ -7,11 +7,9 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
-  nitro: {
-    // Fly runs the generated Node server; Cloudflare remains available by
-    // setting NITRO_PRESET=cloudflare-module in that deployment environment.
-    preset: process.env["NITRO_PRESET"] ?? "node-server",
-  },
+  // Keep the repository default on the Cloudflare-compatible Nitro target supplied
+  // by @lovable.dev/vite-tanstack-config. Fly opts into node-server explicitly in
+  // Dockerfile via NITRO_PRESET=node-server, so it does not need a repo-wide override.
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
