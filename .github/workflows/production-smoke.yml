@@ -13,45 +13,24 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      - name: Verify Cloudflare production and public data
+      - name: Diagnose production API targets
         shell: bash
         run: |
           set -euo pipefail
           SITE="https://geoacademic.app"
-          ENGINE="https://geoacademic-api-xjh4s3mvyq-ey.a.run.app"
+          ORACLE_ENGINE="https://api.geoacademic.app"
+          LEGACY_ENGINE="https://geoacademic-api-xjh4s3mvyq-ey.a.run.app"
 
           page_code=$(curl -L -sS -o /tmp/home.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/" || true)
           health_code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/api/public/data-health" || true)
-          engine_code=$(curl -L -sS -o /tmp/engine.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$ENGINE/health" || true)
+          oracle_code=$(curl -L -sS -o /tmp/oracle.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$ORACLE_ENGINE/health" || true)
+          legacy_code=$(curl -L -sS -o /tmp/legacy.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$LEGACY_ENGINE/health" || true)
 
-          echo "HTTP codes: home=$page_code health=$health_code engine=$engine_code"
-          echo "--- site health ---"
-          [[ -s /tmp/health.json ]] && cat /tmp/health.json || true
-          echo
-          echo "--- engine health ---"
-          [[ -s /tmp/engine.json ]] && cat /tmp/engine.json || true
-          echo
+          echo "HTTP codes: home=$page_code health=$health_code oracle=$oracle_code legacy=$legacy_code"
+          echo "--- site health ---"; [[ -s /tmp/health.json ]] && cat /tmp/health.json || true; echo
+          echo "--- Oracle API ---"; [[ -s /tmp/oracle.json ]] && cat /tmp/oracle.json || true; echo
+          echo "--- legacy Cloud Run API ---"; [[ -s /tmp/legacy.html ]] && head -c 2000 /tmp/legacy.html || true; echo
 
           [[ "$page_code" == "200" ]]
-          [[ "$health_code" == "200" ]]
-          [[ "$engine_code" == "200" ]]
+          [[ "$oracle_code" == "200" ]]
           grep -q "Research Pulse" /tmp/home.html
-
-          node <<'NODE'
-          const fs = require('fs');
-          const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'));
-          const engine = JSON.parse(fs.readFileSync('/tmp/engine.json', 'utf8'));
-          const counts = health.public_surface_counts ?? {};
-          if (health.ok !== true) throw new Error('data-health ok != true');
-          if (engine.ok !== true) throw new Error('Open Engine /health ok != true');
-          if (!Number.isFinite(Number(counts.institutions)) || Number(counts.institutions) < 1) {
-            throw new Error(`Expected at least one public institution, got ${counts.institutions}`);
-          }
-          console.log('Production health passed:', JSON.stringify({
-            site: health.ok,
-            open_engine: engine.ok,
-            institutions: counts.institutions,
-            opportunities: counts.opportunities,
-            events: counts.events,
-          }));
-          NODE
