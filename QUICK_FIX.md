@@ -1,88 +1,39 @@
-# Why Data Isn't Being Populated - Root Cause Summary
+# Historical data-population troubleshooting
 
-## The Problem (3 Issues)
+> This note is retained for context, but the production pipeline has moved on from the original failure described here. Current ingestion uses repository secrets, scheduled workflows, the GeoAcademic open-engine database, and the Cloud Run API.
 
-### Issue 1: INGESTION_HOOK_SECRET Missing from GitHub Actions Secrets ❌
+## What originally went wrong
 
-The ingestion system requires a shared secret for authentication. It's configured locally in `.env` but **NOT in GitHub repository secrets**, so automated workflows can't authenticate.
+The first production setup had three bootstrap problems:
 
-**Result:** Workflows return 503 "Ingestion hook is not configured"
+1. Required ingestion/database credentials were not consistently configured in GitHub Actions.
+2. Source seeding and ingestion were separate jobs, so ingestion could run successfully while having nothing useful to process.
+3. The source registry had not yet been populated.
 
-### Issue 2: Ingestion Is NOT Automatic by Design ⚠️
+Those bootstrap problems are no longer an accurate explanation for an empty UI. Current workflow QA should be used to distinguish database/ingestion failures from API-routing or frontend failures.
 
-Two separate workflows:
-- **Seed Sources** - Manual trigger (`workflow_dispatch`) - registers initial URLs
-- **Ingestion Burst** - Scheduled (`cron: "17 */2 * * *"`) - runs every 2 hours
+## Required secrets
 
-They don't run in combo because:
-- Seeding is one-time bootstrap; ingestion is continuous
-- Task claiming prevents race conditions
-- Designed for GitHub Free tier (12 runs/day max)
+Store credentials only in GitHub Actions secrets or the relevant deployment secret manager. Never commit real values to this repository.
 
-### Issue 3: Sources Were Never Seeded 🔴
-
-The seed workflow has **never been triggered**, so no source URLs are registered. Without sources, ingestion has nothing to fetch.
-
----
-
-## What You Need to Do (NOW)
-
-### Step 1: Add GitHub Secrets (5 minutes)
-
-Go to: https://github.com/ealins/research-pulse-global-f9b8742f/settings/secrets/actions
-
-Add these 3 secrets:
-
-```
-INGESTION_HOOK_SECRET=geoacademic-development-hook-secret-2026-08-31-v1-do-not-use-production
-
-GEOACADEMIC_DATABASE_URL=postgresql://[user]:[password]@db.supabase.co:5432/postgres
-(Get from: Supabase Dashboard → Project Settings → Database)
-
-NVIDIA_API_KEY=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
+```text
+INGESTION_HOOK_SECRET=<rotated secret stored in GitHub Actions>
+GEOACADEMIC_DATABASE_URL=<Supabase/Postgres connection string stored in GitHub Actions>
+NVIDIA_API_KEY=<optional model-provider key stored in GitHub Actions>
 ```
 
-### Step 2: Trigger Seed Workflow (2 minutes)
+## Current verification path
 
-1. Go to: Actions tab
-2. Select: "GeoAcademic seed sources"
-3. Click: "Run workflow"
-4. Wait for completion
+1. Confirm **GeoAcademic Cloud ingestion** completes successfully.
+2. Confirm **GeoAcademic ingestion burst** completes successfully.
+3. Run **GeoAcademic API QA** and inspect both database counts and API checks.
+4. The open-engine API must expose `/health` and `/v1/*`. Do not point `GEOACADEMIC_API_URL` or `VITE_GEOACADEMIC_API_URL` at the frontend application origin.
+5. The canonical public open-engine API currently used by the application code is:
 
-This registers ISPRS, EGU, EarthObservations as sources.
-
-### Step 3: Trigger Ingestion (5 minutes)
-
-1. Go to: Actions tab
-2. Select: "GeoAcademic ingestion burst"
-3. Click: "Run workflow" (or wait for next scheduled 2-hour run)
-
-This fetches data from registered sources.
-
-### Step 4: Verify (1 minute)
-
-```bash
-npx tsx scripts/diagnose-data.ts
+```text
+https://geoacademic-api-xjh4s3mvyq-ey.a.run.app
 ```
 
-Should show non-zero counts.
+## Security note
 
----
-
-## Timeline
-
-- Seed workflow: ~2 minutes
-- First ingestion: ~5 minutes
-- Data visible: ~10 minutes total
-- Ongoing: Every 2 hours automatically
-
----
-
-## Lifecycle Filters Status
-
-✅ **All lifecycle filters are working correctly:**
-- Events: Exclude past events (end_date < today)
-- Projects: Show only active/planned (hide completed)
-- Courses: Exclude low-confidence records
-
-Once data is ingested, the website will automatically show only lean, actionable data.
+Earlier revisions of troubleshooting files in this repository contained plaintext credentials. Any credential that was ever committed must be considered exposed and rotated. Removing a value from the current branch does not erase it from Git history.
