@@ -11,24 +11,33 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 3
     steps:
-      - name: Wait for Cloudflare production and verify public data
+      - name: Verify Cloudflare production and public data
         shell: bash
         run: |
           set -euo pipefail
           SITE="https://geoacademic.app"
           ENGINE="https://geoacademic-api-xjh4s3mvyq-ey.a.run.app"
 
-          for attempt in $(seq 1 40); do
-            echo "Production smoke attempt ${attempt}/40"
+          page_code=$(curl -L -sS -o /tmp/home.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/" || true)
+          health_code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/api/public/data-health" || true)
+          engine_code=$(curl -L -sS -o /tmp/engine.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$ENGINE/health" || true)
 
-            page_code=$(curl -L -sS -o /tmp/home.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/" || true)
-            health_code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/api/public/data-health" || true)
-            engine_code=$(curl -L -sS -o /tmp/engine.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$ENGINE/health" || true)
+          echo "HTTP codes: home=$page_code health=$health_code engine=$engine_code"
+          echo "--- site health ---"
+          [[ -s /tmp/health.json ]] && cat /tmp/health.json || true
+          echo
+          echo "--- engine health ---"
+          [[ -s /tmp/engine.json ]] && cat /tmp/engine.json || true
+          echo
 
-            if [[ "$page_code" == "200" && "$health_code" == "200" && "$engine_code" == "200" ]]; then
-              if grep -q "Research Pulse" /tmp/home.html && node <<'NODE'
+          [[ "$page_code" == "200" ]]
+          [[ "$health_code" == "200" ]]
+          [[ "$engine_code" == "200" ]]
+          grep -q "Research Pulse" /tmp/home.html
+
+          node <<'NODE'
           const fs = require('fs');
           const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'));
           const engine = JSON.parse(fs.readFileSync('/tmp/engine.json', 'utf8'));
@@ -38,7 +47,7 @@ jobs:
           if (!Number.isFinite(Number(counts.institutions)) || Number(counts.institutions) < 1) {
             throw new Error(`Expected at least one public institution, got ${counts.institutions}`);
           }
-          console.log('Production health:', JSON.stringify({
+          console.log('Production health passed:', JSON.stringify({
             site: health.ok,
             open_engine: engine.ok,
             institutions: counts.institutions,
@@ -46,17 +55,3 @@ jobs:
             events: counts.events,
           }));
           NODE
-              then
-                echo "GeoAcademic production smoke passed."
-                exit 0
-              fi
-            fi
-
-            echo "Not healthy yet (home=$page_code health=$health_code engine=$engine_code)."
-            [[ -s /tmp/health.json ]] && { echo -n "site health: "; head -c 1000 /tmp/health.json; echo; } || true
-            [[ -s /tmp/engine.json ]] && { echo -n "engine health: "; head -c 1000 /tmp/engine.json; echo; } || true
-            sleep 10
-          done
-
-          echo "GeoAcademic production did not become healthy within the smoke window." >&2
-          exit 1
