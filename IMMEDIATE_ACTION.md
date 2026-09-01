@@ -36,13 +36,13 @@ git push origin main
 
 # B. Trigger discovery (after SQL is run)
 curl.exe -X POST https://geoacademic-web.fly.dev/api/public/hooks/ingest-batch `
-  -H "x-ingestion-secret: a1906a4c280fc73cac7916f4e5e117a6a56069dc093999ea82722eab77eb96e2" `
+  -H "x-ingestion-secret: <ROTATED-SECRET-DO-NOT-COMMIT>" `
   -H "Content-Type: application/json" `
   -d '{\"action\":\"enqueue-discovery\",\"limit\":50}'
 
 # C. Process the queue
 curl.exe -X POST https://geoacademic-web.fly.dev/api/public/hooks/ingest-batch `
-  -H "x-ingestion-secret: a1906a4c280fc73cac7916f4e5e117a6a56069dc093999ea82722eab77eb96e2" `
+  -H "x-ingestion-secret: <ROTATED-SECRET-DO-NOT-COMMIT>" `
   -H "Content-Type: application/json" `
   -d '{\"action\":\"drain\",\"limit\":100}'
 
