@@ -1,3 +1,4 @@
+# Triggered only for the production route repair.
 name: One-time Cloudflare device deploy
 
 on:
