@@ -1,0 +1,59 @@
+name: GeoAcademic production smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Wait for Cloudflare production and verify public data
+        shell: bash
+        run: |
+          set -euo pipefail
+          SITE="https://geoacademic.app"
+
+          for attempt in $(seq 1 40); do
+            echo "Production smoke attempt ${attempt}/40"
+
+            page_code=$(curl -L -sS -o /tmp/home.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/" || true)
+            health_code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/api/public/data-health" || true)
+
+            if [[ "$page_code" == "200" && "$health_code" == "200" ]]; then
+              if grep -q "Research Pulse" /tmp/home.html && node <<'NODE'
+          const fs = require('fs');
+          const payload = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'));
+          const counts = payload.public_surface_counts ?? {};
+          if (payload.ok !== true) throw new Error('data-health ok != true');
+          if (payload.open_engine?.ok !== true) throw new Error('Open Engine is not healthy');
+          if (!Number.isFinite(Number(counts.institutions)) || Number(counts.institutions) < 1) {
+            throw new Error(`Expected at least one public institution, got ${counts.institutions}`);
+          }
+          console.log('Production health:', JSON.stringify({
+            ok: payload.ok,
+            open_engine: payload.open_engine,
+            institutions: counts.institutions,
+            opportunities: counts.opportunities,
+            events: counts.events,
+          }));
+          NODE
+              then
+                echo "GeoAcademic production smoke passed."
+                exit 0
+              fi
+            fi
+
+            echo "Not healthy yet (home=$page_code health=$health_code)."
+            [[ -s /tmp/health.json ]] && head -c 1000 /tmp/health.json || true
+            echo
+            sleep 10
+          done
+
+          echo "GeoAcademic production did not become healthy within the smoke window." >&2
+          exit 1
