@@ -19,26 +19,29 @@ export const Route = createFileRoute("/api/public/data-health")({
       GET: async () => {
         const checkedAt = new Date().toISOString();
         try {
-          // This is a public health route. It must not require the service-role key:
-          // Cloudflare production can validate the same RLS-protected data that the
-          // browser is allowed to read using the publishable client.
-          const [publicSurface, engineHealth] = await Promise.all([
+          // Public availability is defined by the RLS-protected Supabase surface.
+          // Open Engine is reported independently so a transient server-to-server
+          // health request cannot turn otherwise healthy public data into a 503.
+          const [publicSurface, engineResult] = await Promise.all([
             supabase.rpc("public_surface_counts"),
-            openEngine.health(),
+            openEngine
+              .health()
+              .then((value) => ({ ok: Boolean(value?.ok) }))
+              .catch((error) => {
+                console.warn("[data-health] Open Engine check failed", error);
+                return { ok: false };
+              }),
           ]);
 
           if (publicSurface.error) {
             throw new Error(`public_surface_counts: ${publicSurface.error.message}`);
-          }
-          if (!engineHealth?.ok) {
-            throw new Error("Open Engine health check failed");
           }
 
           return json({
             ok: true,
             checked_at: checkedAt,
             public_surface_counts: publicSurface.data,
-            open_engine: { ok: true },
+            open_engine: engineResult,
           });
         } catch (error) {
           console.error("[data-health]", error);
