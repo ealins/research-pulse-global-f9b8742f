@@ -1,15 +1,13 @@
 // Public Cloud Run deployment of the GeoAcademic open engine. Safe to ship in the
-// browser bundle; VITE_GEOACADEMIC_API_URL always wins when it is provided.
+// browser bundle; VITE_GEOACADEMIC_API_URL is tried first when it is provided.
 const DEFAULT_OPEN_ENGINE_URL = "https://geoacademic-api-xjh4s3mvyq-ey.a.run.app";
-
-const OPEN_ENGINE_URL = (
-  import.meta.env["VITE_GEOACADEMIC_API_URL"] ||
-  DEFAULT_OPEN_ENGINE_URL
+const CONFIGURED_OPEN_ENGINE_URL = (
+  import.meta.env["VITE_GEOACADEMIC_API_URL"] || ""
 ).replace(/\/$/, "");
+const OPEN_ENGINE_URL = CONFIGURED_OPEN_ENGINE_URL || DEFAULT_OPEN_ENGINE_URL;
 const OPEN_ENGINE_SNAPSHOT_URL = import.meta.env["VITE_GEOACADEMIC_SNAPSHOT_URL"] || "";
 
 export const openEngineConfigured = Boolean(OPEN_ENGINE_URL);
-
 
 export type OpenEngineFeed<T = Record<string, unknown>> = {
   entity_type: string;
@@ -73,15 +71,31 @@ async function snapshotFallback<T>(path: string, signal?: AbortSignal): Promise<
   throw new Error(`No public snapshot fallback for ${path}`);
 }
 
+function apiFetch(baseUrl: string, path: string, signal?: AbortSignal) {
+  return fetch(`${baseUrl}${path}`, {
+    signal: signal ?? null,
+    headers: { accept: "application/json" },
+  });
+}
+
 async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   if (!OPEN_ENGINE_URL) {
     throw new Error("VITE_GEOACADEMIC_API_URL is not configured");
   }
   try {
-    const response = await fetch(`${OPEN_ENGINE_URL}${path}`, {
-      signal: signal ?? null,
-      headers: { accept: "application/json" },
-    });
+    let response = await apiFetch(OPEN_ENGINE_URL, path, signal);
+
+    // A deployment variable can accidentally point at the frontend origin rather
+    // than the open-engine API. Frontends commonly return 404/405 for /health and
+    // /v1/*, so retry those route-missing responses against the canonical API.
+    if (
+      CONFIGURED_OPEN_ENGINE_URL &&
+      CONFIGURED_OPEN_ENGINE_URL !== DEFAULT_OPEN_ENGINE_URL &&
+      (response.status === 404 || response.status === 405)
+    ) {
+      response = await apiFetch(DEFAULT_OPEN_ENGINE_URL, path, signal);
+    }
+
     if (!response.ok) {
       if (response.status < 500) {
         throw new NonFallbackApiError(`GeoAcademic API ${response.status}: ${path}`);
