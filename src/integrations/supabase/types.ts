@@ -294,6 +294,7 @@ export type Database = {
       }
       courses: {
         Row: {
+          confidence: Database["public"]["Enums"]["confidence_level"]
           created_at: string
           degree_type: string | null
           department_id: string | null
@@ -311,6 +312,7 @@ export type Database = {
           website: string | null
         }
         Insert: {
+          confidence?: Database["public"]["Enums"]["confidence_level"]
           created_at?: string
           degree_type?: string | null
           department_id?: string | null
@@ -328,6 +330,7 @@ export type Database = {
           website?: string | null
         }
         Update: {
+          confidence?: Database["public"]["Enums"]["confidence_level"]
           created_at?: string
           degree_type?: string | null
           department_id?: string | null
