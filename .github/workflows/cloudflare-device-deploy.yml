@@ -1,0 +1,30 @@
+name: One-time Cloudflare device deploy
+
+on:
+  push:
+    paths:
+      - ".github/workflows/cloudflare-device-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+
+      - name: Install locked dependencies
+        run: npx --yes bun@1.3.14 install --frozen-lockfile
+
+      - name: Build production Worker
+        run: npx --yes bun@1.3.14 run build
+
+      - name: Authorize Cloudflare for this runner
+        run: ./node_modules/.bin/wrangler login --device --browser=false --use-keyring=false
+
+      - name: Deploy research-pulse-global
+        run: ./node_modules/.bin/wrangler deploy
