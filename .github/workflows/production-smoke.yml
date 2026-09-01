@@ -11,26 +11,46 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 4
     steps:
-      - name: Diagnose production API targets
+      - name: Verify active production Worker and public data
         shell: bash
         run: |
           set -euo pipefail
           SITE="https://geoacademic.app"
-          ORACLE_ENGINE="https://api.geoacademic.app"
-          LEGACY_ENGINE="https://geoacademic-api-xjh4s3mvyq-ey.a.run.app"
 
-          page_code=$(curl -L -sS -o /tmp/home.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/" || true)
-          health_code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/api/public/data-health" || true)
-          oracle_code=$(curl -L -sS -o /tmp/oracle.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$ORACLE_ENGINE/health" || true)
-          legacy_code=$(curl -L -sS -o /tmp/legacy.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$LEGACY_ENGINE/health" || true)
+          for attempt in $(seq 1 12); do
+            nonce="${GITHUB_SHA}-${attempt}-$(date +%s)"
+            page_code=$(curl -L -sS -o /tmp/home.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/?smoke=$nonce" || true)
+            health_code=$(curl -L -sS -o /tmp/health.json -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/api/public/data-health?smoke=$nonce" || true)
 
-          echo "HTTP codes: home=$page_code health=$health_code oracle=$oracle_code legacy=$legacy_code"
-          echo "--- site health ---"; [[ -s /tmp/health.json ]] && cat /tmp/health.json || true; echo
-          echo "--- Oracle API ---"; [[ -s /tmp/oracle.json ]] && cat /tmp/oracle.json || true; echo
-          echo "--- legacy Cloud Run API ---"; [[ -s /tmp/legacy.html ]] && head -c 2000 /tmp/legacy.html || true; echo
+            echo "Attempt $attempt: home=$page_code health=$health_code"
+            [[ -s /tmp/health.json ]] && { echo -n "health: "; head -c 1500 /tmp/health.json; echo; } || true
 
-          [[ "$page_code" == "200" ]]
-          [[ "$oracle_code" == "200" ]]
-          grep -q "Research Pulse" /tmp/home.html
+            if [[ "$page_code" == "200" && "$health_code" == "200" ]] && grep -q "Research Pulse" /tmp/home.html; then
+              if node <<'NODE'
+          const fs = require('fs');
+          const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'));
+          const counts = health.public_surface_counts ?? {};
+          if (health.ok !== true) throw new Error('production health is not ok');
+          if (health.open_engine?.ok !== true) throw new Error('Open Engine/fallback is not healthy');
+          if (Number(counts.institutions) < 1) throw new Error('public institution count is empty');
+          console.log('Production passed:', JSON.stringify({
+            institutions: counts.institutions,
+            researchers: counts.researchers,
+            opportunities: counts.opportunities,
+            publications: counts.publications,
+            projects: counts.projects,
+            events: counts.events,
+            open_engine: health.open_engine,
+          }));
+          NODE
+              then
+                exit 0
+              fi
+            fi
+            sleep 10
+          done
+
+          echo "Active geoacademic.app deployment is not healthy." >&2
+          exit 1
