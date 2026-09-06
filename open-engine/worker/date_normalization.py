@@ -1,3 +1,4 @@
+import hashlib
 import re
 from datetime import date
 
@@ -96,6 +97,31 @@ def normalize_single_date(value: object) -> str | None:
     return start
 
 
+def _stabilize_calendar_event_identity(candidate: dict, data: dict) -> None:
+    """Ignore cosmetic calendar badges when deriving deterministic event identity."""
+    if data.get("extractor") != "calendar_table_v1":
+        return
+    raw_date_text = data.get("date_text")
+    if not isinstance(raw_date_text, str):
+        return
+
+    compact = " ".join(raw_date_text.split()).strip()
+    stable_date_text = re.sub(r"\s+new\s*$", "", compact, flags=re.IGNORECASE).strip()
+    if stable_date_text == compact:
+        return
+
+    data["date_text"] = stable_date_text
+    evidence = data.get("evidence")
+    if isinstance(evidence, str):
+        data["evidence"] = re.sub(r"\s+new\s*$", "", evidence.strip(), flags=re.IGNORECASE)
+
+    source_url = str(candidate.get("source_url") or "")
+    title = str(candidate.get("title") or "")
+    candidate["external_key"] = hashlib.sha256(
+        f"event|{source_url}|{title}|{stable_date_text}".encode("utf-8")
+    ).hexdigest()
+
+
 def normalize_candidate_dates(candidate: dict) -> dict:
     data = candidate.get("data")
     if not isinstance(data, dict):
@@ -103,6 +129,7 @@ def normalize_candidate_dates(candidate: dict) -> dict:
 
     entity_type = str(candidate.get("entity_type") or "").lower()
     if entity_type == "event":
+        _stabilize_calendar_event_identity(candidate, data)
         source_start = data.get("startDate") or data.get("date_text")
         source_end = data.get("endDate")
         start_date, inferred_end = normalize_date_range(source_start)
