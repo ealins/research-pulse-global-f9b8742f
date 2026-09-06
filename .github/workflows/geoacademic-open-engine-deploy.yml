@@ -2,10 +2,6 @@ name: Deploy GeoAcademic open engine to Oracle
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - "open-engine/**"
 
 concurrency:
   group: geoacademic-open-engine-deploy
@@ -25,19 +21,15 @@ jobs:
       ORACLE_SSH_KNOWN_HOSTS: ${{ secrets.ORACLE_SSH_KNOWN_HOSTS }}
       ORACLE_DEPLOY_PATH: ${{ secrets.ORACLE_DEPLOY_PATH }}
     steps:
-      - name: Check deployment configuration
-        id: config
+      - name: Require Oracle deployment configuration
         shell: bash
         run: |
           if [ -z "$ORACLE_HOST" ] || [ -z "$ORACLE_USER" ] || [ -z "$ORACLE_SSH_PRIVATE_KEY" ] || [ -z "$ORACLE_SSH_KNOWN_HOSTS" ] || [ -z "$ORACLE_DEPLOY_PATH" ]; then
-            echo "configured=false" >> "$GITHUB_OUTPUT"
-            echo "Oracle deployment secrets are not configured yet; no deployment attempted."
-          else
-            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "Oracle deployment secrets are not configured." >&2
+            exit 1
           fi
 
       - name: Configure SSH
-        if: steps.config.outputs.configured == 'true'
         shell: bash
         run: |
           install -d -m 700 "$HOME/.ssh"
@@ -47,12 +39,10 @@ jobs:
           chmod 600 "$HOME/.ssh/known_hosts"
 
       - name: Deploy current main on Oracle
-        if: steps.config.outputs.configured == 'true'
         shell: bash
         run: |
           ssh -i "$HOME/.ssh/geoacademic_oracle" "$ORACLE_USER@$ORACLE_HOST" \
             "set -euo pipefail; cd '$ORACLE_DEPLOY_PATH'; git fetch origin main; git checkout main; git reset --hard origin/main; cd open-engine; chmod +x deploy-oracle.sh; ./deploy-oracle.sh"
 
       - name: Verify public API
-        if: steps.config.outputs.configured == 'true'
         run: curl --fail --silent --show-error --max-time 30 https://api.geoacademic.app/health
