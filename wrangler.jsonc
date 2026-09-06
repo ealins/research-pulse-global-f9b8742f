@@ -1,4 +1,5 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "research-pulse-global"
+  "name": "research-pulse-global",
+  "route": "geoacademic.app/*"
 }
