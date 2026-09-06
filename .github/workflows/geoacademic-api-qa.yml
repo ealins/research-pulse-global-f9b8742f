@@ -1,4 +1,4 @@
-name: GeoAcademic API QA
+name: GeoAcademic external API QA
 
 on:
   workflow_dispatch:
@@ -7,16 +7,12 @@ on:
         description: Optional API URL override
         required: false
         default: ""
-  workflow_run:
-    workflows: ["GeoAcademic Cloud ingestion"]
-    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   qa:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,7 +27,7 @@ jobs:
       - name: Install QA dependencies
         run: pip install asyncpg==0.30.0 httpx==0.28.1
 
-      - name: Run API and data quality checks
+      - name: Run external API checks
         env:
           DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
           DB_SCHEMA: geoacademic_engine
@@ -41,9 +37,9 @@ jobs:
         run: |
           test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
 
-          # GEOACADEMIC_API_URL has historically been used for both the website and
-          # the open-engine API. A frontend URL returns 404 for /health and /v1/*.
-          # Only trust an override that actually exposes the API health endpoint.
+          # This workflow intentionally tests the standalone Open Engine API.
+          # Production website health is covered separately by production-smoke.yml,
+          # and ingestion/data quality by geoacademic-data-qa.yml.
           CANDIDATE_API_URL="${MANUAL_API_URL:-${REPO_API_URL:-$DEFAULT_API_URL}}"
           if python - "$CANDIDATE_API_URL" <<'PY'
           import sys
@@ -63,10 +59,9 @@ jobs:
           then
             export GEOACADEMIC_API_URL="${CANDIDATE_API_URL%/}"
           else
-            echo "Configured GEOACADEMIC_API_URL is not the open-engine API; falling back to $DEFAULT_API_URL"
+            echo "Configured GEOACADEMIC_API_URL is not the Open Engine API; falling back to $DEFAULT_API_URL"
             export GEOACADEMIC_API_URL="$DEFAULT_API_URL"
           fi
 
           python open-engine/cloudrun/qa.py
           python open-engine/cloudrun/qa_slugs.py
-          python open-engine/cloudrun/qa_scope.py
