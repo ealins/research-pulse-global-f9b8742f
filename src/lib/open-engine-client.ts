@@ -8,6 +8,7 @@ const CONFIGURED_OPEN_ENGINE_URL = (
 ).replace(/\/$/, "");
 const OPEN_ENGINE_URL = CONFIGURED_OPEN_ENGINE_URL || DEFAULT_OPEN_ENGINE_URL;
 const OPEN_ENGINE_SNAPSHOT_URL = import.meta.env["VITE_GEOACADEMIC_SNAPSHOT_URL"] || "";
+const REMOTE_FAILURE_COOLDOWN_MS = 60_000;
 
 export const openEngineConfigured = Boolean(OPEN_ENGINE_URL);
 
@@ -31,6 +32,19 @@ type PublicSnapshot = {
 class NonFallbackApiError extends Error {}
 
 let snapshotPromise: Promise<PublicSnapshot> | null = null;
+let remoteUnavailableUntil = 0;
+
+function remoteInCooldown(): boolean {
+  return Date.now() < remoteUnavailableUntil;
+}
+
+function markRemoteUnavailable(): void {
+  remoteUnavailableUntil = Date.now() + REMOTE_FAILURE_COOLDOWN_MS;
+}
+
+function markRemoteHealthy(): void {
+  remoteUnavailableUntil = 0;
+}
 
 async function publicSnapshot(signal?: AbortSignal): Promise<PublicSnapshot> {
   if (!OPEN_ENGINE_SNAPSHOT_URL) {
@@ -183,11 +197,13 @@ async function fallback<T>(path: string, signal?: AbortSignal): Promise<T> {
 }
 
 async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
-  if (!OPEN_ENGINE_URL) {
+  if (!OPEN_ENGINE_URL || remoteInCooldown()) {
     return fallback<T>(path, signal);
   }
+
+  let response: Response;
   try {
-    let response = await apiFetch(OPEN_ENGINE_URL, path, signal);
+    response = await apiFetch(OPEN_ENGINE_URL, path, signal);
 
     // A deployment variable can accidentally point at the frontend origin rather
     // than the open-engine API. Frontends commonly return 404/405 for /health and
@@ -199,20 +215,22 @@ async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
     ) {
       response = await apiFetch(DEFAULT_OPEN_ENGINE_URL, path, signal);
     }
-
-    if (!response.ok) {
-      if (response.status < 500) {
-        throw new NonFallbackApiError(`GeoAcademic API ${response.status}: ${path}`);
-      }
-      return fallback<T>(path, signal);
-    }
-    return (await response.json()) as T;
   } catch (error) {
-    if (error instanceof NonFallbackApiError || signal?.aborted) {
-      throw error;
-    }
+    if (signal?.aborted) throw error;
+    markRemoteUnavailable();
     return fallback<T>(path, signal);
   }
+
+  if (!response.ok) {
+    if (response.status < 500) {
+      throw new NonFallbackApiError(`GeoAcademic API ${response.status}: ${path}`);
+    }
+    markRemoteUnavailable();
+    return fallback<T>(path, signal);
+  }
+
+  markRemoteHealthy();
+  return (await response.json()) as T;
 }
 
 export const openEngine = {
