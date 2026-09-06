@@ -1,0 +1,35 @@
+name: GeoAcademic data QA
+
+on:
+  workflow_dispatch:
+  workflow_run:
+    workflows: ["GeoAcademic Cloud ingestion"]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  qa:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: open-engine/worker/requirements.txt
+
+      - name: Install QA dependency
+        run: pip install asyncpg==0.30.0
+
+      - name: Validate canonical data and public read models
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+          DB_SCHEMA: geoacademic_engine
+        run: |
+          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          python open-engine/cloudrun/qa_database.py
