@@ -1,0 +1,69 @@
+name: One-shot SSR repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-ssr-repair.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.event.head_commit.message == 'Run one-shot SSR repair'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - name: Patch direct route loaders
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          patches = [
+              (
+                  Path('src/routes/jobs.index.tsx'),
+                  'export const Route = createFileRoute("/jobs/")({\n  validateSearch:',
+                  'export const Route = createFileRoute("/jobs/")({\n  loader: ({ context }) => context.queryClient.ensureQueryData(opportunitiesQuery),\n  validateSearch:',
+              ),
+              (
+                  Path('src/routes/events.index.tsx'),
+                  'export const Route = createFileRoute("/events/")({\n  head:',
+                  'export const Route = createFileRoute("/events/")({\n  loader: ({ context }) => context.queryClient.ensureQueryData(eventsQuery),\n  head:',
+              ),
+          ]
+
+          for path, old, new in patches:
+              text = path.read_text()
+              if new in text:
+                  continue
+              if old not in text:
+                  raise SystemExit(f'Expected patch anchor not found in {path}')
+              path.write_text(text.replace(old, new, 1))
+
+          for path in [Path('src/routes/jobs.tsx'), Path('src/routes/events.tsx')]:
+              if path.exists():
+                  path.unlink()
+          PY
+
+      - name: Install and build
+        run: |
+          bun install --frozen-lockfile
+          bun run build
+
+      - name: Commit generated repair
+        run: |
+          git config user.name "GeoAcademic CI"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A src/routes src/routeTree.gen.ts
+          git rm .github/workflows/one-shot-ssr-repair.yml
+          git commit -m "Fix SSR data loading for jobs and events"
+          git push origin HEAD:main
