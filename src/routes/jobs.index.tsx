@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ExternalLink, Filter, MapPin, Timer, UserRound } from "lucide-react";
 
@@ -61,7 +60,9 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 function JobsPage() {
-  const { data, isLoading, error } = useQuery(opportunitiesQuery);
+  const data = Route.useLoaderData();
+  const isLoading = false;
+  const error = null;
   const { sector } = Route.useSearch();
   const navigate = Route.useNavigate();
   const [status, setStatus] = useState<string>("live");

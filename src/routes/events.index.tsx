@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ExternalLink, Repeat } from "lucide-react";
 
@@ -43,7 +42,9 @@ export const Route = createFileRoute("/events/")({
 });
 
 function EventsPage() {
-  const { data, isLoading, error } = useQuery(eventsQuery);
+  const data = Route.useLoaderData();
+  const isLoading = false;
+  const error = null;
   const [kind, setKind] = useState("all");
   const [country, setCountry] = useState("all");
   const [scope, setScope] = useState("upcoming");
