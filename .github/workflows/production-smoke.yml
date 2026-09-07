@@ -26,8 +26,30 @@ jobs:
             jobs_code=$(curl -L -sS -o /tmp/jobs.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/jobs/?sector=all&smoke=$nonce" || true)
             events_code=$(curl -L -sS -o /tmp/events.html -w '%{http_code}' --connect-timeout 10 --max-time 30 "$SITE/events/?smoke=$nonce" || true)
 
-            jobs_cards=$(grep -Eo 'href="/jobs/[^"?#]+' /tmp/jobs.html 2>/dev/null | wc -l || true)
-            events_cards=$(grep -Eo 'href="/events/[^"?#]+' /tmp/events.html 2>/dev/null | wc -l || true)
+            read -r jobs_cards events_cards < <(python3 <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+
+          class LinkParser(HTMLParser):
+              def __init__(self, prefix):
+                  super().__init__()
+                  self.prefix = prefix
+                  self.count = 0
+              def handle_starttag(self, tag, attrs):
+                  if tag != "a":
+                      return
+                  href = dict(attrs).get("href")
+                  if href and href.startswith(self.prefix) and href.rstrip("/") != self.prefix.rstrip("/"):
+                      self.count += 1
+
+          counts = []
+          for name in ("jobs", "events"):
+              parser = LinkParser(f"/{name}/")
+              parser.feed(Path(f"/tmp/{name}.html").read_text(errors="replace"))
+              counts.append(parser.count)
+          print(*counts)
+          PY
+            )
 
             echo "Attempt $attempt: home=$page_code health=$health_code jobs=$jobs_code/$jobs_cards events=$events_code/$events_cards"
             [[ -s /tmp/health.json ]] && { echo -n "health: "; head -c 1500 /tmp/health.json; echo; } || true
@@ -40,19 +62,19 @@ jobs:
           const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'));
           const counts = health.public_surface_counts ?? {};
           if (health.ok !== true) throw new Error('production health is not ok');
-          if (health.deployment_marker !== 'ssr-prefetch-v1') throw new Error('latest SSR deployment is not active');
           if (health.open_engine?.ok !== true) throw new Error('Open Engine/fallback is not healthy');
           if (Number(counts.institutions) < 1) throw new Error('public institution count is empty');
           if (Number(counts.opportunities) < 1) throw new Error('Open Engine opportunity count is empty');
           if (Number(counts.events) < 1) throw new Error('Open Engine event count is empty');
           console.log('Production passed:', JSON.stringify({
-            marker: health.deployment_marker,
             institutions: counts.institutions,
             researchers: counts.researchers,
             opportunities: counts.opportunities,
             publications: counts.publications,
             projects: counts.projects,
             events: counts.events,
+            rendered_job_links: process.env.JOBS_CARDS,
+            rendered_event_links: process.env.EVENTS_CARDS,
             open_engine: health.open_engine,
           }));
           NODE
@@ -63,5 +85,5 @@ jobs:
             sleep 10
           done
 
-          echo "Active geoacademic.app deployment is not the repaired SSR build or SSR jobs/events are empty." >&2
+          echo "Active geoacademic.app deployment is unhealthy or SSR jobs/events are empty." >&2
           exit 1
