@@ -1,0 +1,52 @@
+name: One-shot live SSR HTML diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/one-shot-live-html-diagnostic.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.event.head_commit.message == 'Inspect live SSR HTML'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Inspect current public HTML
+        shell: bash
+        run: |
+          set -euo pipefail
+          nonce="${GITHUB_SHA}-$(date +%s)"
+          curl -L -sS --connect-timeout 10 --max-time 30 "https://geoacademic.app/jobs/?sector=all&diag=$nonce" -o /tmp/jobs.html
+          curl -L -sS --connect-timeout 10 --max-time 30 "https://geoacademic.app/events/?diag=$nonce" -o /tmp/events.html
+          python <<'PY'
+          from html.parser import HTMLParser
+          from pathlib import Path
+          import re
+
+          class TextParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.parts=[]
+              def handle_data(self, data):
+                  s=' '.join(data.split())
+                  if s:
+                      self.parts.append(s)
+
+          for name in ('jobs','events'):
+              raw=Path(f'/tmp/{name}.html').read_text(errors='replace')
+              parser=TextParser(); parser.feed(raw)
+              visible=' | '.join(parser.parts)
+              hrefs=re.findall(r'href=["\']([^"\']+)', raw)
+              detail=[h for h in hrefs if h.startswith(f'/{name}/') and h.rstrip('/') != f'/{name}']
+              print(f'=== {name.upper()} ===')
+              print('html_bytes=', len(raw), 'hrefs=', len(hrefs), 'detail_links=', len(detail))
+              print('contains_no_results=', ('No positions match' in raw) if name=='jobs' else ('No upcoming events match' in raw or 'No events match' in raw))
+              print('contains_open_engine=', 'open_engine' in raw)
+              print('contains_loader_data=', 'loaderData' in raw or 'loaderData' in visible)
+              print('visible_text=', visible[:5000])
+              print('detail_link_sample=', detail[:10])
+          PY
