@@ -19,6 +19,7 @@ import { CardLink } from "@/components/CardLink";
 type JobSector = "academic" | "industry" | "all";
 
 export const Route = createFileRoute("/jobs/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(opportunitiesQuery),
   validateSearch: (search: Record<string, unknown>): { sector: JobSector } => ({
     sector:
       search["sector"] === "industry"

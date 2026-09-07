@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CardLink } from "@/components/CardLink";
 
 export const Route = createFileRoute("/events/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(eventsQuery),
   head: () => ({
     meta: [
       { title: "Conferences, schools & deadlines — GeoAcademic Radar" },
