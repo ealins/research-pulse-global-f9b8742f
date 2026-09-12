@@ -38,29 +38,47 @@ class DateNormalizationTests(unittest.TestCase):
         self.assertEqual("2026-12-15", normalized["data"]["start_date"])
         self.assertEqual("2026-12-17", normalized["data"]["end_date"])
 
-    def test_calendar_new_badge_does_not_change_identity(self):
-        source_url = "https://www.isprs.org/calendar/2026.aspx"
-        title = "Pacific Islands GIS and Remote Sensing User Conference"
-        stable_date = "30 Nov - 04 Dec 2026"
-        candidate = {
+    def test_calendar_badge_and_clean_row_share_identity(self):
+        source_url = "https://www.isprs.org/calendar/2027.aspx"
+        title = "JISDM 2027"
+        stable_date = "14-16 Apr 2027"
+        expected_key = hashlib.sha256(
+            f"event|{source_url}|{title}|{stable_date}".encode("utf-8")
+        ).hexdigest()
+
+        clean = {
             "entity_type": "event",
-            "external_key": "unstable",
+            "external_key": "extractor-clean-key",
+            "title": title,
+            "source_url": source_url,
+            "data": {
+                "extractor": "calendar_table_v1",
+                "date_text": stable_date,
+                "evidence": f"{title} | Delft, The Netherlands | {stable_date}",
+            },
+        }
+        badged = {
+            "entity_type": "event",
+            "external_key": "extractor-badged-key",
             "title": title,
             "source_url": source_url,
             "data": {
                 "extractor": "calendar_table_v1",
                 "date_text": f"{stable_date} New",
-                "evidence": f"{title} | Suva, Fiji Islands | {stable_date} New",
+                "evidence": f"{title} | Delft, The Netherlands | {stable_date} New",
             },
         }
-        normalized = normalize_candidate_dates(candidate)
-        expected_key = hashlib.sha256(
-            f"event|{source_url}|{title}|{stable_date}".encode("utf-8")
-        ).hexdigest()
-        self.assertEqual(stable_date, normalized["data"]["date_text"])
-        self.assertEqual(expected_key, normalized["external_key"])
-        self.assertEqual("2026-11-30", normalized["data"]["start_date"])
-        self.assertEqual("2026-12-04", normalized["data"]["end_date"])
+
+        normalized_clean = normalize_candidate_dates(clean)
+        normalized_badged = normalize_candidate_dates(badged)
+
+        self.assertEqual(expected_key, normalized_clean["external_key"])
+        self.assertEqual(expected_key, normalized_badged["external_key"])
+        self.assertEqual(stable_date, normalized_clean["data"]["date_text"])
+        self.assertEqual(stable_date, normalized_badged["data"]["date_text"])
+        self.assertEqual(normalized_clean["data"]["evidence"], normalized_badged["data"]["evidence"])
+        self.assertEqual("2027-04-14", normalized_badged["data"]["start_date"])
+        self.assertEqual("2027-04-16", normalized_badged["data"]["end_date"])
 
     def test_opportunity_candidate_enrichment(self):
         candidate = {
