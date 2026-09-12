@@ -98,7 +98,7 @@ def normalize_single_date(value: object) -> str | None:
 
 
 def _stabilize_calendar_event_identity(candidate: dict, data: dict) -> None:
-    """Ignore cosmetic calendar badges when deriving deterministic event identity."""
+    """Derive one deterministic identity for calendar rows, ignoring cosmetic badges."""
     if data.get("extractor") != "calendar_table_v1":
         return
     raw_date_text = data.get("date_text")
@@ -107,10 +107,8 @@ def _stabilize_calendar_event_identity(candidate: dict, data: dict) -> None:
 
     compact = " ".join(raw_date_text.split()).strip()
     stable_date_text = re.sub(r"\s+new\s*$", "", compact, flags=re.IGNORECASE).strip()
-    if stable_date_text == compact:
-        return
-
     data["date_text"] = stable_date_text
+
     evidence = data.get("evidence")
     if isinstance(evidence, str):
         data["evidence"] = re.sub(r"\s+new\s*$", "", evidence.strip(), flags=re.IGNORECASE)
