@@ -4,10 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths:
-      - "open-engine/**"
-      - "supabase/migrations/**"
-      - ".github/workflows/geoacademic-data-qa.yml"
   workflow_run:
     workflows: ["GeoAcademic Cloud ingestion"]
     types: [completed]
@@ -17,7 +13,6 @@ permissions:
 
 jobs:
   qa:
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -37,5 +32,6 @@ jobs:
           DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
           DB_SCHEMA: geoacademic_engine
         run: |
+          echo "QA trigger: $GITHUB_EVENT_NAME"
           test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
           python open-engine/cloudrun/qa_database.py
