@@ -1,14 +1,10 @@
-name: GeoAcademic ingestion burst
+name: GeoAcademic legacy ingestion burst (manual fallback)
 
 on:
   workflow_dispatch:
-  schedule:
-    # Avoid the top-of-hour congestion window. 12 runs/day fits inside the
-    # GitHub Free private-repository allowance when each run stays under 5 min.
-    - cron: "17 */2 * * *"
 
 concurrency:
-  group: geoacademic-ingestion
+  group: geoacademic-ingestion-manual
   cancel-in-progress: false
 
 permissions:
@@ -38,7 +34,7 @@ jobs:
           INGESTION_LEASE_LIMIT: "4"
           INGESTION_RUNTIME_MS: "45000"
           INGESTION_BURST_MODE: "true"
-          INGESTION_WORKER_TRIGGER: "github-actions-fetch"
+          INGESTION_WORKER_TRIGGER: "github-actions-manual-fallback"
         run: node scripts/ingestion-worker.mjs
       - name: Review newly fetched job pages
         env:
