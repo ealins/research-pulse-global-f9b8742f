@@ -1,4 +1,4 @@
-name: GeoAcademic Cloud ingestion (manual fallback)
+name: GeoAcademic Cloud ingestion (transition fallback)
 
 on:
   workflow_dispatch:
@@ -11,6 +11,10 @@ on:
         description: Maximum EXTRACT tasks this run
         required: false
         default: "40"
+  schedule:
+    # Transitional safety net. Remove after the Cloud Run Job + Cloud Scheduler
+    # bootstrap has completed successfully and its first scheduled run is verified.
+    - cron: "43 */2 * * *"
 
 permissions:
   contents: read
@@ -37,7 +41,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Manual fallback is inert until GEOACADEMIC_DATABASE_URL and GEOACADEMIC_S3_* secrets are configured."
+            echo "Transition fallback is inert until GEOACADEMIC_DATABASE_URL and GEOACADEMIC_S3_* secrets are configured."
           fi
 
       - uses: actions/setup-python@v5
@@ -51,7 +55,7 @@ jobs:
         if: steps.preflight.outputs.ready == 'true'
         run: pip install -r open-engine/worker/requirements.txt
 
-      - name: Run bounded ingestion cycle
+      - name: Run bounded ingestion cycle and QA
         if: steps.preflight.outputs.ready == 'true'
         env:
           DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
