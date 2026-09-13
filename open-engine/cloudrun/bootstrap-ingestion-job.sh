@@ -105,8 +105,8 @@ gcloud run jobs deploy "$JOB" \
   --project "$PROJECT_ID" \
   --service-account "$RUNTIME_SA" \
   --set-secrets "$SECRET_FLAGS" \
-  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-}" \
-  --args="all,--max-fetch,$MAX_FETCH,--max-process,$MAX_PROCESS" \
+  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-}" \
+  --args="all,--max-fetch=$MAX_FETCH,--max-process=$MAX_PROCESS" \
   --cpu=1 \
   --memory=1Gi \
   --task-timeout=30m \
