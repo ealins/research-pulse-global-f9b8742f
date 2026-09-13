@@ -10,7 +10,12 @@ RUN pip install --no-cache-dir -r /app/worker/requirements.txt
 
 COPY worker /app/worker
 COPY cloudrun /app/cloudrun
-RUN chmod +x /app/cloudrun/run-ingestion-job.sh
 
-ENTRYPOINT ["/app/cloudrun/run-ingestion-job.sh"]
-CMD ["all", "--max-fetch", "40", "--max-process", "40"]
+# Cloud Build can receive a source archive produced from a Windows checkout.
+# Normalize shell scripts inside the Linux image so CRLF line endings cannot
+# turn the shebang into /usr/bin/env "bash\r" and fail with exit code 127.
+RUN sed -i 's/\r$//' /app/cloudrun/*.sh \
+    && chmod +x /app/cloudrun/run-ingestion-job.sh
+
+ENTRYPOINT ["bash", "/app/cloudrun/run-ingestion-job.sh"]
+CMD ["all", "--max-fetch=40", "--max-process=40"]
