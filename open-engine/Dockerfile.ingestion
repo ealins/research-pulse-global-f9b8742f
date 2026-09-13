@@ -10,6 +10,7 @@ RUN pip install --no-cache-dir -r /app/worker/requirements.txt
 
 COPY worker /app/worker
 COPY cloudrun /app/cloudrun
+RUN chmod +x /app/cloudrun/run-ingestion-job.sh
 
-ENTRYPOINT ["python", "/app/cloudrun/batch_runner.py"]
+ENTRYPOINT ["/app/cloudrun/run-ingestion-job.sh"]
 CMD ["all", "--max-fetch", "40", "--max-process", "40"]
