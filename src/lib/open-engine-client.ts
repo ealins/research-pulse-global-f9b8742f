@@ -1,16 +1,13 @@
 import { supabase } from "@/integrations/supabase/client";
 
-// Public Cloud Run deployment of the GeoAcademic open engine. Safe to ship in the
-// browser bundle; VITE_GEOACADEMIC_API_URL is tried first when it is provided.
-const DEFAULT_OPEN_ENGINE_URL = "https://geoacademic-api-xjh4s3mvyq-ey.a.run.app";
-const CONFIGURED_OPEN_ENGINE_URL = (
-  import.meta.env["VITE_GEOACADEMIC_API_URL"] || ""
-).replace(/\/$/, "");
-const OPEN_ENGINE_URL = CONFIGURED_OPEN_ENGINE_URL || DEFAULT_OPEN_ENGINE_URL;
+// Public reads are served from the Supabase open-engine RPC surface. Cloud Run is
+// the ingestion runtime, not a browser-facing read dependency. Keeping reads on
+// Supabase avoids adding a failed/decommissioned API hop to every cold page load.
 const OPEN_ENGINE_SNAPSHOT_URL = import.meta.env["VITE_GEOACADEMIC_SNAPSHOT_URL"] || "";
-const REMOTE_FAILURE_COOLDOWN_MS = 60_000;
 
-export const openEngineConfigured = Boolean(OPEN_ENGINE_URL);
+// The open-engine read model is available through Supabase even when no separate
+// HTTP API URL is configured.
+export const openEngineConfigured = true;
 
 export type OpenEngineFeed<T = Record<string, unknown>> = {
   entity_type: string;
@@ -32,19 +29,6 @@ type PublicSnapshot = {
 class NonFallbackApiError extends Error {}
 
 let snapshotPromise: Promise<PublicSnapshot> | null = null;
-let remoteUnavailableUntil = 0;
-
-function remoteInCooldown(): boolean {
-  return Date.now() < remoteUnavailableUntil;
-}
-
-function markRemoteUnavailable(): void {
-  remoteUnavailableUntil = Date.now() + REMOTE_FAILURE_COOLDOWN_MS;
-}
-
-function markRemoteHealthy(): void {
-  remoteUnavailableUntil = 0;
-}
 
 async function publicSnapshot(signal?: AbortSignal): Promise<PublicSnapshot> {
   if (!OPEN_ENGINE_SNAPSHOT_URL) {
@@ -87,13 +71,6 @@ async function snapshotFallback<T>(path: string, signal?: AbortSignal): Promise<
   throw new Error(`No public snapshot fallback for ${path}`);
 }
 
-function apiFetch(baseUrl: string, path: string, signal?: AbortSignal) {
-  return fetch(`${baseUrl}${path}`, {
-    signal: signal ?? null,
-    headers: { accept: "application/json" },
-  });
-}
-
 function queryParams(path: string): URLSearchParams {
   const index = path.indexOf("?");
   return new URLSearchParams(index >= 0 ? path.slice(index + 1) : "");
@@ -112,7 +89,7 @@ async function rpcFallback<T>(path: string): Promise<T> {
     if (error) throw error;
     return {
       ok: true,
-      service: "geoacademic-open-engine-supabase-fallback",
+      service: "geoacademic-open-engine-supabase",
       fallback: "supabase",
       sample_items: Array.isArray(data?.items) ? data.items.length : 0,
     } as T;
@@ -186,7 +163,7 @@ async function rpcFallback<T>(path: string): Promise<T> {
   throw new Error(`No Supabase Open Engine fallback for ${path}`);
 }
 
-async function fallback<T>(path: string, signal?: AbortSignal): Promise<T> {
+async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
   try {
     return await rpcFallback<T>(path);
   } catch (rpcError) {
@@ -194,43 +171,6 @@ async function fallback<T>(path: string, signal?: AbortSignal): Promise<T> {
     if (!OPEN_ENGINE_SNAPSHOT_URL) throw rpcError;
     return snapshotFallback<T>(path, signal);
   }
-}
-
-async function request<T>(path: string, signal?: AbortSignal): Promise<T> {
-  if (!OPEN_ENGINE_URL || remoteInCooldown()) {
-    return fallback<T>(path, signal);
-  }
-
-  let response: Response;
-  try {
-    response = await apiFetch(OPEN_ENGINE_URL, path, signal);
-
-    // A deployment variable can accidentally point at the frontend origin rather
-    // than the open-engine API. Frontends commonly return 404/405 for /health and
-    // /v1/*, so retry those route-missing responses against the canonical API.
-    if (
-      CONFIGURED_OPEN_ENGINE_URL &&
-      CONFIGURED_OPEN_ENGINE_URL !== DEFAULT_OPEN_ENGINE_URL &&
-      (response.status === 404 || response.status === 405)
-    ) {
-      response = await apiFetch(DEFAULT_OPEN_ENGINE_URL, path, signal);
-    }
-  } catch (error) {
-    if (signal?.aborted) throw error;
-    markRemoteUnavailable();
-    return fallback<T>(path, signal);
-  }
-
-  if (!response.ok) {
-    if (response.status < 500) {
-      throw new NonFallbackApiError(`GeoAcademic API ${response.status}: ${path}`);
-    }
-    markRemoteUnavailable();
-    return fallback<T>(path, signal);
-  }
-
-  markRemoteHealthy();
-  return (await response.json()) as T;
 }
 
 export const openEngine = {
