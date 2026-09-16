@@ -18,7 +18,7 @@ GEO_TERMS = re.compile(
 
 TOPIC_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
     (re.compile(r"remote sensing|earth observation|satellite|hyperspectral", re.I), "Environmental Remote Sensing"),
-    (re.compile(r"foundation model|multimodal", re.I), "Foundation Models for Earth Observation"),
+    (re.compile(r"foundation model", re.I), "Foundation Models for Earth Observation"),
     (re.compile(r"multimodal.*earth observation|earth observation.*multimodal", re.I), "Multimodal Earth Observation"),
     (re.compile(r"geomatics|geodes\w*|geoinformat\w*", re.I), "Geomatics"),
     (re.compile(r"\bgis\b|3d gis|citygml", re.I), "3D GIS"),
