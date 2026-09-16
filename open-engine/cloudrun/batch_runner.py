@@ -119,21 +119,35 @@ async def run_verify() -> None:
         await pool.close()
 
 
-async def run_all(max_fetch: int, max_process: int) -> None:
+async def run_ats(max_sources: int) -> None:
+    from ats_enrichment import run_ats_enrichment
+
+    pool = await asyncpg.create_pool(**pool_kwargs(3))
+    try:
+        await run_ats_enrichment(pool, max_sources=max_sources)
+    finally:
+        await pool.close()
+
+
+async def run_all(max_fetch: int, max_process: int, max_ats_sources: int) -> None:
     await run_schedule()
     await run_fetch(max_fetch)
     await run_process(max_process)
     await run_verify()
+    # ATS adapters are deliberately bounded and complementary. Unsupported
+    # university career sites remain on the generic HTML extraction path.
+    await run_ats(max_ats_sources)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run bounded GeoAcademic ingestion work")
     parser.add_argument(
         "mode",
-        choices=("schedule", "fetch", "process", "verify", "all"),
+        choices=("schedule", "fetch", "process", "verify", "ats", "all"),
     )
     parser.add_argument("--max-fetch", type=int, default=40)
     parser.add_argument("--max-process", type=int, default=40)
+    parser.add_argument("--max-ats-sources", type=int, default=5)
     return parser.parse_args()
 
 
@@ -147,8 +161,14 @@ async def main() -> None:
         await run_process(max(1, args.max_process))
     elif args.mode == "verify":
         await run_verify()
+    elif args.mode == "ats":
+        await run_ats(max(1, args.max_ats_sources))
     else:
-        await run_all(max(1, args.max_fetch), max(1, args.max_process))
+        await run_all(
+            max(1, args.max_fetch),
+            max(1, args.max_process),
+            max(1, args.max_ats_sources),
+        )
 
 
 if __name__ == "__main__":
