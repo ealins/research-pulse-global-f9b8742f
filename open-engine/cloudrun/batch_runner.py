@@ -119,6 +119,12 @@ async def run_verify() -> None:
         await pool.close()
 
 
+async def run_public() -> None:
+    from public_enrichment_bridge import run_public_enrichment
+
+    await run_public_enrichment()
+
+
 async def run_ats(max_sources: int) -> None:
     from ats_enrichment import run_ats_enrichment
 
@@ -134,6 +140,9 @@ async def run_all(max_fetch: int, max_process: int, max_ats_sources: int) -> Non
     await run_fetch(max_fetch)
     await run_process(max_process)
     await run_verify()
+    # Reuse the existing canonical provider/non-vacancy writers while Cloud Run
+    # owns the cadence. This bridge is a no-op until its shared secret exists.
+    await run_public()
     # ATS adapters are deliberately bounded and complementary. Unsupported
     # university career sites remain on the generic HTML extraction path.
     await run_ats(max_ats_sources)
@@ -143,7 +152,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run bounded GeoAcademic ingestion work")
     parser.add_argument(
         "mode",
-        choices=("schedule", "fetch", "process", "verify", "ats", "all"),
+        choices=("schedule", "fetch", "process", "verify", "public", "ats", "all"),
     )
     parser.add_argument("--max-fetch", type=int, default=40)
     parser.add_argument("--max-process", type=int, default=40)
@@ -161,6 +170,8 @@ async def main() -> None:
         await run_process(max(1, args.max_process))
     elif args.mode == "verify":
         await run_verify()
+    elif args.mode == "public":
+        await run_public()
     elif args.mode == "ats":
         await run_ats(max(1, args.max_ats_sources))
     else:
