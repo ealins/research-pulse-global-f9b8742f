@@ -12,7 +12,7 @@ const BASE_URL = (
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
 const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.Nvidia || "";
 const NVIDIA_MODEL =
-  process.env.NVIDIA_MODEL_NANO || "nvidia/nemotron-3-nano-30b-a3b";
+  process.env.NVIDIA_MODEL_NANO || "nvidia/nemotron-3.5-lightning-30b-a3b";
 const RUNTIME_MS = clamp(
   process.env.REVIEW_RUNTIME_MS,
   30_000,
@@ -93,30 +93,25 @@ async function callHook(action, payload = {}) {
     signal: AbortSignal.timeout(HOOK_TIMEOUT_MS),
   });
   const text = await response.text();
-  let result;
+  let body = {};
   try {
-    result = text ? JSON.parse(text) : {};
+    body = text ? JSON.parse(text) : {};
   } catch {
-    result = { raw: text.slice(0, 500) };
+    body = { raw: text.slice(0, 500) };
   }
-  if (
-    !response.ok &&
-    !(response.status === 409 && action === "complete-review")
-  ) {
+  if (!response.ok) {
     throw new Error(
-      `Hook ${action} HTTP ${response.status}: ${JSON.stringify(result).slice(0, 500)}`,
+      `Hook ${action} HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`,
     );
   }
-  return result;
+  return body;
 }
 
-async function extractWithNemotron(lease) {
-  const pageText = String(lease.text_content || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 8_000);
-  const user = `PAGE URL: ${lease.url}\nPAGE TITLE: ${lease.title}\nEMPLOYER: ${lease.institution_name || "not stated"}\n\nPAGE TEXT:\n"""\n${pageText}\n"""`;
-  const startedAt = Date.now();
+async function extractWithNvidia(lease) {
+  if (!NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
+  const pageText = String(lease.text_content || "").slice(0, 8_000);
+  if (pageText.length < 120) throw new Error("Page text too short for review");
+
   const response = await fetch(
     "https://integrate.api.nvidia.com/v1/chat/completions",
     {
@@ -128,118 +123,119 @@ async function extractWithNemotron(lease) {
       },
       body: JSON.stringify({
         model: NVIDIA_MODEL,
-        temperature: 0.05,
-        max_tokens: 1_800,
+        temperature: 0.1,
+        max_tokens: 1800,
         chat_template_kwargs: { enable_thinking: false },
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: user },
+          {
+            role: "user",
+            content: `SOURCE URL: ${lease.final_url || lease.source_url || ""}\nPAGE TITLE: ${lease.page_title || ""}\nPAGE TEXT:\n${pageText}`,
+          },
         ],
       }),
-      signal: AbortSignal.timeout(45_000),
+      signal: AbortSignal.timeout(55_000),
     },
   );
-  const body = await response.json().catch(() => ({}));
+  const text = await response.text();
   if (!response.ok) {
-    throw new Error(
-      `NVIDIA HTTP ${response.status}: ${JSON.stringify(body).slice(0, 300)}`,
-    );
+    throw new Error(`NVIDIA HTTP ${response.status}: ${text.slice(0, 500)}`);
   }
-  const content = body?.choices?.[0]?.message?.content;
-  const extraction = validateBasicExtraction(parseJsonObject(content));
-  return {
-    extraction,
-    model: body?.model || NVIDIA_MODEL,
-    latency_ms: Date.now() - startedAt,
-    input_characters: SYSTEM_PROMPT.length + user.length,
-    output_characters: String(content || "").length,
-  };
+  const payload = JSON.parse(text);
+  const content = payload?.choices?.[0]?.message?.content;
+  if (!content) throw new Error("NVIDIA returned no content");
+  return validateBasicExtraction(parseJsonObject(content));
 }
 
-async function reviewLease(lease) {
-  const base = {
-    task_id: lease.task_id,
-    source_id: lease.source_id,
-    raw_record_id: lease.raw_record_id,
-    lease_started_at: lease.lease_started_at,
-  };
+async function processLease(lease) {
   try {
-    const modelResult =
-      lease.requires_model && NVIDIA_API_KEY
-        ? await extractWithNemotron(lease)
-        : lease.requires_model
-          ? { allow_server_model: true }
-          : {};
+    const extraction = await extractWithNvidia(lease);
     return await callHook("complete-review", {
-      completion: { ...base, success: true, ...modelResult },
+      completion: {
+        task_id: lease.task_id,
+        raw_record_id: lease.raw_record_id,
+        lease_started_at: lease.lease_started_at,
+        success: true,
+        model: NVIDIA_MODEL,
+        extraction,
+      },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    return await callHook("complete-review", {
-      completion: { ...base, success: false, error: message.slice(0, 1_000) },
-    });
+    try {
+      return await callHook("complete-review", {
+        completion: {
+          task_id: lease.task_id,
+          raw_record_id: lease.raw_record_id,
+          lease_started_at: lease.lease_started_at,
+          success: false,
+          model: NVIDIA_MODEL,
+          error: message.slice(0, 900),
+        },
+      });
+    } catch (completionError) {
+      const completionMessage =
+        completionError instanceof Error ? completionError.message : String(completionError);
+      throw new Error(`${message}; completion failed: ${completionMessage}`);
+    }
   }
 }
 
-async function mapConcurrent(items, concurrency, callback) {
-  let cursor = 0;
-  const results = new Array(items.length);
-  await Promise.all(
-    Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-      while (cursor < items.length) {
-        const index = cursor;
-        cursor += 1;
-        results[index] = await callback(items[index]);
-      }
-    }),
-  );
-  return results;
-}
-
-async function main() {
+async function runWorker() {
   if (!HOOK_SECRET) throw new Error("Missing INGESTION_HOOK_SECRET");
-  const deadline = Date.now() + RUNTIME_MS;
-  const totals = { leased: 0, complete: 0, retry: 0, dead: 0, stale: 0 };
-  console.log(
-    `GeoAcademic review burst -> ${BASE_URL} runtime=${Math.round(RUNTIME_MS / 1000)}s model=${NVIDIA_API_KEY ? NVIDIA_MODEL : "Lovable backend fallback"}`,
-  );
+  if (!NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
 
-  while (Date.now() < deadline - 10_000) {
-    const response = await callHook("lease-review", {
+  const deadline = Date.now() + RUNTIME_MS;
+  let processed = 0;
+  let succeeded = 0;
+  let failed = 0;
+
+  while (Date.now() < deadline) {
+    const leased = await callHook("lease-review", {
       limit: LEASE_LIMIT,
-      // The Lovable backend already has Nemotron configured and can act as a
-      // fallback. Adding NVIDIA_API_KEY moves those calls out as well.
       model_available: true,
     });
-    const leases = Array.isArray(response.leases) ? response.leases : [];
-    if (leases.length === 0) break;
-    totals.leased += leases.length;
-    const results = await mapConcurrent(leases, CONCURRENCY, reviewLease);
-    for (const result of results) {
-      const key = String(result?.status || "stale").toLowerCase();
-      if (key in totals) totals[key] += 1;
+    const leases = Array.isArray(leased?.leases) ? leased.leases : [];
+    if (!leases.length) break;
+
+    for (let index = 0; index < leases.length; index += CONCURRENCY) {
+      const batch = leases.slice(index, index + CONCURRENCY);
+      const results = await Promise.allSettled(batch.map(processLease));
+      for (const result of results) {
+        processed += 1;
+        if (result.status === "fulfilled") succeeded += 1;
+        else {
+          failed += 1;
+          console.error(result.reason);
+        }
+      }
+      if (Date.now() >= deadline) break;
     }
-    console.log(
-      `${new Date().toISOString()} REVIEW leased=${leases.length} complete=${totals.complete} retry=${totals.retry} dead=${totals.dead}`,
-    );
   }
-  const status = await callHook("worker-status");
+
   console.log(
-    `DONE leased=${totals.leased} complete=${totals.complete} retry=${totals.retry} dead=${totals.dead} remaining_review=${status.due_vacancy_review ?? "?"} fetch_paused=${status.fetch_paused ?? "?"}`,
+    `REVIEW_WORKER processed=${processed} succeeded=${succeeded} failed=${failed} model=${NVIDIA_MODEL}`,
   );
+}
+
+function selfTest() {
+  const accepted = validateBasicExtraction({
+    is_single_real_position: true,
+    rejection_reason: null,
+    title: "PhD position in InSAR",
+    confidence: 0.92,
+    evidence: ["PhD position in InSAR"],
+    topics: ["InSAR"],
+  });
+  if (!accepted.is_single_real_position) throw new Error("self-test failed");
+  console.log(`REVIEW_WORKER_SELF_TEST_OK model=${NVIDIA_MODEL}`);
 }
 
 if (process.argv.includes("--self-test")) {
-  validateBasicExtraction({
-    is_single_real_position: false,
-    confidence: 1,
-    evidence: [],
-    topics: [],
-  });
-  console.log("job-review-worker self-test passed");
+  selfTest();
 } else {
-  main().catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
-    process.exitCode = 1;
+  runWorker().catch((error) => {
+    console.error(error);
+    process.exit(1);
   });
 }
