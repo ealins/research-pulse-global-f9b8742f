@@ -7,6 +7,10 @@ import { supabaseAdmin } from "@/integrations/supabase/client.server";
 /** Skip reasons written before the entity extractors existed — safe to retry. */
 const LEGACY_SKIP = "unsupported record type for canonical extraction";
 const LEGACY_SKIP_ALT = "no extractor for classification";
+const SEMANTIC_REVIEW_MISSING =
+  "semantic vacancy review is required but no validated result is available";
+const RETIRED_NVIDIA_MODEL = "NVIDIA HTTP 410";
+const NVIDIA_NOT_CONFIGURED = "NVIDIA_SECRET_NOT_CONFIGURED";
 
 /** Classifications that now have a gate + extractor + canonical writer. */
 export const BACKFILL_CLASSIFICATIONS = [
@@ -50,9 +54,26 @@ export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
     if (status === "NORMALIZED") return false;
     if (status === "PENDING") return true;
     const err = r.normalization_error ?? "";
+
+    // Retry only failure modes that mean the canonical writer never actually
+    // received a usable semantic result. These are infrastructure/model-routing
+    // failures, not business-rule rejections. Cloud Run now owns the NVIDIA
+    // review lease, so these records are safe to requeue gradually.
+    if (
+      status === "FAILED" &&
+      (err.includes(SEMANTIC_REVIEW_MISSING) ||
+        err.includes(RETIRED_NVIDIA_MODEL) ||
+        err.includes(NVIDIA_NOT_CONFIGURED))
+    ) {
+      return true;
+    }
+
     // Only retry skips that were caused by missing extractors, never real
     // rejections from the gates or the validator.
-    return status === "SKIPPED" && (err.includes(LEGACY_SKIP) || err.includes(LEGACY_SKIP_ALT));
+    return (
+      status === "SKIPPED" &&
+      (err.includes(LEGACY_SKIP) || err.includes(LEGACY_SKIP_ALT))
+    );
   });
 
   // One task per source: normalizeSource() always works on the newest raw page.
@@ -68,11 +89,18 @@ export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
     .select("source_id")
     .eq("task_type", "NORMALIZE")
     .in("status", ["QUEUED", "PROCESSING", "RETRY"]);
-  const open = new Set((openTasks ?? []).map((t) => t.source_id).filter(Boolean) as string[]);
+  const open = new Set(
+    (openTasks ?? []).map((t) => t.source_id).filter(Boolean) as string[],
+  );
 
-  const rows: { task_type: string; source_id: string; payload: Record<string, unknown> }[] = [];
+  const rows: {
+    task_type: string;
+    source_id: string;
+    payload: Record<string, unknown>;
+  }[] = [];
   for (const [sourceId, classification] of bySource) {
-    plan.by_classification[classification] = (plan.by_classification[classification] ?? 0) + 1;
+    plan.by_classification[classification] =
+      (plan.by_classification[classification] ?? 0) + 1;
     if (open.has(sourceId)) {
       plan.already_queued += 1;
       continue;
@@ -87,7 +115,9 @@ export async function enqueueRawBackfill(limit = 400): Promise<BackfillPlan> {
 
   for (let i = 0; i < rows.length; i += 100) {
     const chunk = rows.slice(i, i + 100);
-    const { error } = await supabaseAdmin.from("ingestion_tasks").insert(chunk as never);
+    const { error } = await supabaseAdmin
+      .from("ingestion_tasks")
+      .insert(chunk as never);
     if (!error) plan.queued += chunk.length;
   }
   return plan;
@@ -103,15 +133,27 @@ export type ProviderPlan = {
  * Enqueues structured-provider work: institution identity reconciliation via ROR, OpenAIRE project/publication import,
  * and Crossref publication fallback.
  */
-export async function enqueueProviderBackfill(limit = 120): Promise<ProviderPlan> {
-  const out: ProviderPlan = { promote_queued: 0, publications_queued: 0, projects_queued: 0 };
+export async function enqueueProviderBackfill(
+  limit = 120,
+): Promise<ProviderPlan> {
+  const out: ProviderPlan = {
+    promote_queued: 0,
+    publications_queued: 0,
+    projects_queued: 0,
+  };
 
   const { data: openTasks } = await supabaseAdmin
     .from("ingestion_tasks")
     .select("task_type, institution_id")
-    .in("task_type", ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"])
+    .in("task_type", [
+      "PROMOTE_INSTITUTION",
+      "IMPORT_PUBLICATIONS",
+      "IMPORT_PROJECTS",
+    ])
     .in("status", ["QUEUED", "PROCESSING", "RETRY"]);
-  const openKey = new Set((openTasks ?? []).map((t) => `${t.task_type}:${t.institution_id}`));
+  const openKey = new Set(
+    (openTasks ?? []).map((t) => `${t.task_type}:${t.institution_id}`),
+  );
 
   const { data: institutions } = await supabaseAdmin
     .from("institutions")
@@ -119,8 +161,11 @@ export async function enqueueProviderBackfill(limit = 120): Promise<ProviderPlan
     .order("is_demo", { ascending: false })
     .limit(500);
 
-  const rows: { task_type: string; institution_id: string; payload: Record<string, unknown> }[] =
-    [];
+  const rows: {
+    task_type: string;
+    institution_id: string;
+    payload: Record<string, unknown>;
+  }[] = [];
   const hasRor = (value: string | null) =>
     /^(?:https?:\/\/ror\.org\/)?0[a-z0-9]{8}$/i.test((value ?? "").trim());
 
@@ -143,7 +188,10 @@ export async function enqueueProviderBackfill(limit = 120): Promise<ProviderPlan
       continue;
     }
 
-    if (!openKey.has(`IMPORT_PUBLICATIONS:${inst.id}`) && rows.length < limit) {
+    if (
+      !openKey.has(`IMPORT_PUBLICATIONS:${inst.id}`) &&
+      rows.length < limit
+    ) {
       rows.push({
         task_type: "IMPORT_PUBLICATIONS",
         institution_id: inst.id,
@@ -162,7 +210,9 @@ export async function enqueueProviderBackfill(limit = 120): Promise<ProviderPlan
   }
 
   for (let i = 0; i < rows.length; i += 100) {
-    await supabaseAdmin.from("ingestion_tasks").insert(rows.slice(i, i + 100) as never);
+    await supabaseAdmin
+      .from("ingestion_tasks")
+      .insert(rows.slice(i, i + 100) as never);
   }
   return out;
 }
