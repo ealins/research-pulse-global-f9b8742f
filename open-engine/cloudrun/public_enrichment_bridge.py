@@ -60,21 +60,18 @@ async def _run_rounds(
 
 async def run_public_enrichment(
     *,
-    backfill_limit: int = 40,
+    backfill_limit: int = 8,
     provider_limit: int = 4,
     normalize_limit: int = 8,
 ) -> dict[str, object]:
-    """Drain bounded website-facing enrichment work through the existing hook.
+    """Drain bounded website-facing enrichment through the existing hook.
 
-    The TypeScript application already contains the canonical ROR/OpenAIRE/
-    Crossref writers and non-vacancy normalizers. Reusing that path prevents a
-    second provider implementation while Cloud Run becomes the single cadence
-    owner. The bridge is optional until the shared hook secret is configured.
-
-    `backfill-raw` has its own bounded limit. It creates fresh tasks for pending
-    raw pages whose previous NORMALIZE task died (including the retired Nemotron
-    3 Nano HTTP 410 failures) without reopening records that were intentionally
-    rejected by a current deterministic gate.
+    Cloud Run owns the production cadence. Backfill first requeues only safe
+    recovery candidates. Provider work is deterministic. Vacancy semantic review
+    then runs inside Cloud Run with the configured NVIDIA key. The generic
+    canonical drain is allowed only when the review worker did not saturate its
+    bounded capacity, which prevents Cloudflare from consuming unresolved vacancy
+    tasks before the external reviewer can validate them.
     """
 
     if not HOOK_SECRET:
@@ -84,7 +81,7 @@ async def run_public_enrichment(
     timeout = httpx.Timeout(120.0, connect=20.0)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
         try:
-            backfill = await _call(client, "backfill-raw", normalize_limit)
+            backfill = await _call(client, "backfill-raw", backfill_limit)
         except Exception as exc:
             print(f"PUBLIC_ENRICHMENT_BACKFILL_FAILED error={exc}")
             backfill = {"error": str(exc)[:300]}
@@ -97,18 +94,57 @@ async def run_public_enrichment(
             print(f"PUBLIC_ENRICHMENT_PROVIDER_FAILED error={exc}")
             providers = {"error": str(exc)[:300]}
 
-        try:
-            canonical = await _run_rounds(
-                client, "drain", normalize_limit, max_rounds=3
-            )
-        except Exception as exc:
-            print(f"PUBLIC_ENRICHMENT_NORMALIZE_FAILED error={exc}")
-            canonical = {"error": str(exc)[:300]}
+    try:
+        from review_enrichment import run_review_enrichment
+
+        review = await run_review_enrichment(
+            max_rounds=3,
+            lease_limit=4,
+            concurrency=2,
+        )
+    except Exception as exc:
+        print(f"PUBLIC_REVIEW_FAILED error={exc}")
+        review = {"error": str(exc)[:300], "processed": 0, "skipped": True}
+
+    review_processed = int(review.get("processed", 0) or 0)
+    review_capacity = int(review.get("capacity", 12) or 12)
+    review_saturated = review_processed >= review_capacity
+    review_available = review.get("skipped") is not True and "error" not in review
+
+    # If the reviewer filled its entire capacity, vacancy work may still remain.
+    # Do not let the generic Cloudflare normalizer claim those tasks and turn a
+    # routing problem into raw-record failures. Once the reviewer catches up,
+    # the generic drain resumes for researcher/event/programme/course records.
+    if review_available and not review_saturated:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            try:
+                canonical = await _run_rounds(
+                    client, "drain", normalize_limit, max_rounds=3
+                )
+            except Exception as exc:
+                print(f"PUBLIC_ENRICHMENT_NORMALIZE_FAILED error={exc}")
+                canonical = {"error": str(exc)[:300]}
+    else:
+        canonical = {
+            "skipped": True,
+            "reason": (
+                "vacancy review backlog still active"
+                if review_saturated
+                else "vacancy review unavailable"
+            ),
+            "processed": 0,
+        }
 
     print(
         "PUBLIC_ENRICHMENT "
         f"backfill={backfill.get('queued', backfill.get('action', 'unknown'))} "
         f"providers={providers.get('processed', providers.get('action', 'unknown'))} "
+        f"review={review_processed} "
         f"normalize={canonical.get('processed', canonical.get('action', 'unknown'))}"
     )
-    return {"backfill": backfill, "providers": providers, "canonical": canonical}
+    return {
+        "backfill": backfill,
+        "providers": providers,
+        "review": review,
+        "canonical": canonical,
+    }
