@@ -36,10 +36,12 @@ def _opportunity_type(title: str) -> str:
     value = title.lower()
     if re.search(r"\bph\.?d\b", value):
         return "phd"
-    if "doctoral" in value:
-        return "doctoral_researcher"
+    # Check postdoctoral before the broader "doctoral" match because the word
+    # "postdoctoral" contains "doctoral".
     if re.search(r"post[- ]?doc|postdoctoral", value):
         return "postdoc"
+    if "doctoral" in value:
+        return "doctoral_researcher"
     if "research assistant" in value:
         return "research_assistant"
     return "other"
