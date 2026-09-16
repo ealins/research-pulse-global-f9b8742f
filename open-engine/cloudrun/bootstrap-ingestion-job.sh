@@ -83,6 +83,7 @@ upsert_secret geoacademic-s3-bucket "$S3_BUCKET"
 
 if [ -n "${OPENROUTER_API_KEY:-}" ]; then upsert_secret geoacademic-openrouter-api-key "$OPENROUTER_API_KEY"; fi
 if [ -n "${NVIDIA_API_KEY:-}" ]; then upsert_secret geoacademic-nvidia-api-key "$NVIDIA_API_KEY"; fi
+if [ -n "${INGESTION_HOOK_SECRET:-}" ]; then upsert_secret geoacademic-ingestion-hook-secret "$INGESTION_HOOK_SECRET"; fi
 
 log "Building ingestion image with Cloud Build"
 gcloud builds submit "$REPO_ROOT/open-engine" \
@@ -98,6 +99,9 @@ fi
 if gcloud secrets describe geoacademic-nvidia-api-key --project "$PROJECT_ID" >/dev/null 2>&1; then
   SECRET_FLAGS+=",NVIDIA_API_KEY=geoacademic-nvidia-api-key:latest"
 fi
+if gcloud secrets describe geoacademic-ingestion-hook-secret --project "$PROJECT_ID" >/dev/null 2>&1; then
+  SECRET_FLAGS+=",INGESTION_HOOK_SECRET=geoacademic-ingestion-hook-secret:latest"
+fi
 
 log "Deploying Cloud Run Job"
 gcloud run jobs deploy "$JOB" \
@@ -106,7 +110,7 @@ gcloud run jobs deploy "$JOB" \
   --project "$PROJECT_ID" \
   --service-account "$RUNTIME_SA" \
   --set-secrets "$SECRET_FLAGS" \
-  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}" \
+  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},GEOACADEMIC_BASE_URL=${GEOACADEMIC_BASE_URL:-https://geoacademic.app},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}" \
   --args="all,--max-fetch=$MAX_FETCH,--max-process=$MAX_PROCESS,--max-ats-sources=$MAX_ATS_SOURCES" \
   --cpu=1 \
   --memory=1Gi \
