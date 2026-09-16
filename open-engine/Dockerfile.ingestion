@@ -11,6 +11,13 @@ RUN pip install --no-cache-dir -r /app/worker/requirements.txt
 COPY worker /app/worker
 COPY cloudrun /app/cloudrun
 
+# Fail the image build early if the enrichment libraries or deterministic
+# filters are broken. This keeps optional ATS support from jeopardizing a
+# scheduled production run after deployment.
+RUN PYTHONPATH=/app/cloudrun:/app/worker python /app/cloudrun/test_ats_enrichment.py \
+    && PYTHONPATH=/app/worker python -c "from content_extract import visible_text; assert 'Remote sensing' in visible_text('<main>Remote sensing research</main>')" \
+    && python -c "from ats_scrapers import get_scraper_for_url; assert get_scraper_for_url('https://jobs.ashbyhq.com/openai')"
+
 # Cloud Build can receive a source archive produced from a Windows checkout.
 # Normalize shell scripts inside the Linux image so CRLF line endings cannot
 # turn the shebang into /usr/bin/env "bash\r" and fail with exit code 127.
@@ -18,4 +25,4 @@ RUN sed -i 's/\r$//' /app/cloudrun/*.sh \
     && chmod +x /app/cloudrun/run-ingestion-job.sh
 
 ENTRYPOINT ["bash", "/app/cloudrun/run-ingestion-job.sh"]
-CMD ["all", "--max-fetch=40", "--max-process=40"]
+CMD ["all", "--max-fetch=40", "--max-process=40", "--max-ats-sources=5"]
