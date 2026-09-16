@@ -5,8 +5,10 @@ export const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/complet
 
 // One NVIDIA API key is used for the whole routing ladder. Model ids can be
 // overridden per environment without changing source code.
+// Nemotron 3 Nano 30B A3B was retired from the hosted NVIDIA endpoint on
+// 2026-09-01. Lightning 3.5 is the current hosted 30B A3B workhorse model.
 export const NVIDIA_MODEL_NANO =
-  process.env["NVIDIA_MODEL_NANO"] ?? "nvidia/nemotron-3-nano-30b-a3b";
+  process.env["NVIDIA_MODEL_NANO"] ?? "nvidia/nemotron-3.5-lightning-30b-a3b";
 export const NVIDIA_MODEL_SUPER =
   process.env["NVIDIA_MODEL_SUPER"] ?? "nvidia/nemotron-3-super-120b-a12b";
 export const NVIDIA_MODEL_ULTRA =
@@ -15,7 +17,7 @@ export const NVIDIA_MODEL_ULTRA =
 // Backwards-compatible alias used by older status/provenance code. The primary
 // routine model is Nano; difficult operations route upward automatically.
 export const NVIDIA_MODEL = NVIDIA_MODEL_NANO;
-export const NVIDIA_MODEL_CHAIN_LABEL = "Nano → Super → Ultra";
+export const NVIDIA_MODEL_CHAIN_LABEL = "Lightning 3.5 → Super → Ultra";
 
 export type NvidiaModelTier = "NANO" | "SUPER" | "ULTRA";
 export const NVIDIA_MODEL_BY_TIER: Record<NvidiaModelTier, string> = {
@@ -46,7 +48,7 @@ export type LlmOperation =
 /**
  * Model routing policy.
  *
- * - Nano handles cheap, high-volume extraction.
+ * - Lightning 3.5 handles cheap, high-volume extraction.
  * - Super is the default for the two hardest entity types and the first
  *   fallback for routine extractors.
  * - Ultra is a rare last resort for difficult canonical extraction.
