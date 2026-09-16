@@ -49,7 +49,12 @@ jobs:
             open-engine/cloudrun/migrate.py \
             open-engine/cloudrun/import_legacy_sources.py \
             open-engine/cloudrun/batch_runner.py \
+            open-engine/cloudrun/public_enrichment_bridge.py \
+            open-engine/cloudrun/review_enrichment.py \
+            open-engine/cloudrun/publication_enrichment.py \
+            open-engine/cloudrun/ats_enrichment.py \
             open-engine/cloudrun/qa.py \
+            open-engine/cloudrun/qa_database.py \
             open-engine/cloudrun/qa_slugs.py \
             open-engine/cloudrun/qa_scope.py
 
