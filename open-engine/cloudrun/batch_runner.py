@@ -125,6 +125,19 @@ async def run_public() -> None:
     await run_public_enrichment()
 
 
+async def run_publications(max_institutions: int) -> None:
+    from publication_enrichment import run_publication_enrichment
+
+    pool = await asyncpg.create_pool(**pool_kwargs(4))
+    try:
+        await run_publication_enrichment(
+            pool,
+            max_institutions=max(1, max_institutions),
+        )
+    finally:
+        await pool.close()
+
+
 async def run_ats(max_sources: int) -> None:
     from ats_enrichment import run_ats_enrichment
 
@@ -135,14 +148,24 @@ async def run_ats(max_sources: int) -> None:
         await pool.close()
 
 
-async def run_all(max_fetch: int, max_process: int, max_ats_sources: int) -> None:
+async def run_all(
+    max_fetch: int,
+    max_process: int,
+    max_ats_sources: int,
+    max_publication_institutions: int,
+) -> None:
     await run_schedule()
     await run_fetch(max_fetch)
     await run_process(max_process)
     await run_verify()
-    # Reuse the existing canonical provider/non-vacancy writers while Cloud Run
-    # owns the cadence. This bridge is a no-op until its shared secret exists.
+    # Cloud Run owns the production cadence. This bridge reuses the app's
+    # authenticated canonical writers and now performs vacancy review here,
+    # where the NVIDIA secret is actually configured.
     await run_public()
+    # OpenAIRE publication citation indicators are often absent. A bounded
+    # exact-ROR recovery pass prevents unknown citation metadata from yielding
+    # a permanently empty canonical publication table.
+    await run_publications(max_publication_institutions)
     # ATS adapters are deliberately bounded and complementary. Unsupported
     # university career sites remain on the generic HTML extraction path.
     await run_ats(max_ats_sources)
@@ -152,11 +175,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run bounded GeoAcademic ingestion work")
     parser.add_argument(
         "mode",
-        choices=("schedule", "fetch", "process", "verify", "public", "ats", "all"),
+        choices=(
+            "schedule",
+            "fetch",
+            "process",
+            "verify",
+            "public",
+            "publications",
+            "ats",
+            "all",
+        ),
     )
     parser.add_argument("--max-fetch", type=int, default=40)
     parser.add_argument("--max-process", type=int, default=40)
     parser.add_argument("--max-ats-sources", type=int, default=5)
+    parser.add_argument("--max-publication-institutions", type=int, default=6)
     return parser.parse_args()
 
 
@@ -172,6 +205,8 @@ async def main() -> None:
         await run_verify()
     elif args.mode == "public":
         await run_public()
+    elif args.mode == "publications":
+        await run_publications(max(1, args.max_publication_institutions))
     elif args.mode == "ats":
         await run_ats(max(1, args.max_ats_sources))
     else:
@@ -179,6 +214,7 @@ async def main() -> None:
             max(1, args.max_fetch),
             max(1, args.max_process),
             max(1, args.max_ats_sources),
+            max(1, args.max_publication_institutions),
         )
 
 
