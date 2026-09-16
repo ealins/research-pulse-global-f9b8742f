@@ -171,6 +171,15 @@ export function classifyUrlAndText(
   const path = pathOf(url);
   const heading = title.toLowerCase();
   const body = text.toLowerCase().slice(0, 6000);
+
+  // Explicit job-directory paths are stronger evidence than page text. This
+  // prevents job detail pages mentioning professors or teams from being
+  // misclassified as researcher profiles without treating arbitrary mentions
+  // of those terms as vacancies.
+  if (/(?:^|\/)(?:jobs?|vacancies|careers)(?:\/|$)/i.test(path)) {
+    return { classification: "VACANCY", confidence: 0.95 };
+  }
+
   let best: Classification = { classification: "UNKNOWN", confidence: 0 };
   for (const rule of CATEGORY_RULES) {
     let score = 0;
@@ -1212,11 +1221,39 @@ export async function runQueueBatch(
   skipped: number;
   details: string[];
 }> {
+  const now = new Date();
+  const staleBefore = new Date(now.getTime() - 15 * 60_000).toISOString();
+  let staleQuery = supabaseAdmin
+    .from("ingestion_tasks")
+    .select("id, attempts, max_attempts")
+    .eq("status", "PROCESSING")
+    .lt("started_at", staleBefore);
+  if (taskTypes && taskTypes.length > 0)
+    staleQuery = staleQuery.in("task_type", taskTypes);
+
+  const { data: staleTasks, error: staleError } = await staleQuery.limit(200);
+  if (staleError) throw staleError;
+  for (const task of staleTasks ?? []) {
+    const dead = task.attempts >= task.max_attempts;
+    const { error: recoveryError } = await supabaseAdmin
+      .from("ingestion_tasks")
+      .update({
+        status: dead ? "DEAD" : "RETRY",
+        started_at: null,
+        run_after: now.toISOString(),
+        last_error: "Queue worker lease expired before completion",
+      })
+      .eq("id", task.id)
+      .eq("status", "PROCESSING")
+      .lt("started_at", staleBefore);
+    if (recoveryError) throw recoveryError;
+  }
+
   let query = supabaseAdmin
     .from("ingestion_tasks")
     .select("*")
     .in("status", ["QUEUED", "RETRY"])
-    .lte("run_after", new Date().toISOString());
+    .lte("run_after", now.toISOString());
   if (taskTypes && taskTypes.length > 0)
     query = query.in("task_type", taskTypes);
 

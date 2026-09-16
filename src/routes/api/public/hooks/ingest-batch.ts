@@ -35,6 +35,16 @@ function json(payload: unknown, status = 200) {
   });
 }
 
+function errorMessage(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
 function safeEqual(left: string, right: string): boolean {
   if (!left || left.length !== right.length) return false;
   let mismatch = 0;
@@ -357,14 +367,18 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         try {
           // Backlog draining is adaptive: process NORMALIZE in small waves with
           // NVIDIA concurrency fixed at 2, but keep draining cheap deterministic
-          // rejects within the same cron invocation. A wall-clock budget prevents
-          // one model-heavy tick from running indefinitely or hammering a busy API.
+          // rejects within the same cron invocation. The request limit remains a
+          // real upper bound, and a short wall-clock budget prevents Worker timeouts.
           const normalizeTarget =
-            queueState.mode === "BACKLOG" ? 40 : Math.min(2, batch);
+            queueState.mode === "BACKLOG"
+              ? Math.min(8, batch)
+              : Math.min(2, batch);
           const normalizeWave =
-            queueState.mode === "BACKLOG" ? 8 : Math.min(2, batch);
+            queueState.mode === "BACKLOG"
+              ? Math.min(4, normalizeTarget)
+              : Math.min(2, normalizeTarget);
           const normalizeBudgetMs =
-            queueState.mode === "BACKLOG" ? 70_000 : 30_000;
+            queueState.mode === "BACKLOG" ? 42_000 : 30_000;
           const emptyResult = () => ({
             processed: 0,
             ok: 0,
@@ -465,7 +479,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             ...result,
           });
         } catch (e) {
-          const message = e instanceof Error ? e.message : String(e);
+          const message = errorMessage(e);
           if (run?.id) {
             await supabaseAdmin
               .from("pipeline_runs")
@@ -480,7 +494,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           return json({ error: message }, 500);
         }
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = errorMessage(error);
           console.error(`[ingestion-hook] ${action} failed`, error);
           return json(
             {
