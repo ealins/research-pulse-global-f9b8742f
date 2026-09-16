@@ -11,10 +11,16 @@ RUN pip install --no-cache-dir -r /app/worker/requirements.txt
 COPY worker /app/worker
 COPY cloudrun /app/cloudrun
 
-# Fail the image build early if the enrichment libraries or deterministic
-# filters are broken. This keeps optional ATS support from jeopardizing a
-# scheduled production run after deployment.
-RUN PYTHONPATH=/app/cloudrun:/app/worker python /app/cloudrun/test_ats_enrichment.py \
+# Fail the image build early if the enrichment libraries, Cloud Run entrypoints,
+# or deterministic filters are broken. This keeps optional enrichment support
+# from jeopardizing a scheduled production run after deployment.
+RUN python -m py_compile \
+        /app/cloudrun/batch_runner.py \
+        /app/cloudrun/public_enrichment_bridge.py \
+        /app/cloudrun/review_enrichment.py \
+        /app/cloudrun/publication_enrichment.py \
+        /app/cloudrun/ats_enrichment.py \
+    && PYTHONPATH=/app/cloudrun:/app/worker python /app/cloudrun/test_ats_enrichment.py \
     && PYTHONPATH=/app/worker python -c "from content_extract import visible_text; assert 'Remote sensing' in visible_text('<main>Remote sensing research</main>')" \
     && python -c "from ats_scrapers import get_scraper_for_url; assert get_scraper_for_url('https://jobs.ashbyhq.com/openai')"
 
