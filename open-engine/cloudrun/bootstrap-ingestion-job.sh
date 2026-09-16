@@ -11,6 +11,7 @@ DB_SCHEMA="${DB_SCHEMA:-geoacademic_engine}"
 SCHEDULE="${GCP_INGESTION_CRON:-43 */2 * * *}"
 MAX_FETCH="${MAX_FETCH:-40}"
 MAX_PROCESS="${MAX_PROCESS:-40}"
+MAX_ATS_SOURCES="${MAX_ATS_SOURCES:-5}"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 log() { printf '\n==> %s\n' "$*"; }
@@ -105,8 +106,8 @@ gcloud run jobs deploy "$JOB" \
   --project "$PROJECT_ID" \
   --service-account "$RUNTIME_SA" \
   --set-secrets "$SECRET_FLAGS" \
-  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-}" \
-  --args="all,--max-fetch=$MAX_FETCH,--max-process=$MAX_PROCESS" \
+  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}" \
+  --args="all,--max-fetch=$MAX_FETCH,--max-process=$MAX_PROCESS,--max-ats-sources=$MAX_ATS_SOURCES" \
   --cpu=1 \
   --memory=1Gi \
   --task-timeout=30m \
