@@ -4,7 +4,8 @@ import os
 import re
 
 import httpx
-from bs4 import BeautifulSoup
+
+from content_extract import visible_text
 
 ALLOWED_ENTITY_TYPES = {
     "institution",
@@ -18,14 +19,6 @@ ALLOWED_ENTITY_TYPES = {
 
 OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
 NVIDIA_URL = os.getenv("NVIDIA_URL", "https://integrate.api.nvidia.com/v1/chat/completions")
-
-
-def _visible_text(html: str) -> str:
-    soup = BeautifulSoup(html, "html.parser")
-    for tag in soup(["script", "style", "noscript", "svg"]):
-        tag.decompose()
-    text = " ".join(soup.get_text(" ", strip=True).split())
-    return text[:24000]
 
 
 def _parse_json(content: str):
@@ -149,7 +142,7 @@ def _validated_candidates(payload, source_url: str, provider: str, model: str):
 
 
 async def extract_with_ai(html: str, source_url: str):
-    text = _visible_text(html)
+    text = visible_text(html)
     if len(text) < 200:
         return []
 
