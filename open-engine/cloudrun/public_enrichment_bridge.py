@@ -39,6 +39,11 @@ async def run_public_enrichment(
     Crossref writers and non-vacancy normalizers. Reusing that path prevents a
     second provider implementation while Cloud Run becomes the single cadence
     owner. The bridge is optional until the shared hook secret is configured.
+
+    `backfill-raw` runs at the same bound as normalization. It creates fresh
+    tasks for pending raw pages whose previous NORMALIZE task died (including
+    the retired Nemotron 3 Nano HTTP 410 failures) without reopening records
+    that were intentionally rejected by a current deterministic gate.
     """
 
     if not HOOK_SECRET:
@@ -47,6 +52,12 @@ async def run_public_enrichment(
 
     timeout = httpx.Timeout(120.0, connect=20.0)
     async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+        try:
+            backfill = await _call(client, "backfill-raw", normalize_limit)
+        except Exception as exc:
+            print(f"PUBLIC_ENRICHMENT_BACKFILL_FAILED error={exc}")
+            backfill = {"error": str(exc)[:300]}
+
         try:
             providers = await _call(client, "drain-providers", provider_limit)
         except Exception as exc:
@@ -61,7 +72,8 @@ async def run_public_enrichment(
 
     print(
         "PUBLIC_ENRICHMENT "
+        f"backfill={backfill.get('queued', backfill.get('action', 'unknown'))} "
         f"providers={providers.get('processed', providers.get('action', 'unknown'))} "
         f"normalize={canonical.get('processed', canonical.get('action', 'unknown'))}"
     )
-    return {"providers": providers, "canonical": canonical}
+    return {"backfill": backfill, "providers": providers, "canonical": canonical}
