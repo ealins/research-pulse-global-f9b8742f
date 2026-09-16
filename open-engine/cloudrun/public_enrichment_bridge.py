@@ -31,7 +31,7 @@ async def _call(client: httpx.AsyncClient, action: str, limit: int) -> dict:
 async def run_public_enrichment(
     *,
     provider_limit: int = 12,
-    normalize_limit: int = 16,
+    normalize_limit: int = 40,
 ) -> dict[str, object]:
     """Drain bounded website-facing enrichment work through the existing hook.
 
