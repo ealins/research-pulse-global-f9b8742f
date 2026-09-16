@@ -2,3 +2,5 @@ asyncpg==0.30.0
 httpx==0.28.1
 boto3==1.40.21
 beautifulsoup4==4.13.4
+trafilatura==2.2.0
+ats-scrapers==0.3.0
