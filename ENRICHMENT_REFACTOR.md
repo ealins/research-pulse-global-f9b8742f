@@ -18,6 +18,12 @@ Use Trafilatura to turn fetched HTML into clean main-content text before an LLM 
 
 This reduces navigation/boilerplate tokens and should make AI extraction both cheaper and more precise.
 
+### Public enrichment bridge
+
+The existing TypeScript canonical writers for ROR/OpenAIRE/Crossref and non-vacancy normalization are reused through the authenticated `/api/public/hooks/ingest-batch` route. Cloud Run invokes bounded `drain-providers` and `drain` batches during the same scheduled execution.
+
+This is a transition mechanism, not a second enrichment implementation: Cloud Run owns the cadence while the existing canonical writers remain authoritative. If `INGESTION_HOOK_SECRET` is not configured, this bridge is a safe no-op and the rest of ingestion continues.
+
 ## Existing components retained
 
 - Cloud Scheduler owns the production cadence.
