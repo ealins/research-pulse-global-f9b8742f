@@ -124,10 +124,10 @@ GeoAcademic Cloud Run deployment completed.
 Cloud Run API:
   $SERVICE_URL
 
-Lovable environment variable after you choose to switch traffic:
+Frontend environment variable after you choose to switch traffic:
   VITE_GEOACADEMIC_API_URL=$SERVICE_URL
 
-Do NOT switch Lovable yet if you still want to test the open engine first.
+Do NOT switch the frontend yet if you still want to test the open engine first.
 
 Next, configure these GitHub repository secrets for scheduled ingestion:
   GEOACADEMIC_DATABASE_URL       (same Supabase Session Pooler URL)

@@ -46,14 +46,14 @@ Value: <Oracle VM public IP>
 
 After DNS resolves, `https://api.geoacademic.app/health` should become available through Caddy HTTPS.
 
-Only after the API is healthy should Lovable receive:
+Only after the API is healthy should the frontend receive:
 
 ```text
 VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app
 VITE_GEOACADEMIC_SNAPSHOT_URL=<the object-specific snapshot URL printed by bootstrap>
 ```
 
-Do not put `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, database passwords, Object Storage credentials, or `INTERNAL_API_TOKEN` into Lovable browser variables.
+Do not put `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`, database passwords, Object Storage credentials, or `INTERNAL_API_TOKEN` into frontend browser variables.
 
 ## AI keys
 

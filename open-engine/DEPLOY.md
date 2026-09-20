@@ -1,6 +1,6 @@
 # Deploy GeoAcademic Open Engine
 
-This production path keeps Lovable as the frontend publisher only. The data engine runs on any standard Linux VPS with Docker.
+This production path keeps the web app as the frontend publisher only. The data engine runs on any standard Linux VPS with Docker.
 
 ## 1. Create a generic Ubuntu server
 
@@ -16,7 +16,7 @@ Create a DNS A record:
 
 If you also have IPv6, add the matching AAAA record.
 
-Do not point Lovable away from `geoacademic.app`; the website stays there.
+Keep the website's DNS pointed at `geoacademic.app`; the website stays there.
 
 ## 3. Install Docker
 
@@ -84,13 +84,13 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --scale fet
 
 All replicas safely share the queue using `FOR UPDATE SKIP LOCKED`.
 
-Later, Kafka and OpenSearch can be inserted behind the existing API contract without changing Lovable routes.
+Later, Kafka and OpenSearch can be inserted behind the existing API contract without changing frontend routes.
 
-## 9. Connect Lovable only after data is healthy
+## 9. Connect the frontend only after data is healthy
 
 Do not switch the frontend while the new engine is empty.
 
-Once the API has useful verified data, set this Lovable build variable:
+Once the API has useful verified data, set this frontend build variable:
 
 ```text
 VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app

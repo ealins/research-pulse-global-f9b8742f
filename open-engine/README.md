@@ -1,6 +1,6 @@
 # GeoAcademic Open Engine
 
-This directory is the independent data engine for GeoAcademic. Lovable remains the React/TanStack publisher only; ingestion, verification, storage, search projections and Pulse generation live here.
+This directory is the independent data engine for GeoAcademic. The React/TanStack web app remains the publisher only; ingestion, verification, storage, search projections and Pulse generation live here.
 
 ## Product contract
 
@@ -37,7 +37,7 @@ Useful routes:
 
 ## Scale path
 
-The first deployment deliberately uses PostgreSQL as the durable queue with `FOR UPDATE SKIP LOCKED`. This keeps operations simple while preserving worker isolation. The public API is already independent of that queue, so Kafka can be inserted later between acquisition, extraction, verification and materialization without changing the Lovable frontend contract.
+The first deployment deliberately uses PostgreSQL as the durable queue with `FOR UPDATE SKIP LOCKED`. This keeps operations simple while preserving worker isolation. The public API is already independent of that queue, so Kafka can be inserted later between acquisition, extraction, verification and materialization without changing the frontend contract.
 
 Raw page bodies are stored in S3-compatible object storage (MinIO locally). PostgreSQL stores canonical entities, provenance, current hashes, signals and task state. When public search volume outgrows PostgreSQL/pg_trgm, project verified entity changes into OpenSearch; FastAPI routes stay the same.
 
