@@ -1,7 +1,11 @@
-name: GeoAcademic legacy ingestion burst (manual fallback)
+name: GeoAcademic legacy ingestion burst (scheduled fallback)
 
 on:
   workflow_dispatch:
+  schedule:
+    # Daily vacancy-review + crawl burst; inert until INGESTION_HOOK_SECRET
+    # and NVIDIA_API_KEY secrets are configured.
+    - cron: "23 5 * * *"
 
 concurrency:
   group: geoacademic-ingestion-manual
