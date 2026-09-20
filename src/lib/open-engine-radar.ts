@@ -246,8 +246,9 @@ const openEnginePulseQuery = queryOptions({
   queryKey: ["pulse", "open-engine"],
   queryFn: async (): Promise<any[]> => {
     const feed = await openEngine.pulse(720, 100);
-    return (feed.items as unknown as EngineSignal[]).map((signal) => ({
+    const mapped = (feed.items as unknown as EngineSignal[]).map((signal) => ({
       id: String(signal.id),
+      entity_id: signal.entity_id,
       category: pulseCategory(signal),
       title: signal.title,
       summary: signal.summary,
@@ -261,6 +262,17 @@ const openEnginePulseQuery = queryOptions({
       country: signal.country,
       pulse_event_topics: [],
     }));
+    // One row per entity: ingestion emits both NEW and UPDATED signals for the
+    // same record, which renders as duplicate rows. Keep the freshest signal.
+    const latestByEntity = new Map<string, (typeof mapped)[number]>();
+    for (const item of mapped) {
+      const key = item.entity_id ?? item.id;
+      const prev = latestByEntity.get(key);
+      if (!prev || item.event_date >= prev.event_date) latestByEntity.set(key, item);
+    }
+    return [...latestByEntity.values()].sort((a, b) =>
+      b.event_date < a.event_date ? -1 : b.event_date > a.event_date ? 1 : 0,
+    );
   },
   staleTime: 60_000,
 });

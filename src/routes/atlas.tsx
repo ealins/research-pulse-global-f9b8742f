@@ -133,18 +133,20 @@ function AtlasPage() {
 
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         <div className="grid gap-4 sm:grid-cols-4">
-          <StatTile label="Institutions mapped" value={points.length} tone="signal" />
+          <StatTile label="Institutions mapped" value={points.length} tone="signal" loading={isLoading} />
           <StatTile
             label="With live calls"
             value={points.filter((p) => p.live).length}
             tone="growth"
+            loading={isLoading}
           />
-          <StatTile label="Countries" value={byCountry.length} />
+          <StatTile label="Countries" value={byCountry.length} loading={isLoading} />
           <StatTile
             label="Missing coordinates"
             value={missing}
             tone="deadline"
             hint="Not plotted — we don't guess locations"
+            loading={isLoading}
           />
         </div>
 
@@ -198,7 +200,8 @@ function AtlasPage() {
             </h2>
             <ul className="mt-3 space-y-1.5">
               {byCountry.map(([country, row]) => {
-                const max = byCountry[0]?.[1].institutions || 1;
+                const max = Math.max(1, ...byCountry.map(([, r]) => r.institutions));
+                const pct = Math.min(100, (row.institutions / max) * 100);
                 return (
                   <li key={country} className="panel panel-hover px-3 py-2">
                     <div className="flex items-center justify-between text-xs">
@@ -213,10 +216,10 @@ function AtlasPage() {
                         {row.institutions} inst · {row.live} live
                       </span>
                     </div>
-                    <div className="mt-1.5 h-1 w-full rounded-full bg-muted">
+                    <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted">
                       <div
                         className="h-1 rounded-full bg-primary/70"
-                        style={{ width: `${(row.institutions / max) * 100}%` }}
+                        style={{ width: `${pct}%` }}
                       />
                     </div>
                   </li>

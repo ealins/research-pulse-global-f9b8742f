@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { CardLink } from "@/components/CardLink";
 import { EmptyState } from "@/components/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import type { ReactNode } from "react";
 import {
   Activity,
@@ -168,6 +169,7 @@ export function StatTile({
   to,
   params,
   search,
+  loading = false,
 }: {
   label: string;
   value: string | number;
@@ -176,6 +178,7 @@ export function StatTile({
   to?: string;
   params?: Record<string, string>;
   search?: Record<string, unknown>;
+  loading?: boolean;
 }) {
   const toneClass =
     tone === "signal"
@@ -192,14 +195,18 @@ export function StatTile({
       <p className="text-[0.65rem] font-medium uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </p>
-      {empty ? (
+      {loading ? (
+        <div className="mt-2">
+          <Skeleton className="h-7 w-16" />
+        </div>
+      ) : empty ? (
         <div className="mt-2">
           <EmptyState variant="compact" />
         </div>
       ) : (
         <p className={`mono-num mt-2 text-2xl font-semibold ${toneClass}`}>{value}</p>
       )}
-      {hint && !empty ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
+      {hint && !empty && !loading ? <p className="mt-1 text-xs text-muted-foreground">{hint}</p> : null}
     </div>
   );
 }

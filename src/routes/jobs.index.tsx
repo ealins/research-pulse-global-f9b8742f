@@ -71,20 +71,32 @@ function JobsPage() {
   const [seniority, setSeniority] = useState<string>("all");
   const [q, setQ] = useState("");
 
+  const LIVE_STATUSES = ["open", "closing_soon", "rolling", "possibly_open"];
+
+  const statusRows = useMemo(
+    () =>
+      (data ?? []).filter((o) => {
+        if (status === "live" && !LIVE_STATUSES.includes(o.status)) return false;
+        if (status !== "live" && status !== "all" && o.status !== status) return false;
+        return true;
+      }),
+    [data, status],
+  );
+
   const sectorRows = useMemo(
-    () => (data ?? []).filter((o) => sector === "all" || o.sector === sector),
-    [data, sector],
+    () => statusRows.filter((o) => sector === "all" || o.sector === sector),
+    [statusRows, sector],
   );
 
   const sectorTabs = useMemo(() => {
-    const academic = (data ?? []).filter((o) => o.sector === "academic").length;
-    const industry = (data ?? []).filter((o) => o.sector === "industry").length;
+    const academic = statusRows.filter((o) => o.sector === "academic").length;
+    const industry = statusRows.filter((o) => o.sector === "industry").length;
     return [
       { key: "academic", label: "Academic track", count: academic },
       { key: "industry", label: "Industry track", count: industry },
-      { key: "all", label: "Both tracks", count: data?.length ?? 0 },
+      { key: "all", label: "Both tracks", count: statusRows.length },
     ];
-  }, [data]);
+  }, [statusRows]);
 
   const seniorities = useMemo(
     () =>
@@ -98,10 +110,7 @@ function JobsPage() {
   );
 
   const rows = useMemo(() => {
-    const live = ["open", "closing_soon", "rolling", "possibly_open"];
     return sectorRows.filter((o) => {
-      if (status === "live" && !live.includes(o.status)) return false;
-      if (status !== "live" && status !== "all" && o.status !== status) return false;
       if (type !== "all" && o.opportunity_type !== type) return false;
       if (country !== "all" && o.country !== country) return false;
       if (seniority !== "all" && o.seniority !== seniority) return false;
@@ -122,7 +131,7 @@ function JobsPage() {
       }
       return true;
     });
-  }, [sectorRows, status, type, country, seniority, q]);
+  }, [sectorRows, type, country, seniority, q]);
 
   const closingSoon = sectorRows.filter((o) => o.status === "closing_soon").length;
   const openNow = sectorRows.filter((o) => o.status === "open").length;

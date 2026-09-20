@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { TrendingDown, TrendingUp, Minus } from "lucide-react";
 
@@ -83,14 +83,15 @@ function TrendsPage() {
                     : growth < 0.95
                       ? "text-destructive"
                       : "text-muted-foreground";
-              return (
-                <li key={t.id} className="panel panel-hover rise-in p-4">
+              const slug = t.research_topics?.slug;
+              const card = (
+                <>
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="min-w-0">
                       <p className="text-[0.62rem] uppercase tracking-[0.16em] text-muted-foreground">
                         {t.research_topics?.category ?? "Topic"}
                       </p>
-                      <h2 className="mt-1 text-sm font-semibold text-foreground">
+                      <h2 className="mt-1 text-sm font-semibold text-foreground group-hover:text-primary">
                         {t.research_topics?.name}
                       </h2>
                     </div>
@@ -116,6 +117,22 @@ function TrendsPage() {
                     <span>{t.open_opportunities} positions</span>
                     <span>{t.institutions_active} institutions</span>
                   </div>
+                </>
+              );
+              return (
+                <li key={t.id} className="panel panel-hover rise-in group">
+                  {slug ? (
+                    <Link
+                      to="/topics/$slug"
+                      params={{ slug }}
+                      className="block p-4"
+                      aria-label={`${t.research_topics?.name ?? "Topic"} dossier`}
+                    >
+                      {card}
+                    </Link>
+                  ) : (
+                    <div className="p-4">{card}</div>
+                  )}
                 </li>
               );
             })}
