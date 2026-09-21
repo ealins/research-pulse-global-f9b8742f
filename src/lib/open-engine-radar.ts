@@ -297,10 +297,21 @@ export const hybridEventsQuery = queryOptions({
 
 export const hybridPulseQuery = queryOptions({
   queryKey: openEngineConfigured ? ["pulse", "open-engine"] : ["pulse"],
-  queryFn: async (context): Promise<any[]> =>
-    openEngineConfigured
-      ? openEnginePulseQuery.queryFn!(context as never)
-      : runLegacy<any[]>(legacyPulseQuery, context),
+  queryFn: async (context): Promise<any[]> => {
+    if (!openEngineConfigured) return runLegacy<any[]>(legacyPulseQuery, context);
+
+    try {
+      const openEngineItems = await openEnginePulseQuery.queryFn!(context as never);
+      // Open Engine is an optional acceleration layer. During a degraded
+      // deployment or ingestion restart, the public Supabase surface remains
+      // usable and must continue to populate the homepage.
+      if (openEngineItems.length > 0) return openEngineItems;
+    } catch {
+      // Fall through to the existing public Supabase pulse surface.
+    }
+
+    return runLegacy<any[]>(legacyPulseQuery, context);
+  },
   staleTime: 60_000,
 });
 
@@ -309,15 +320,23 @@ export const hybridCountsQuery = queryOptions({
   queryFn: async (context): Promise<any> => {
     const legacy = await runLegacy<any>(legacyCountsQuery, context);
     if (!openEngineConfigured) return legacy;
-    const [events, opportunities] = await Promise.all([
-      openEngine.latest("event", 200),
-      openEngine.latest("opportunity", 200),
-    ]);
-    return {
-      ...legacy,
-      events: events.items.length,
-      opportunities: opportunities.items.length,
-    };
+
+    try {
+      const [events, opportunities] = await Promise.all([
+        openEngine.latest("event", 200),
+        openEngine.latest("opportunity", 200),
+      ]);
+      return {
+        ...legacy,
+        events: events.items.length > 0 ? events.items.length : legacy.events,
+        opportunities:
+          opportunities.items.length > 0 ? opportunities.items.length : legacy.opportunities,
+      };
+    } catch {
+      // Never blank the homepage because the optional Open Engine read path is
+      // unhealthy. The database-backed aggregate is already available.
+      return legacy;
+    }
   },
   staleTime: 60_000,
 });
