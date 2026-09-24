@@ -212,7 +212,7 @@ export const researchersQuery = queryOptions({
         `id, full_name, slug, academic_title, current_position, official_profile_url,
          research_summary, verification_status, is_demo,
          institutions ( name, slug, country ),
-         researcher_topics!inner ( research_topics ( name, slug ) )`,
+         researcher_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
@@ -283,7 +283,7 @@ export const publicationsQuery = queryOptions({
          citation_source, is_open_access, landing_url, source,
          verification_status, confidence, is_demo,
          institutions!publications_institution_id_fkey ( name, slug ),
-         publication_topics!inner ( research_topics ( name, slug ) )`,
+         publication_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
@@ -323,7 +323,7 @@ export const projectsQuery = queryOptions({
          funding_amount, funding_currency, website, summary, verification_status,
          confidence, is_demo,
          institutions!projects_institution_id_fkey ( name, slug, country ),
-         project_topics!inner ( research_topics ( name, slug ) )`,
+         project_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
