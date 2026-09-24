@@ -43,6 +43,17 @@ def pool_kwargs(max_size: int) -> dict:
     }
 
 
+async def run_exa_discovery() -> None:
+    import exa_discovery
+
+    pool = await asyncpg.create_pool(**pool_kwargs(3))
+    try:
+        result = await exa_discovery.discover_and_register(pool)
+        print(f"BATCH_EXA {json.dumps(result.as_log_fields(), sort_keys=True)}")
+    finally:
+        await pool.close()
+
+
 async def run_schedule() -> None:
     import scheduler
 
@@ -154,6 +165,9 @@ async def run_all(
     max_ats_sources: int,
     max_publication_institutions: int,
 ) -> None:
+    # Exa only registers low-trust candidate URLs. The existing scheduler and
+    # fetch/extract/verify pipeline remain the sole path to canonical data.
+    await run_exa_discovery()
     await run_schedule()
     await run_fetch(max_fetch)
     await run_process(max_process)
@@ -176,6 +190,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "mode",
         choices=(
+            "exa",
             "schedule",
             "fetch",
             "process",
@@ -195,7 +210,9 @@ def parse_args() -> argparse.Namespace:
 
 async def main() -> None:
     args = parse_args()
-    if args.mode == "schedule":
+    if args.mode == "exa":
+        await run_exa_discovery()
+    elif args.mode == "schedule":
         await run_schedule()
     elif args.mode == "fetch":
         await run_fetch(max(1, args.max_fetch))

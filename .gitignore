@@ -16,6 +16,15 @@ dist-ssr
 .nitro
 *.local
 output.txt
+# One-off local diagnostics; use supported package scripts instead.
+/fix.mjs
+/run.mjs
+/run-worker.mjs
+/status.txt
+/test-rpc.mjs
+/test-rpc.ts
+/test-tasks.mjs
+/test-topics.mjs
 backups/
 *.backup
 supabase/.temp/
