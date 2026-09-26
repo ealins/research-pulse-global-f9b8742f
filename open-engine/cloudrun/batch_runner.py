@@ -50,6 +50,21 @@ async def run_exa_discovery() -> None:
     try:
         result = await exa_discovery.discover_and_register(pool)
         print(f"BATCH_EXA {json.dumps(result.as_log_fields(), sort_keys=True)}")
+    except Exception as e:
+        print(f"BATCH_EXA FAILED: {e}")
+    finally:
+        await pool.close()
+
+
+async def run_github_discovery() -> None:
+    import github_discovery
+
+    pool = await asyncpg.create_pool(**pool_kwargs(3))
+    try:
+        result = await github_discovery.run_github_discovery(pool)
+        print(f"BATCH_GITHUB_DISCOVERY queued={result}")
+    except Exception as e:
+        print(f"BATCH_GITHUB_DISCOVERY FAILED: {e}")
     finally:
         await pool.close()
 
@@ -167,8 +182,7 @@ async def run_all(
 ) -> None:
     # Exa only registers low-trust candidate URLs. The existing scheduler and
     # fetch/extract/verify pipeline remain the sole path to canonical data.
-    await run_exa_discovery()
-    await run_schedule()
+    await run_exa_discovery()    await run_github_discovery()    await run_schedule()
     await run_fetch(max_fetch)
     await run_process(max_process)
     await run_verify()

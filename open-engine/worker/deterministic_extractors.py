@@ -350,8 +350,47 @@ def extract_heading_job_candidates(html: str, source_url: str) -> list[dict]:
     return results
 
 
+def extract_github_project_candidates(html: str, source_url: str) -> list[dict]:
+    """
+    Fast-path extraction for GitHub repositories (projects).
+    Avoids sending massive GitHub HTML blobs to LLM and correctly tags them as projects.
+    """
+    parsed = urlparse(source_url)
+    if parsed.hostname != "github.com":
+        return []
+        
+    parts = [p for p in parsed.path.split("/") if p]
+    if len(parts) < 2:
+        return []
+        
+    soup = BeautifulSoup(html, "html.parser")
+    # GitHub usually has <meta property="og:title" content="owner/repo: description">
+    # or <title>owner/repo: description</title>
+    title_tag = soup.find("meta", property="og:title")
+    title = title_tag["content"] if title_tag else soup.title.string if soup.title else f"{parts[0]}/{parts[1]}"
+    
+    desc_tag = soup.find("meta", property="og:description")
+    desc = desc_tag["content"] if desc_tag else ""
+    
+    # Strip the "owner/repo: " prefix if present in the title
+    if ":" in title and title.startswith(f"{parts[0]}/{parts[1]}"):
+        title = title.split(":", 1)[1].strip()
+    
+    if not title or title == "GitHub":
+        title = f"{parts[0]}/{parts[1]} GitHub Repository"
+        
+    # It's a GitHub repository, definitively a PROJECT
+    return [{
+        "entity_type": "project",
+        "title": title[:300],
+        "summary": desc[:800],
+        "link_url": source_url,
+        "confidence": 0.95
+    }]
+
 def extract_deterministic_candidates(html: str, source_url: str) -> list[dict]:
     for extractor in (
+        extract_github_project_candidates,
         extract_calendar_table_candidates,
         extract_job_table_candidates,
         extract_heading_job_candidates,
