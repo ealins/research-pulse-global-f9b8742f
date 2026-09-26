@@ -6,15 +6,15 @@ on:
       max_fetch:
         description: Maximum FETCH tasks this run
         required: false
-        default: "40"
+        default: "100"
       max_process:
-        description: Maximum EXTRACT tasks this run
+        description: "Maximum EXTRACT tasks to run"
         required: false
-        default: "40"
+        default: "100"
   schedule:
-    # Daily bounded ingestion cycle; inert until GEOACADEMIC_DATABASE_URL
-    # and GEOACADEMIC_S3_* secrets are configured.
-    - cron: "17 4 * * *"
+    # 4-hour bounded ingestion cycle (6x daily); inert until
+    # GEOACADEMIC_DATABASE_URL and GEOACADEMIC_S3_* secrets are configured.
+    - cron: "15 */4 * * *"
 
 permissions:
   contents: read
@@ -71,8 +71,9 @@ jobs:
           OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_MODEL: ${{ secrets.NVIDIA_MODEL }}
-          MAX_FETCH: ${{ github.event.inputs.max_fetch || '40' }}
-          MAX_PROCESS: ${{ github.event.inputs.max_process || '40' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MAX_FETCH: ${{ github.event.inputs.max_fetch || '100' }}
+          MAX_PROCESS: ${{ github.event.inputs.max_process || '100' }}
         run: |
           python open-engine/cloudrun/batch_runner.py all \
             --max-fetch "$MAX_FETCH" \
