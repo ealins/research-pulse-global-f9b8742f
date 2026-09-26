@@ -77,13 +77,21 @@ function CollaborationPage() {
         <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
           <StatTile
             label="Institutions in graph"
-            value={model?.nodes.length ?? "—"}
+            value={error ? "—" : (model?.nodes.length ?? 0)}
             tone="signal"
+            loading={isLoading}
           />
-          <StatTile label="Edges" value={data?.edges.length ?? "—"} />
+          <StatTile label="Edges" value={error ? "—" : (data?.edges.length ?? 0)} loading={isLoading} />
           <StatTile
             label="Most connected"
-            value={model?.nodes[0]?.inst?.abbreviation ?? model?.nodes[0]?.inst?.name ?? "—"}
+            value={
+              error
+                ? "—"
+                : (model?.nodes[0]?.inst?.abbreviation ??
+                  model?.nodes[0]?.inst?.name ??
+                  "None yet")
+            }
+            loading={isLoading}
           />
           <StatTile
             label="Focus"
@@ -93,6 +101,7 @@ function CollaborationPage() {
                 : "All"
             }
             hint="Click a node to filter"
+            loading={isLoading}
           />
         </section>
 

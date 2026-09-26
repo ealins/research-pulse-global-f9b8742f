@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { openEngine, openEngineConfigured } from "@/lib/open-engine-client";
 import {
   LIVE_OPPORTUNITY_STATUSES,
   PUBLIC_CONFIDENCE_LEVELS,
@@ -121,6 +122,72 @@ export type TopJob = {
 };
 
 /** The "most relevant right now" digest: top jobs, areas, courses, institutions, countries. */
+type TopPickEvent = {
+  id: string;
+  title: string;
+  slug: string;
+  start_date: string | null;
+  location: string | null;
+  country: string | null;
+  event_kind: string | null;
+  abstract_deadline: string | null;
+};
+
+function engineEventKind(title: string): string {
+  const value = title.toLowerCase();
+  if (value.includes("workshop")) return "workshop";
+  if (value.includes("school") || value.includes("course")) return "summer_school";
+  if (value.includes("colloquium")) return "colloquium";
+  if (value.includes("fair") || value.includes("expo")) return "trade_fair";
+  return "conference";
+}
+
+/**
+ * "Next deadlines and events" leg of Top picks. The legacy events table is
+ * sparsely populated, so prefer the open-engine event feed when configured
+ * and fall back to the legacy query otherwise.
+ */
+async function fetchTopPickEvents(): Promise<{ data: TopPickEvent[] | null; error: unknown }> {
+  if (openEngineConfigured) {
+    try {
+      const feed = await openEngine.latest("event", 60);
+      const today = new Date().toISOString().slice(0, 10);
+      const items = ((feed as { items?: unknown[] }).items ?? [])
+        .map((entity) => {
+          const e = entity as Record<string, any>;
+          const data = e.data && typeof e.data === "object" ? (e.data as Record<string, any>) : {};
+          return {
+            id: String(e.id),
+            title: String(e.title ?? ""),
+            slug: e.slug ?? e.external_key?.slice(0, 16) ?? String(e.id),
+            start_date: e.start_date ?? data.start_date ?? null,
+            location: data.location ?? null,
+            country: e.country ?? null,
+            event_kind: engineEventKind(String(e.title ?? "")),
+            abstract_deadline: null,
+          } satisfies TopPickEvent;
+        })
+        .filter((e) => e.start_date && e.start_date >= today)
+        .sort((a, b) => (a.start_date ?? "").localeCompare(b.start_date ?? ""))
+        .slice(0, 6);
+      return { data: items, error: null };
+    } catch (error) {
+      return { data: null, error };
+    }
+  }
+  const { data, error } = await supabase
+    .from("events")
+    .select(
+      "id, title, slug, start_date, location, country, event_kind, abstract_deadline, event_topics!inner(topic_id)",
+    )
+    .gte("start_date", new Date().toISOString().slice(0, 10))
+    .eq("is_demo", false)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+    .order("start_date")
+    .limit(6);
+  return { data: data as TopPickEvent[] | null, error };
+}
+
 export const topPicksQuery = queryOptions({
   queryKey: ["top-picks"],
   queryFn: async () => {
@@ -186,16 +253,7 @@ export const topPicksQuery = queryOptions({
         .eq("active", true)
         .eq("is_demo", false)
         .limit(400),
-      supabase
-        .from("events")
-        .select(
-          "id, title, slug, start_date, location, country, event_kind, abstract_deadline, event_topics!inner(topic_id)",
-        )
-        .gte("start_date", new Date().toISOString().slice(0, 10))
-        .eq("is_demo", false)
-        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
-        .order("start_date")
-        .limit(6),
+      fetchTopPickEvents(),
     ]);
 
     const err =

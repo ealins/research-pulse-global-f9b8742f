@@ -128,6 +128,52 @@ async def main() -> None:
             conn,
             "SELECT count(*) FROM canonical_entities WHERE verification_status='verified'",
         )
+
+        # --- Enrichment completeness (public app schema) ---
+        # These are warnings, not failures: sparse data is a pipeline-state
+        # signal, not a build-breaking defect.
+        await conn.execute('SET search_path TO public')
+        enrich = {}
+        enrich["institutions_total"] = await scalar(conn, "SELECT count(*) FROM institutions")
+        enrich["institutions_missing_geo"] = await scalar(
+            conn,
+            "SELECT count(*) FROM institutions "
+            "WHERE city IS NULL OR country IS NULL OR latitude IS NULL OR longitude IS NULL",
+        )
+        enrich["opportunities_total"] = await scalar(
+            conn, "SELECT count(*) FROM opportunities WHERE coalesce(is_demo,false)=false"
+        )
+        enrich["opportunities_without_topics"] = await scalar(
+            conn,
+            "SELECT count(*) FROM opportunities o "
+            "WHERE coalesce(o.is_demo,false)=false "
+            "AND NOT EXISTS (SELECT 1 FROM opportunity_topics t WHERE t.opportunity_id=o.id)",
+        )
+        enrich["publications_total"] = await scalar(
+            conn, "SELECT count(*) FROM publications WHERE coalesce(is_demo,false)=false"
+        )
+        enrich["publications_without_abstract"] = await scalar(
+            conn,
+            "SELECT count(*) FROM publications "
+            "WHERE coalesce(is_demo,false)=false AND (abstract IS NULL OR btrim(abstract)='')",
+        )
+        enrich["publications_without_topics"] = await scalar(
+            conn,
+            "SELECT count(*) FROM publications p "
+            "WHERE coalesce(p.is_demo,false)=false "
+            "AND NOT EXISTS (SELECT 1 FROM publication_topics t WHERE t.publication_id=p.id)",
+        )
+        enrich["events_without_dates"] = await scalar(
+            conn,
+            "SELECT count(*) FROM events "
+            "WHERE coalesce(is_demo,false)=false AND start_date IS NULL",
+        )
+        enrich["public_needs_review"] = await scalar(
+            conn,
+            "SELECT (SELECT count(*) FROM opportunities WHERE verification_status='needs_review') "
+            "+ (SELECT count(*) FROM publications WHERE verification_status='needs_review') "
+            "+ (SELECT count(*) FROM events WHERE verification_status='needs_review')",
+        )
     finally:
         await conn.close()
 
@@ -176,6 +222,34 @@ async def main() -> None:
         f"missing_dates={deterministic_events_missing_dates} bad_canonical_json={bad_canonical_json} "
         f"bad_signal_json={bad_signal_json} bad_evidence_json={bad_evidence_json} off_scope={off_scope_public}"
     )
+    print(
+        "QA_ENRICHMENT "
+        f"institutions={enrich['institutions_total']} missing_geo={enrich['institutions_missing_geo']} "
+        f"opportunities={enrich['opportunities_total']} no_topics={enrich['opportunities_without_topics']} "
+        f"publications={enrich['publications_total']} no_abstract={enrich['publications_without_abstract']} "
+        f"pubs_no_topics={enrich['publications_without_topics']} "
+        f"events_no_dates={enrich['events_without_dates']} "
+        f"public_needs_review={enrich['public_needs_review']}"
+    )
+
+    if enrich["institutions_missing_geo"]:
+        warnings.append(
+            f"{enrich['institutions_missing_geo']}/{enrich['institutions_total']} institutions lack city/country/coordinates"
+        )
+    if enrich["opportunities_without_topics"]:
+        warnings.append(
+            f"{enrich['opportunities_without_topics']}/{enrich['opportunities_total']} opportunities have no topic links"
+        )
+    if enrich["publications_without_topics"]:
+        warnings.append(
+            f"{enrich['publications_without_topics']}/{enrich['publications_total']} publications have no topic links"
+        )
+    if enrich["events_without_dates"]:
+        warnings.append(f"{enrich['events_without_dates']} events have no start date")
+    if enrich["public_needs_review"]:
+        warnings.append(
+            f"{enrich['public_needs_review']} public rows are stuck in needs_review"
+        )
 
     summary_path = os.getenv("GITHUB_STEP_SUMMARY", "").strip()
     if summary_path:
@@ -197,6 +271,12 @@ async def main() -> None:
             f"| Non-object signal JSONB rows | {bad_signal_json} |",
             f"| Non-object provenance JSONB rows | {bad_evidence_json} |",
             f"| Off-scope public opportunities | {off_scope_public} |",
+            "| Institutions missing geo | {0} |".format(enrich["institutions_missing_geo"]),
+            "| Opportunities without topics | {0} |".format(enrich["opportunities_without_topics"]),
+            "| Publications without topics | {0} |".format(enrich["publications_without_topics"]),
+            "| Publications without abstract | {0} |".format(enrich["publications_without_abstract"]),
+            "| Events without dates | {0} |".format(enrich["events_without_dates"]),
+            "| Public rows in needs_review | {0} |".format(enrich["public_needs_review"]),
         ]
         Path(summary_path).open("a", encoding="utf-8").write("\n".join(lines) + "\n")
 

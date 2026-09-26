@@ -1,10 +1,10 @@
 # GeoAcademic resilient production architecture
 
-This is the target architecture for running GeoAcademic with Lovable, GitHub, Oracle Cloud and provider-swappable AI without making any one of them the product's permanent backend contract.
+This is the target architecture for running GeoAcademic with GitHub, Oracle Cloud and provider-swappable AI without making any one of them the product's permanent backend contract.
 
 ## Responsibility split
 
-- **Lovable / `geoacademic.app`**: React/TanStack presentation and publishing. No database service-role key and no AI provider key belongs in browser code.
+- **`geoacademic.app`**: React/TanStack presentation and publishing. No database service-role key and no AI provider key belongs in browser code.
 - **Oracle / `api.geoacademic.app`**: always-on FastAPI, PostgreSQL/PostGIS, source scheduler, fetch workers, processors, verifier and Pulse generation.
 - **Oracle Object Storage**: changed-source evidence plus the degraded-mode public snapshot object.
 - **GitHub**: source of truth, CI, controlled deployment to Oracle and an hourly recovery/maintenance path.
@@ -15,7 +15,7 @@ This is the target architecture for running GeoAcademic with Lovable, GitHub, Or
 
 ```text
 users
-  -> geoacademic.app (Lovable)
+  -> geoacademic.app (frontend)
   -> api.geoacademic.app (FastAPI on Oracle)
   -> PostgreSQL/PostGIS
 
@@ -59,7 +59,7 @@ The `snapshotter` service writes `public/latest.json` to the configured S3-compa
 - latest researchers,
 - latest institutions.
 
-Set `VITE_GEOACADEMIC_SNAPSHOT_URL` in Lovable to a browser-readable URL for this single snapshot object. `src/lib/open-engine-client.ts` still uses the live API first and falls back to this snapshot only on network/server failure; valid 4xx API errors are not hidden by stale data.
+Set `VITE_GEOACADEMIC_SNAPSHOT_URL` in the frontend build environment to a browser-readable URL for this single snapshot object. `src/lib/open-engine-client.ts` still uses the live API first and falls back to this snapshot only on network/server failure; valid 4xx API errors are not hidden by stale data.
 
 Keep the evidence bucket private. Prefer an Oracle Object Storage pre-authenticated request (or another narrowly scoped public object mechanism) for `public/latest.json`, with browser CORS permitting `https://geoacademic.app`. Do not make raw evidence public merely to expose the fallback snapshot.
 
@@ -128,7 +128,7 @@ ORACLE_DEPLOY_PATH=<absolute repository path on the server>
 
 ## Scaling path
 
-Start with one Oracle VM and low worker concurrency. Scale in this order without changing the Lovable API contract:
+Start with one Oracle VM and low worker concurrency. Scale in this order without changing the frontend API contract:
 
 1. increase `WORKER_CONCURRENCY` only while CPU/RAM and target-domain politeness permit;
 2. run additional fetch/processor containers or additional worker VMs;
@@ -151,9 +151,9 @@ Do not turn everything on at once.
 6. Let at least one source complete a later recheck and verify automatic promotion behavior.
 7. Add OpenRouter and/or NVIDIA backend secrets and verify ambiguous extraction.
 8. Create a narrowly scoped browser-readable URL for `public/latest.json`; keep raw evidence private.
-9. Add `VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app` and `VITE_GEOACADEMIC_SNAPSHOT_URL=<snapshot URL>` in Lovable.
+9. Add `VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app` and `VITE_GEOACADEMIC_SNAPSHOT_URL=<snapshot URL>` to the frontend build environment.
 10. Migrate one frontend section at a time to the open-engine client.
 11. Configure GitHub maintenance and Oracle deployment secrets.
 12. Increase source coverage and worker concurrency gradually while monitoring queue depth and error rates.
 
-The existing Lovable/Supabase ingestion path can remain available during this migration. The Oracle engine is intentionally additive until each public surface has been verified against live data.
+The existing Supabase ingestion path can remain available during this migration. The Oracle engine is intentionally additive until each public surface has been verified against live data.

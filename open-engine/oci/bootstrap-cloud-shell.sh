@@ -380,14 +380,14 @@ DNS record you still need to create at your domain/DNS provider:
 After DNS resolves, verify:
   https://api.geoacademic.app/health
 
-Lovable environment variable after API verification:
+Frontend environment variable after API verification:
   VITE_GEOACADEMIC_API_URL=https://api.geoacademic.app
 EOF
 
 if [ -n "${PUBLIC_SNAPSHOT_URL:-}" ]; then
   cat <<EOF
 
-Lovable degraded-mode snapshot variable:
+Frontend degraded-mode snapshot variable:
   VITE_GEOACADEMIC_SNAPSHOT_URL=$PUBLIC_SNAPSHOT_URL
 EOF
 fi

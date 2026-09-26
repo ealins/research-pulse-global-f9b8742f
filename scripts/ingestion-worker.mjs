@@ -2,7 +2,7 @@
  * GeoAcademic external fetch worker.
  *
  * Railway performs robots checks, downloads, HTML cleanup and link extraction.
- * Lovable only leases tasks and persists compact validated snapshots, keeping
+ * The web app only leases tasks and persists compact validated snapshots, keeping
  * expensive and long-running network work outside the web application.
  */
 import { lookup } from "node:dns/promises";

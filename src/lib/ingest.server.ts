@@ -2386,8 +2386,8 @@ export async function completeExternalReview(
   }
 
   // If GitHub has no NVIDIA secret, it can still orchestrate the queue while
-  // the already-configured Lovable backend performs only the model request.
-  // Supplying an extraction keeps the entire expensive review outside Lovable.
+  // the already-configured backend performs only the model request.
+  // Supplying an extraction keeps the entire expensive review outside the web app.
   const outcome = await normalizeSource(
     input.source_id,
     extraction || !input.allow_server_model
