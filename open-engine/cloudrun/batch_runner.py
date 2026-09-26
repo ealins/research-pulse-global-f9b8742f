@@ -120,15 +120,26 @@ async def run_fetch(max_tasks: int) -> None:
 async def run_process(max_tasks: int) -> None:
     import processor
 
-    pool = await asyncpg.create_pool(**pool_kwargs(4))
+    concurrency = int(os.environ.get("WORKER_CONCURRENCY", "4"))
+    pool = await asyncpg.create_pool(**pool_kwargs(concurrency + 2))
     processed = 0
     try:
         while processed < max_tasks:
-            task = await processor.claim(pool)
-            if not task:
+            claims = []
+            for _ in range(min(concurrency, max_tasks - processed)):
+                task = await processor.claim(pool)
+                if task:
+                    claims.append(task)
+                else:
+                    break
+            
+            if not claims:
                 break
-            await processor.materialize(pool, task)
-            processed += 1
+                
+            await asyncio.gather(
+                *(processor.materialize(pool, task) for task in claims)
+            )
+            processed += len(claims)
     finally:
         await pool.close()
     print(f"BATCH_PROCESS processed={processed}")
@@ -180,23 +191,24 @@ async def run_all(
     max_ats_sources: int,
     max_publication_institutions: int,
 ) -> None:
-    # Exa only registers low-trust candidate URLs. The existing scheduler and
-    # fetch/extract/verify pipeline remain the sole path to canonical data.
-    await run_exa_discovery()    await run_github_discovery()    await run_schedule()
+    # 1. Discovery and scheduling can run in parallel (independent queues)
+    await asyncio.gather(
+        run_exa_discovery(),
+        run_github_discovery(),
+        run_schedule(),
+    )
+
+    # 2. Core pipeline runs sequentially to propagate data in a single execution
     await run_fetch(max_fetch)
     await run_process(max_process)
-    await run_verify()
-    # Cloud Run owns the production cadence. This bridge reuses the app's
-    # authenticated canonical writers and now performs vacancy review here,
-    # where the NVIDIA secret is actually configured.
-    await run_public()
-    # OpenAIRE publication citation indicators are often absent. A bounded
-    # exact-ROR recovery pass prevents unknown citation metadata from yielding
-    # a permanently empty canonical publication table.
-    await run_publications(max_publication_institutions)
-    # ATS adapters are deliberately bounded and complementary. Unsupported
-    # university career sites remain on the generic HTML extraction path.
-    await run_ats(max_ats_sources)
+
+    # 3. Final steps and independent enrichments can run in parallel
+    await asyncio.gather(
+        run_verify(),
+        run_public(),
+        run_publications(max_publication_institutions),
+        run_ats(max_ats_sources),
+    )
 
 
 def parse_args() -> argparse.Namespace:
