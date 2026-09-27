@@ -35,7 +35,10 @@ jobs:
           REPO_API_URL: ${{ vars.GEOACADEMIC_API_URL }}
           DEFAULT_API_URL: https://geoacademic-api-xjh4s3mvyq-ey.a.run.app
         run: |
-          test -n "$DATABASE_URL" || { echo "Missing GEOACADEMIC_DATABASE_URL"; exit 1; }
+          if [ -z "$DATABASE_URL" ]; then
+            echo "GEOACADEMIC_DATABASE_URL secret is not configured. Skipping external API QA check gracefully."
+            exit 0
+          fi
 
           # This workflow intentionally tests the standalone Open Engine API.
           # Production website health is covered separately by production-smoke.yml,
