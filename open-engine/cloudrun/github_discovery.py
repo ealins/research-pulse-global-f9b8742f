@@ -19,6 +19,7 @@ DOMAIN_QUERIES = [
 ]
 
 async def run_github_discovery(pool: asyncpg.Pool, max_queries: int = 5) -> int:
+    print("GITHUB_DISCOVERY_VERSION=2026-09-28-v2")
     token = os.getenv("GITHUB_TOKEN", "").strip()
     headers = {
         "Accept": "application/vnd.github.v3+json",
