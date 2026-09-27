@@ -5,7 +5,7 @@ $Project = "geoacademic-506304"
 $Region = "europe-west3"
 $Job = "geoacademic-ingestion"
 $Scheduler = "geoacademic-ingestion-2h"
-$RepoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$RepoRoot = Split-Path -Parent $PSScriptRoot
 $Image = "$Region-docker.pkg.dev/$Project/geoacademic/geoacademic-ingestion:latest"
 
 function Invoke-Gcloud {
@@ -34,7 +34,6 @@ Write-Host "==> Exporting current Cloud Run job configuration"
 
 Write-Host "==> Pausing the 2-hour scheduler during deployment"
 Invoke-Gcloud @("scheduler","jobs","pause",$Scheduler,"--location=$Region","--project=$Project","--quiet")
-$schedulerPaused = $true
 
 try {
     Write-Host "==> Building the updated ingestion image"
