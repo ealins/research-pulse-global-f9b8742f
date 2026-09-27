@@ -1,6 +1,8 @@
-name: Manual Cloudflare device deploy
+name: Deploy GeoAcademic to Cloudflare
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -10,9 +12,21 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
       - name: Check out main
         uses: actions/checkout@v4
+
+      - name: Require Cloudflare deployment credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -z "${CLOUDFLARE_API_TOKEN:-}" || -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]]; then
+            echo "::error::CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID GitHub Actions secrets are required for production deployment."
+            exit 1
+          fi
 
       - name: Install locked dependencies
         run: npx --yes bun@1.3.14 install --frozen-lockfile
@@ -20,8 +34,5 @@ jobs:
       - name: Build production Worker
         run: npx --yes bun@1.3.14 run build
 
-      - name: Authorize Cloudflare for this runner
-        run: ./node_modules/.bin/wrangler login --device --browser=false --use-keyring=false
-
-      - name: Deploy research-pulse-global
+      - name: Deploy active Worker
         run: ./node_modules/.bin/wrangler deploy
