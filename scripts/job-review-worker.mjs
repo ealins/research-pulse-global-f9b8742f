@@ -130,7 +130,7 @@ async function extractWithNvidia(lease) {
           { role: "system", content: SYSTEM_PROMPT },
           {
             role: "user",
-            content: `SOURCE URL: ${lease.final_url || lease.source_url || ""}\nPAGE TITLE: ${lease.page_title || ""}\nPAGE TEXT:\n${pageText}`,
+            content: `SOURCE URL: ${lease.url || ""}\nPAGE TITLE: ${lease.title || ""}\nPAGE TEXT:\n${pageText}`,
           },
         ],
       }),
@@ -153,6 +153,7 @@ async function processLease(lease) {
     return await callHook("complete-review", {
       completion: {
         task_id: lease.task_id,
+        source_id: lease.source_id,
         raw_record_id: lease.raw_record_id,
         lease_started_at: lease.lease_started_at,
         success: true,
@@ -166,6 +167,7 @@ async function processLease(lease) {
       return await callHook("complete-review", {
         completion: {
           task_id: lease.task_id,
+          source_id: lease.source_id,
           raw_record_id: lease.raw_record_id,
           lease_started_at: lease.lease_started_at,
           success: false,
