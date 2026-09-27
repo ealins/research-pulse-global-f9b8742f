@@ -60,7 +60,7 @@ async def run_github_discovery(pool: asyncpg.Pool, max_queries: int = 5) -> int:
                                 INSERT INTO source_registry (url, name, source_type, entity_hint, trust_level)
                                 VALUES ($1, $2, 'project', 'PROJECT', 'standard')
                                 ON CONFLICT (url) DO NOTHING
-                            """, repo_url, name, f"GitHub Discovery: {desc[:200]}")
+                            """, repo_url, name
                             inserted += 1
                             
             except Exception as e:
