@@ -40,13 +40,13 @@ async function verifyData() {
   }
 
   // Test Projects (filter to active/planned only)
-  console.log("\n🏗️ PROJECTS (planned/active only)...");
+  console.log("\n🏗️ PROJECTS (planned/active/completed only)...");
   const { data: projects, error: projectsError } = await supabase
     .from("projects")
     .select("id, name, status, verification_status")
     .eq("is_demo", false)
     .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
-    .in("status", ["planned", "active"])
+    .in("status", ["planned", "active", "completed"])
     .limit(10);
 
   if (projectsError) {

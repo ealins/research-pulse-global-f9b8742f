@@ -327,7 +327,7 @@ export const projectsQuery = queryOptions({
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
-      .in("status", ["planned", "active"])
+      .in("status", ["planned", "active", "completed"])
       .order("is_demo", { ascending: true })
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;

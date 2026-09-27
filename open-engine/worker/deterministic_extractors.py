@@ -1,8 +1,35 @@
 import hashlib
 import re
+import urllib.parse
 from urllib.parse import urlparse
 
 from bs4 import BeautifulSoup
+
+TRACKING_PARAMS = {
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "fbclid", "gclid", "mc_cid", "mc_eid", "ref", "source", "campaign", "trk"
+}
+
+def canonicalize_url(url: str) -> str:
+    """Normalize and canonicalize URLs: strip tracking params, normalize slashes and casing."""
+    try:
+        parsed = urllib.parse.urlsplit(url.strip())
+        if not parsed.scheme or not parsed.netloc:
+            return url
+        scheme = parsed.scheme.lower()
+        netloc = parsed.netloc.lower()
+        query_params = urllib.parse.parse_qsl(parsed.query, keep_blank_values=True)
+        filtered_query = [
+            (k, v) for k, v in query_params 
+            if not (k.lower() in TRACKING_PARAMS or k.lower().startswith("utm_"))
+        ]
+        query = urllib.parse.urlencode(filtered_query)
+        path = parsed.path
+        if path != "/" and path.endswith("/"):
+            path = path.rstrip("/")
+        return urllib.parse.urlunsplit((scheme, netloc, path, query, ""))
+    except Exception:
+        return url
 
 MONTHS = (
     "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|"
