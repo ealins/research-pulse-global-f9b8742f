@@ -16,7 +16,9 @@ COPY cloudrun /app/cloudrun
 # from jeopardizing a scheduled production run after deployment.
 RUN python -m py_compile \
         /app/cloudrun/batch_runner.py \
-    /app/cloudrun/exa_discovery.py \    /app/cloudrun/github_discovery.py \        /app/cloudrun/public_enrichment_bridge.py \
+        /app/cloudrun/exa_discovery.py \
+        /app/cloudrun/github_discovery.py \
+        /app/cloudrun/public_enrichment_bridge.py \
         /app/cloudrun/review_enrichment.py \
         /app/cloudrun/publication_enrichment.py \
         /app/cloudrun/ats_enrichment.py \
