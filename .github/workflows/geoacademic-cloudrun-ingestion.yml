@@ -51,6 +51,34 @@ jobs:
           cache: pip
           cache-dependency-path: open-engine/worker/requirements.txt
 
+      - name: Validate database URL format
+        if: steps.preflight.outputs.ready == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.GEOACADEMIC_DATABASE_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          raw = os.environ["DATABASE_URL"]
+          value = raw.strip()
+          if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+              value = value[1:-1].strip()
+
+          parsed = urlsplit(value)
+          scheme = parsed.scheme.lower()
+          print(f"DATABASE_URL present: {bool(raw)}")
+          print(f"DATABASE_URL length: {len(raw)}")
+          print(f"DATABASE_URL scheme: {scheme or '<missing>'}")
+          print(f"DATABASE_URL host present: {bool(parsed.hostname)}")
+
+          if scheme not in {"postgresql", "postgres"}:
+              raise SystemExit(
+                  "GEOACADEMIC_DATABASE_URL is malformed: expected "
+                  "postgresql:// or postgres://."
+              )
+          PY
+
       - name: Install ingestion dependencies
         if: steps.preflight.outputs.ready == 'true'
         run: pip install -r open-engine/worker/requirements.txt
