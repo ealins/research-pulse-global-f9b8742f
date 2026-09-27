@@ -198,32 +198,72 @@ async def materialize(pool, task):
                         "SELECT id, data FROM canonical_entities WHERE entity_type=$1 AND external_key=$2",
                         candidate["entity_type"], candidate["external_key"],
                     )
-                    entity_id = await conn.fetchval(
-                        """
-                        INSERT INTO canonical_entities(
-                            entity_type, external_key, title, country, verification_status,
-                            confidence, source_url, published_at, data
-                        ) VALUES($1,$2,$3,$4,$5,$6,$7,now(),$8::jsonb)
-                        ON CONFLICT (entity_type, external_key) WHERE external_key IS NOT NULL
-                        DO UPDATE SET
-                            title=excluded.title,
-                            country=coalesce(excluded.country, canonical_entities.country),
-                            verification_status=CASE
-                                WHEN canonical_entities.verification_status='verified' THEN 'verified'
-                                ELSE excluded.verification_status
-                            END,
-                            confidence=greatest(canonical_entities.confidence, excluded.confidence),
-                            source_url=excluded.source_url,
-                            last_seen_at=now(),
-                            last_changed_at=CASE WHEN canonical_entities.data IS DISTINCT FROM excluded.data THEN now() ELSE canonical_entities.last_changed_at END,
-                            data=excluded.data,
-                            updated_at=now()
-                        RETURNING id
-                        """,
-                        candidate["entity_type"], candidate["external_key"], candidate["title"],
-                        candidate["country"], verification_status, candidate["confidence"],
-                        candidate["source_url"], json.dumps(candidate["data"]),
-                    )
+                    # External keys can change between source snapshots. Fall back to the
+                    # stable title/source identity used by database QA so a changed key
+                    # cannot create a second canonical row for the same source record.
+                    if existing is None and candidate.get("source_url"):
+                        existing = await conn.fetchrow(
+                            """
+                            SELECT id, data
+                            FROM canonical_entities
+                            WHERE entity_type=$1
+                              AND lower(btrim(title))=lower(btrim($2))
+                              AND source_url=$3
+                            ORDER BY updated_at DESC NULLS LAST, id
+                            LIMIT 1
+                            """,
+                            candidate["entity_type"], candidate["title"], candidate["source_url"],
+                        )
+                    if existing is not None:
+                        entity_id = await conn.fetchval(
+                            """
+                            UPDATE canonical_entities
+                            SET title=$2,
+                                country=coalesce($3, country),
+                                verification_status=CASE
+                                    WHEN verification_status='verified' THEN 'verified'
+                                    ELSE $4
+                                END,
+                                confidence=greatest(confidence, $5),
+                                source_url=$6,
+                                last_seen_at=now(),
+                                last_changed_at=CASE WHEN data IS DISTINCT FROM $7::jsonb THEN now() ELSE last_changed_at END,
+                                data=$7::jsonb,
+                                updated_at=now()
+                            WHERE id=$1
+                            RETURNING id
+                            """,
+                            existing["id"], candidate["title"], candidate["country"],
+                            verification_status, candidate["confidence"], candidate["source_url"],
+                            json.dumps(candidate["data"]),
+                        )
+                    else:
+                        entity_id = await conn.fetchval(
+                            """
+                            INSERT INTO canonical_entities(
+                                entity_type, external_key, title, country, verification_status,
+                                confidence, source_url, published_at, data
+                            ) VALUES($1,$2,$3,$4,$5,$6,$7,now(),$8::jsonb)
+                            ON CONFLICT (entity_type, external_key) WHERE external_key IS NOT NULL
+                            DO UPDATE SET
+                                title=excluded.title,
+                                country=coalesce(excluded.country, canonical_entities.country),
+                                verification_status=CASE
+                                    WHEN canonical_entities.verification_status='verified' THEN 'verified'
+                                    ELSE excluded.verification_status
+                                END,
+                                confidence=greatest(canonical_entities.confidence, excluded.confidence),
+                                source_url=excluded.source_url,
+                                last_seen_at=now(),
+                                last_changed_at=CASE WHEN canonical_entities.data IS DISTINCT FROM excluded.data THEN now() ELSE canonical_entities.last_changed_at END,
+                                data=excluded.data,
+                                updated_at=now()
+                            RETURNING id
+                            """,
+                            candidate["entity_type"], candidate["external_key"], candidate["title"],
+                            candidate["country"], verification_status, candidate["confidence"],
+                            candidate["source_url"], json.dumps(candidate["data"]),
+                        )
                     await conn.execute(
                         """
                         WITH updated AS (
