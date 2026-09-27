@@ -7,7 +7,15 @@ from urllib.parse import quote
 import asyncpg
 import httpx
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+def normalize_database_url(raw: str) -> str:
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1].strip()
+    if not value.lower().startswith(("postgresql://", "postgres://")):
+        raise SystemExit("DATABASE_URL must start with postgresql:// or postgres://")
+    return value
+
+DATABASE_URL = normalize_database_url(os.environ["DATABASE_URL"])
 DB_SCHEMA = os.getenv("DB_SCHEMA", "geoacademic_engine")
 API_URL = os.getenv(
     "GEOACADEMIC_API_URL",
