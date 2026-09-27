@@ -24,7 +24,7 @@ console.log("Nemotron models:");
 for (const id of nemotron.sort()) console.log(`  ${id}`);
 
 const wanted = [
-  "nvidia/nemotron-3-nano-30b-a3b",
+  "nvidia/nemotron-3.5-lightning-30b-a3b",
   "nvidia/nemotron-3-super-120b-a12b",
   "nvidia/nemotron-3-ultra-550b-a55b",
 ];
