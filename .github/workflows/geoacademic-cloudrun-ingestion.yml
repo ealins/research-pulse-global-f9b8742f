@@ -70,7 +70,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_MODEL: ${{ secrets.OPENROUTER_MODEL }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-          NVIDIA_MODEL: ${{ secrets.NVIDIA_MODEL }}
+          NVIDIA_MODEL: nvidia/nemotron-3.5-lightning-30b-a3b
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           MAX_FETCH: ${{ github.event.inputs.max_fetch || '100' }}
           MAX_PROCESS: ${{ github.event.inputs.max_process || '100' }}
