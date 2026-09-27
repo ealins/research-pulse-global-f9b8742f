@@ -10,7 +10,21 @@ import asyncpg
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "worker"))
 
-DATABASE_URL = os.environ["DATABASE_URL"]
+def normalize_database_url(raw: str) -> str:
+    # GitHub Actions secrets can accidentally be pasted with surrounding quotes
+    # or whitespace. Normalize only harmless wrappers; never log the value.
+    value = raw.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1].strip()
+    if not value.lower().startswith(("postgresql://", "postgres://")):
+        scheme = value.split(":", 1)[0].lower() if ":" in value else ""
+        raise ValueError(
+            "DATABASE_URL must start with postgresql:// or postgres:// "
+            f"(detected scheme={scheme or '<missing>'})"
+        )
+    return value
+
+DATABASE_URL = normalize_database_url(os.environ["DATABASE_URL"])
 DB_SCHEMA = os.getenv("DB_SCHEMA", "geoacademic_engine")
 DB_SEARCH_PATH = f"{DB_SCHEMA},extensions,public"
 
