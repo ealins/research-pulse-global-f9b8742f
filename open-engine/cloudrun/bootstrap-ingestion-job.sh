@@ -9,9 +9,9 @@ SCHEDULER_SA_NAME="${GCP_SCHEDULER_SA:-geoacademic-scheduler}"
 ARTIFACT_REPO="${GCP_ARTIFACT_REPO:-geoacademic}"
 DB_SCHEMA="${DB_SCHEMA:-geoacademic_engine}"
 SCHEDULE="${GCP_INGESTION_CRON:-43 */2 * * *}"
-MAX_FETCH="${MAX_FETCH:-40}"
-MAX_PROCESS="${MAX_PROCESS:-40}"
-MAX_ATS_SOURCES="${MAX_ATS_SOURCES:-5}"
+MAX_FETCH="${MAX_FETCH:-200}"
+MAX_PROCESS="${MAX_PROCESS:-200}"
+MAX_ATS_SOURCES="${MAX_ATS_SOURCES:-10}"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
 log() { printf '\n==> %s\n' "$*"; }
@@ -110,10 +110,10 @@ gcloud run jobs deploy "$JOB" \
   --project "$PROJECT_ID" \
   --service-account "$RUNTIME_SA" \
   --set-secrets "$SECRET_FLAGS" \
-  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=4,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},GEOACADEMIC_BASE_URL=${GEOACADEMIC_BASE_URL:-https://geoacademic.app},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}" \
+  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=8,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},GEOACADEMIC_BASE_URL=${GEOACADEMIC_BASE_URL:-https://geoacademic.app},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}" \
   --args="all,--max-fetch=$MAX_FETCH,--max-process=$MAX_PROCESS,--max-ats-sources=$MAX_ATS_SOURCES" \
-  --cpu=1 \
-  --memory=1Gi \
+  --cpu=2 \
+  --memory=2Gi \
   --task-timeout=30m \
   --max-retries=2 \
   --tasks=1 \
@@ -169,3 +169,4 @@ Image:     $IMAGE
 
 GitHub Actions no longer needs to run production ingestion on a cron schedule.
 EOF
+
