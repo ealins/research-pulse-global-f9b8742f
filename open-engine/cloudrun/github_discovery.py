@@ -57,8 +57,8 @@ async def run_github_discovery(pool: asyncpg.Pool, max_queries: int = 5) -> int:
                         exists = await conn.fetchval("SELECT id FROM source_registry WHERE url = $1", repo_url)
                         if not exists:
                             await conn.execute("""
-                                INSERT INTO source_registry (url, name, source_type, entity_hint, trust_level, notes)
-                                VALUES ($1, $2, 'project', 'PROJECT', 'standard', $3)
+                                INSERT INTO source_registry (url, name, source_type, entity_hint, trust_level)
+                                VALUES ($1, $2, 'project', 'PROJECT', 'standard')
                                 ON CONFLICT (url) DO NOTHING
                             """, repo_url, name, f"GitHub Discovery: {desc[:200]}")
                             inserted += 1
