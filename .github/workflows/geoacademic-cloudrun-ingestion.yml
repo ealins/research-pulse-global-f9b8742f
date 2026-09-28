@@ -1,4 +1,4 @@
-name: GeoAcademic Cloud ingestion (scheduled fallback)
+name: GeoAcademic Cloud ingestion (manual fallback)
 
 on:
   workflow_dispatch:
@@ -11,10 +11,6 @@ on:
         description: "Maximum EXTRACT tasks to run"
         required: false
         default: "100"
-  schedule:
-    # 4-hour bounded ingestion cycle (6x daily); inert until
-    # GEOACADEMIC_DATABASE_URL and GEOACADEMIC_S3_* secrets are configured.
-    - cron: "15 */4 * * *"
 
 permissions:
   contents: read
@@ -45,7 +41,7 @@ jobs:
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "Scheduled fallback is inert until GEOACADEMIC_DATABASE_URL and GEOACADEMIC_S3_* secrets are configured."
+            echo "Manual fallback is unavailable until GEOACADEMIC_DATABASE_URL and GEOACADEMIC_S3_* secrets are configured."
           fi
 
       - uses: actions/setup-python@v5
@@ -110,4 +106,3 @@ jobs:
           python open-engine/cloudrun/batch_runner.py all \
             --max-fetch "$MAX_FETCH" \
             --max-process "$MAX_PROCESS"
-          python open-engine/cloudrun/qa_database.py
