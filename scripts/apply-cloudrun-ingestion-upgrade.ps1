@@ -47,7 +47,7 @@ Invoke-Gcloud @("scheduler","jobs","pause",$Scheduler,"--location=$Region","--pr
 
 Write-Host "==> Syncing optional provider secrets from local environment when present"
 $providerSecrets = @(
-    @("NVIDIA_API_KEY", "geoacademic-nvidia-api-key"),
+    @("Google_API_Key", "geoacademic-google-api-key"),
     @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key"),
     @("GITHUB_TOKEN", "geoacademic-github-token")
 )
@@ -104,7 +104,7 @@ try {
     $optionalSecrets = @()
     foreach ($secret in @(
         @("GITHUB_TOKEN", "geoacademic-github-token"),
-        @("NVIDIA_API_KEY", "geoacademic-nvidia-api-key"),
+        @("GOOGLE_API_KEY", "geoacademic-google-api-key"),
         @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key")
     )) {
         $oldErrorActionPreference = $ErrorActionPreference
@@ -137,8 +137,14 @@ try {
     Write-Host "==> Inspecting verification logs and enforcing acceptance checks"
     $execution = (& gcloud run jobs describe $Job --region=$Region --project=$Project --format="value(status.latestCreatedExecution.name)" 2>$null).Trim()
     if (-not $execution) { throw "Could not determine the latest Cloud Run execution name." }
-    $logs = (& gcloud beta run jobs executions logs read $execution --region=$Region --project=$Project --limit=500 2>&1 | Out-String)
-    Write-Host $logs
+    $deadline = (Get-Date).AddMinutes(5)
+    $logs = ""
+    do {
+        $logs = (& gcloud beta run jobs executions logs read $execution --region=$Region --project=$Project --limit=1000 2>&1 | Out-String)
+        Write-Host $logs
+        if ($logs -match "QA_DATABASE_OK" -or $logs -match "QA_FAILURE") { break }
+        Start-Sleep -Seconds 10
+    } while ((Get-Date) -lt $deadline)
     $fatalPatterns = @(
         "server expects 2 arguments for this query, 3 were passed",
         "GitHub search failed",
@@ -152,8 +158,11 @@ try {
             throw "Cloud Run acceptance check failed: $pattern"
         }
     }
+    if ($logs -match "QA_FAILURE") {
+        throw "Cloud Run acceptance check failed: QA_FAILURE was emitted."
+    }
     if ($logs -notmatch "QA_DATABASE_OK") {
-        throw "Cloud Run acceptance check failed: QA_DATABASE_OK was not emitted."
+        throw "Cloud Run acceptance check failed: QA_DATABASE_OK was not emitted within 5 minutes."
     }
     if ($logs -notmatch "GITHUB_DISCOVERY_VERSION=2026-09-28-v2") {
         throw "Cloud Run acceptance check failed: expected GitHub discovery version marker was not emitted."
