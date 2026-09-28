@@ -28,11 +28,11 @@ GEO_RE = re.compile(
 
 
 TOPIC_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"remote sensing|earth observation|satellite|hyperspectral|radar|sar", re.I), "Environmental Remote Sensing"),
+    (re.compile(r"remote sensing|earth observation|satellite|hyperspectral|radar|sar|lidar|climate monitoring", re.I), "Environmental Remote Sensing"),
     (re.compile(r"foundation model", re.I), "Foundation Models for Earth Observation"),
     (re.compile(r"multimodal.*earth observation|earth observation.*multimodal", re.I), "Multimodal Earth Observation"),
     (re.compile(r"geomatics|geodes\w*|geoinformat\w*|photogrammetr", re.I), "Geomatics"),
-    (re.compile(r"\bgis\b|3d gis|citygml|lidar|point cloud|3d reconstruction|laser scanning", re.I), "3D GIS"),
+    (re.compile(r"\bgis\b|3d|citygml|lidar|point cloud|3d reconstruction|laser scanning", re.I), "3D GIS"),
     (re.compile(r"uav|drone|aerial mapping|photogrammetr", re.I), "UAV Mapping"),
     (re.compile(r"digital twin|geobim|citygml|urban", re.I), "Urban Digital Twins"),
 )
