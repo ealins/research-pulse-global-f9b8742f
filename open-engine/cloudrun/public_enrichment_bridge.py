@@ -68,7 +68,7 @@ async def run_public_enrichment(
 
     Cloud Run owns the production cadence. Backfill first requeues only safe
     recovery candidates. Provider work is deterministic. Vacancy semantic review
-    then runs inside Cloud Run with the configured NVIDIA key. The generic
+    then runs inside Cloud Run with the configured Google Gemini provider. The generic
     canonical drain is allowed only when the review worker did not saturate its
     bounded capacity, which prevents Cloudflare from consuming unresolved vacancy
     tasks before the external reviewer can validate them.
