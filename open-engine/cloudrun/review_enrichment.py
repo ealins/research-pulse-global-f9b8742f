@@ -12,7 +12,7 @@ import httpx
 BASE_URL = os.getenv("GEOACADEMIC_BASE_URL", "https://geoacademic.app").rstrip("/")
 HOOK_SECRET = os.getenv("INGESTION_HOOK_SECRET", "").strip()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", os.getenv("Google_API_Key", "")).strip()
-GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash").strip()
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-3.8-flash").strip()
 GOOGLE_URL = os.getenv("GOOGLE_URL", "https://generativelanguage.googleapis.com/v1beta/models").strip()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "").strip()
