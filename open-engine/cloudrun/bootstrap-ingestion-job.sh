@@ -84,6 +84,7 @@ upsert_secret geoacademic-s3-bucket "$S3_BUCKET"
 if [ -n "${OPENROUTER_API_KEY:-}" ]; then upsert_secret geoacademic-openrouter-api-key "$OPENROUTER_API_KEY"; fi
 if [ -n "${NVIDIA_API_KEY:-}" ]; then upsert_secret geoacademic-nvidia-api-key "$NVIDIA_API_KEY"; fi
 if [ -n "${INGESTION_HOOK_SECRET:-}" ]; then upsert_secret geoacademic-ingestion-hook-secret "$INGESTION_HOOK_SECRET"; fi
+if [ -n "${GITHUB_TOKEN:-}" ]; then upsert_secret geoacademic-github-token "$GITHUB_TOKEN"; fi
 
 log "Building ingestion image with Cloud Build"
 gcloud builds submit "$REPO_ROOT/open-engine" \
@@ -101,6 +102,9 @@ if gcloud secrets describe geoacademic-nvidia-api-key --project "$PROJECT_ID" >/
 fi
 if gcloud secrets describe geoacademic-ingestion-hook-secret --project "$PROJECT_ID" >/dev/null 2>&1; then
   SECRET_FLAGS+=",INGESTION_HOOK_SECRET=geoacademic-ingestion-hook-secret:latest"
+fi
+if gcloud secrets describe geoacademic-github-token --project "$PROJECT_ID" >/dev/null 2>&1; then
+  SECRET_FLAGS+=",GITHUB_TOKEN=geoacademic-github-token:latest"
 fi
 
 log "Deploying Cloud Run Job"
