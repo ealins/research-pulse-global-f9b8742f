@@ -18,7 +18,7 @@ ALLOWED_ENTITY_TYPES = {
 }
 
 OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
-NVIDIA_URL = os.getenv("NVIDIA_URL", "https://integrate.api.nvidia.com/v1/chat/completions")
+GOOGLE_URL = os.getenv("GOOGLE_URL", "https://generativelanguage.googleapis.com/v1beta/models")
 
 
 def _parse_json(content: str):
@@ -69,6 +69,28 @@ Rules:
 PAGE TEXT:
 {text}
 """
+    if provider == "google":
+        response = await client.post(
+            f"{url.rstrip('/')}/{model}:generateContent",
+            params={"key": api_key},
+            headers={"Content-Type": "application/json"},
+            json={
+                "system_instruction": {"parts": [{"text": system}]},
+                "contents": [{"role": "user", "parts": [{"text": user}]}],
+                "generationConfig": {
+                    "temperature": 0,
+                    "maxOutputTokens": 1800,
+                    "responseMimeType": "application/json",
+                },
+            },
+            timeout=45,
+        )
+        response.raise_for_status()
+        payload = response.json()
+        parts = (((payload.get("candidates") or [{}])[0].get("content") or {}).get("parts")) or []
+        content = "".join(str(part.get("text") or "") for part in parts if isinstance(part, dict))
+        return _parse_json(content)
+
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -152,10 +174,10 @@ async def extract_with_ai(html: str, source_url: str):
     if openrouter_key and openrouter_model:
         providers.append(("openrouter", OPENROUTER_URL, openrouter_key, openrouter_model))
 
-    nvidia_key = os.getenv("NVIDIA_API_KEY", "").strip()
-    nvidia_model = os.getenv("NVIDIA_MODEL", "").strip()
-    if nvidia_key and nvidia_model:
-        providers.append(("nvidia", NVIDIA_URL, nvidia_key, nvidia_model))
+    google_key = os.getenv("GOOGLE_API_KEY", os.getenv("Google_API_Key", "")).strip()
+    google_model = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash").strip()
+    if google_key and google_model:
+        providers.append(("google", GOOGLE_URL, google_key, google_model))
 
     if not providers:
         return []
