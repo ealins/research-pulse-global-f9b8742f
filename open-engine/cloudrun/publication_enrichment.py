@@ -26,6 +26,34 @@ GEO_RE = re.compile(
 )
 
 
+
+TOPIC_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"remote sensing|earth observation|satellite|hyperspectral|radar|sar", re.I), "Environmental Remote Sensing"),
+    (re.compile(r"foundation model", re.I), "Foundation Models for Earth Observation"),
+    (re.compile(r"multimodal.*earth observation|earth observation.*multimodal", re.I), "Multimodal Earth Observation"),
+    (re.compile(r"geomatics|geodes\w*|geoinformat\w*|photogrammetr", re.I), "Geomatics"),
+    (re.compile(r"\bgis\b|3d gis|citygml|lidar|point cloud|3d reconstruction|laser scanning", re.I), "3D GIS"),
+    (re.compile(r"uav|drone|aerial mapping|photogrammetr", re.I), "UAV Mapping"),
+    (re.compile(r"digital twin|geobim|citygml|urban", re.I), "Urban Digital Twins"),
+)
+
+def _topic_names(value: str) -> list[str]:
+    return [name for pattern, name in TOPIC_PATTERNS if pattern.search(value)]
+
+async def _link_topics(conn: asyncpg.Connection, publication_id: str, value: str) -> None:
+    names = _topic_names(value)
+    if not names:
+        return
+    rows = await conn.fetch(
+        "select id from public.research_topics where active=true and name=any($1::text[])",
+        names,
+    )
+    for row in rows:
+        await conn.execute(
+            "insert into public.publication_topics(publication_id,topic_id) values($1,$2) on conflict do nothing",
+            publication_id, row["id"],
+        )
+
 def _normalized_title(value: str) -> str:
     text = unicodedata.normalize("NFKD", value.lower())
     text = "".join(ch for ch in text if not unicodedata.combining(ch))
@@ -274,6 +302,8 @@ async def _upsert_publication(
             f"Imported from OpenAIRE Graph for {institution_name}",
             {"external_id": external_id, "doi": doi, "provider": "openaire", "query": query},
         )
+
+    await _link_topics(conn, publication_id, evidence_text)
 
     await conn.execute(
         """
