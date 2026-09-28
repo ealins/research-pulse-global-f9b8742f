@@ -51,6 +51,10 @@ foreach ($item in $providerSecrets) {
             $value | & gcloud secrets versions add $secretName --data-file=- --project=$Project | Out-Null
         } else {
             $value | & gcloud secrets create $secretName --replication-policy=automatic --data-file=- --project=$Project | Out-Null
+            & gcloud secrets add-iam-policy-binding $secretName `
+                --member="serviceAccount:geoacademic-run@$Project.iam.gserviceaccount.com" `
+                --role="roles/secretmanager.secretAccessor" `
+                --project=$Project | Out-Null
         }
     }
 }
