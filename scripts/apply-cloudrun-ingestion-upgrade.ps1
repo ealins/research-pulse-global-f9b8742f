@@ -8,6 +8,16 @@ $Scheduler = "geoacademic-ingestion-2h"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Image = "$Region-docker.pkg.dev/$Project/geoacademic/geoacademic-ingestion:latest"
 
+function Test-GcloudSecret {
+    param([Parameter(Mandatory=$true)][string]$SecretName)
+    $oldErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & gcloud secrets describe $SecretName --project=$Project --format="value(name)" 2>$null | Out-Null
+    $result = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = $oldErrorActionPreference
+    return $result
+}
+
 function Invoke-Gcloud {
     param([Parameter(Mandatory=$true)][string[]]$Args)
     & gcloud @Args
@@ -46,8 +56,12 @@ foreach ($item in $providerSecrets) {
     $secretName = $item[1]
     $value = [Environment]::GetEnvironmentVariable($envName)
     if ($value) {
-        $exists = (& gcloud secrets describe $secretName --project=$Project 2>$null)
-        if ($LASTEXITCODE -eq 0) {
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & gcloud secrets describe $secretName --project=$Project --format="value(name)" 2>$null | Out-Null
+        $secretExists = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $oldErrorActionPreference
+        if ($secretExists) {
             $value | & gcloud secrets versions add $secretName --data-file=- --project=$Project | Out-Null
         } else {
             $value | & gcloud secrets create $secretName --replication-policy=automatic --data-file=- --project=$Project | Out-Null
@@ -93,8 +107,12 @@ try {
         @("NVIDIA_API_KEY", "geoacademic-nvidia-api-key"),
         @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key")
     )) {
-        $exists = (& gcloud secrets describe $secret[1] --project=$Project 2>$null)
-        if ($LASTEXITCODE -eq 0) {
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        & gcloud secrets describe $secret[1] --project=$Project --format="value(name)" 2>$null | Out-Null
+        $secretExists = ($LASTEXITCODE -eq 0)
+        $ErrorActionPreference = $oldErrorActionPreference
+        if ($secretExists) {
             $optionalSecrets += "$($secret[0])=$($secret[1]):latest"
         }
     }
