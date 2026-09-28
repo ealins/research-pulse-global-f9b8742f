@@ -30,6 +30,7 @@ jobs:
 
       - name: Compile Python entrypoints
         run: |
+          python -m compileall -q open-engine/cloudrun open-engine/backend open-engine/worker
           python -m py_compile \
             open-engine/backend/main.py \
             open-engine/backend/internal.py \
@@ -79,7 +80,11 @@ jobs:
           bash -n open-engine/deploy.sh
           bash -n open-engine/oci/bootstrap-cloud-shell.sh
           bash -n open-engine/cloudrun/bootstrap-cloud-shell.sh
+          bash -n open-engine/cloudrun/bootstrap-ingestion-job.sh
           bash -n open-engine/cloudrun/redeploy-api.sh
+
+      - name: Build ingestion container
+        run: docker build -f open-engine/Dockerfile.ingestion open-engine
 
       - name: Validate Oracle compose file
         run: |
