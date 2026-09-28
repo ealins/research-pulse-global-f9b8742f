@@ -47,16 +47,16 @@ postgresql://postgres:postgres@db.rqalvagtdcqurubrsdnc.supabase.co:5432/postgres
 
 ---
 
-## Secret 3: NVIDIA_API_KEY
+## Secret 3: Google_API_Key
 
 **Name (type this):**
 ```
-NVIDIA_API_KEY
+Google_API_Key
 ```
 
 **Value (copy this entire line):**
 ```
-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
+[REVOKED_SECRET_NOT_STORED_IN_REPO]
 ```
 
 ---
@@ -90,7 +90,7 @@ You should see data counts increasing!
 
 - [ ] Add INGESTION_HOOK_SECRET to GitHub
 - [ ] Add GEOACADEMIC_DATABASE_URL to GitHub
-- [ ] Add NVIDIA_API_KEY to GitHub
+- [ ] Add Google_API_Key to GitHub
 - [ ] Run "GeoAcademic seed sources" workflow
 - [ ] Run "GeoAcademic ingestion burst" workflow
 - [ ] Verify with: `node scripts/ingestion-status.mjs status`
