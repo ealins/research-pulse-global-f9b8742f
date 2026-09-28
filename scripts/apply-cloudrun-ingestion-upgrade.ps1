@@ -51,11 +51,14 @@ foreach ($item in $providerSecrets) {
             $value | & gcloud secrets versions add $secretName --data-file=- --project=$Project | Out-Null
         } else {
             $value | & gcloud secrets create $secretName --replication-policy=automatic --data-file=- --project=$Project | Out-Null
-            & gcloud secrets add-iam-policy-binding $secretName `
-                --member="serviceAccount:geoacademic-run@$Project.iam.gserviceaccount.com" `
-                --role="roles/secretmanager.secretAccessor" `
-                --project=$Project | Out-Null
         }
+
+        # Ensure the Cloud Run execution identity can read the secret whether it
+        # already existed or was created above. This is idempotent.
+        & gcloud secrets add-iam-policy-binding $secretName `
+            --member="serviceAccount:geoacademic-run@$Project.iam.gserviceaccount.com" `
+            --role="roles/secretmanager.secretAccessor" `
+            --project=$Project | Out-Null
     }
 }
 
@@ -133,6 +136,9 @@ try {
     }
     if ($logs -notmatch "QA_DATABASE_OK") {
         throw "Cloud Run acceptance check failed: QA_DATABASE_OK was not emitted."
+    }
+    if ($logs -notmatch "GITHUB_DISCOVERY_VERSION=2026-09-28-v2") {
+        throw "Cloud Run acceptance check failed: expected GitHub discovery version marker was not emitted."
     }
     if ($logs -match "PUBLIC_REVIEW skipped=missing_model_provider_credentials") {
         Write-Warning "Semantic review provider credentials are not configured; ingestion is healthy but AI review remains disabled."
