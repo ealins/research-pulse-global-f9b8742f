@@ -95,7 +95,7 @@ jobs:
           WORKER_CONCURRENCY: "8"
           FETCH_TIMEOUT_SECONDS: "25"
           AI_FALLBACK_ENABLED: "true"
-          OMNIROUTE_URL: https://makes-seconds-gilbert-suited.trycloudflare.com/v1
+          OMNIROUTE_URL: ${{ secrets.OMNIROUTE_URL }}
           OMNIROUTE_MODEL: auto
           OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
