@@ -155,7 +155,9 @@ async def main() -> None:
             conn,
             "SELECT count(*) FROM opportunities o "
             "WHERE coalesce(o.is_demo,false)=false "
-            "AND NOT EXISTS (SELECT 1 FROM opportunity_topics t WHERE t.opportunity_id=o.id)",
+            "AND NOT EXISTS (SELECT 1 FROM opportunity_topics t WHERE t.opportunity_id=o.id) "
+            "AND (coalesce(o.title,'') || ' ' || coalesce(o.description,'')) ~* "
+            "'(remote sensing|earth observation|satellite|hyperspectral|radar|sar|lidar|climate monitoring|foundation model|multimodal.*earth observation|earth observation.*multimodal|geomatics|geodes(y|ic)|geoinformatics|topograph|\\mgis\\M|3d|citygml|point cloud|3d reconstruction|uav|drone|aerial mapping|photogrammetr|digital twin|geobim|urban mapping)'",
         )
         enrich["publications_total"] = await scalar(
             conn, "SELECT count(*) FROM publications WHERE coalesce(is_demo,false)=false"
@@ -169,7 +171,9 @@ async def main() -> None:
             conn,
             "SELECT count(*) FROM publications p "
             "WHERE coalesce(p.is_demo,false)=false "
-            "AND NOT EXISTS (SELECT 1 FROM publication_topics t WHERE t.publication_id=p.id)",
+            "AND NOT EXISTS (SELECT 1 FROM publication_topics t WHERE t.publication_id=p.id) "
+            "AND (coalesce(p.title,'') || ' ' || coalesce(p.abstract,'')) ~* "
+            "'(remote sensing|earth observation|satellite|hyperspectral|radar|sar|lidar|climate monitoring|foundation model|multimodal.*earth observation|earth observation.*multimodal|geomatics|geodes(y|ic)|geoinformatics|topograph|\\mgis\\M|3d|citygml|point cloud|3d reconstruction|uav|drone|aerial mapping|photogrammetr|digital twin|geobim|urban mapping)'",
         )
         enrich["events_without_dates"] = await scalar(
             conn,
