@@ -92,7 +92,7 @@ try {
         "--image=$Image",
         "--region=$Region",
         "--project=$Project",
-        "--update-env-vars","WORKER_CONCURRENCY=8,GOOGLE_MODEL=gemini-2.5-flash,GEOACADEMIC_BASE_URL=https://geoacademic.app",
+        "--update-env-vars","WORKER_CONCURRENCY=8,GOOGLE_MODEL=gemini-3.8-flash,GEOACADEMIC_BASE_URL=https://geoacademic.app",
         "--remove-env-vars","NVIDIA_MODEL",
         "--args=all,--max-fetch=200,--max-process=200,--max-ats-sources=10",
         "--cpu=2",
