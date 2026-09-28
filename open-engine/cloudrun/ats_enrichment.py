@@ -17,13 +17,13 @@ GEO_TERMS = re.compile(
 )
 
 TOPIC_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"remote sensing|earth observation|satellite|hyperspectral", re.I), "Environmental Remote Sensing"),
+    (re.compile(r"remote sensing|earth observation|satellite|hyperspectral|radar|sar|lidar|climate monitoring", re.I), "Environmental Remote Sensing"),
     (re.compile(r"foundation model", re.I), "Foundation Models for Earth Observation"),
     (re.compile(r"multimodal.*earth observation|earth observation.*multimodal", re.I), "Multimodal Earth Observation"),
-    (re.compile(r"geomatics|geodes\w*|geoinformat\w*", re.I), "Geomatics"),
-    (re.compile(r"\bgis\b|3d gis|citygml", re.I), "3D GIS"),
+    (re.compile(r"geomatics|geodes\w*|geoinformat\w*|topograph\w*", re.I), "Geomatics"),
+    (re.compile(r"\bgis\b|3d|citygml|lidar|point cloud|3d reconstruction", re.I), "3D GIS"),
     (re.compile(r"uav|drone|aerial mapping", re.I), "UAV Mapping"),
-    (re.compile(r"digital twin|geobim|citygml", re.I), "Urban Digital Twins"),
+    (re.compile(r"digital twin|geobim|citygml|urban mapping", re.I), "Urban Digital Twins"),
 )
 
 
