@@ -82,7 +82,7 @@ upsert_secret geoacademic-s3-secret-key "$S3_SECRET_KEY"
 upsert_secret geoacademic-s3-bucket "$S3_BUCKET"
 
 if [ -n "${OPENROUTER_API_KEY:-}" ]; then upsert_secret geoacademic-openrouter-api-key "$OPENROUTER_API_KEY"; fi
-if [ -n "${NVIDIA_API_KEY:-}" ]; then upsert_secret geoacademic-nvidia-api-key "$NVIDIA_API_KEY"; fi
+if [ -n "${GOOGLE_API_KEY:-}" ]; then upsert_secret geoacademic-google-api-key "$GOOGLE_API_KEY"; fi
 if [ -n "${INGESTION_HOOK_SECRET:-}" ]; then upsert_secret geoacademic-ingestion-hook-secret "$INGESTION_HOOK_SECRET"; fi
 if [ -n "${GITHUB_TOKEN:-}" ]; then upsert_secret geoacademic-github-token "$GITHUB_TOKEN"; fi
 
@@ -97,8 +97,8 @@ SECRET_FLAGS="DATABASE_URL=geoacademic-database-url:latest,S3_ENDPOINT=geoacadem
 if gcloud secrets describe geoacademic-openrouter-api-key --project "$PROJECT_ID" >/dev/null 2>&1; then
   SECRET_FLAGS+=",OPENROUTER_API_KEY=geoacademic-openrouter-api-key:latest"
 fi
-if gcloud secrets describe geoacademic-nvidia-api-key --project "$PROJECT_ID" >/dev/null 2>&1; then
-  SECRET_FLAGS+=",NVIDIA_API_KEY=geoacademic-nvidia-api-key:latest"
+if gcloud secrets describe geoacademic-google-api-key --project "$PROJECT_ID" >/dev/null 2>&1; then
+  SECRET_FLAGS+=",GOOGLE_API_KEY=geoacademic-google-api-key:latest"
 fi
 if gcloud secrets describe geoacademic-ingestion-hook-secret --project "$PROJECT_ID" >/dev/null 2>&1; then
   SECRET_FLAGS+=",INGESTION_HOOK_SECRET=geoacademic-ingestion-hook-secret:latest"
@@ -114,7 +114,7 @@ gcloud run jobs deploy "$JOB" \
   --project "$PROJECT_ID" \
   --service-account "$RUNTIME_SA" \
   --set-secrets "$SECRET_FLAGS" \
-  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=8,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},GEOACADEMIC_BASE_URL=${GEOACADEMIC_BASE_URL:-https://geoacademic.app},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}" \
+  --set-env-vars "DB_SCHEMA=$DB_SCHEMA,WORKER_CONCURRENCY=8,FETCH_TIMEOUT_SECONDS=25,AI_FALLBACK_ENABLED=true,S3_REGION=${S3_REGION:-eu-west-1},GEOACADEMIC_BASE_URL=${GEOACADEMIC_BASE_URL:-https://geoacademic.app},OPENROUTER_MODEL=${OPENROUTER_MODEL:-},GOOGLE_MODEL=${GOOGLE_MODEL:-gemini-2.5-flash}" \
   --args="all,--max-fetch=$MAX_FETCH,--max-process=$MAX_PROCESS,--max-ats-sources=$MAX_ATS_SOURCES" \
   --cpu=2 \
   --memory=2Gi \
