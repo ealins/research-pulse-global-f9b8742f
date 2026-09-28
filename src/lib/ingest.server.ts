@@ -3046,7 +3046,7 @@ export async function normalizeSource(
     application_deadline: deadline,
     is_demo: false,
     extracted_by: usedModel
-      ? "NVIDIA_NEMOTRON"
+      ? "AI_SEMANTIC_REVIEW"
       : usedStructured
         ? "STRUCTURED_METADATA"
         : "DETERMINISTIC",
