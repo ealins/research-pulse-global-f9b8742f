@@ -224,6 +224,12 @@ async def run_all(
         run_ats(max_ats_sources),
     )
 
+    # 4. Emit the database acceptance signal only after all enrichments finish.
+    # This is consumed by the production deployment verification script.
+    from qa_database import run_qa
+
+    await run_qa()
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Run bounded GeoAcademic ingestion work")
