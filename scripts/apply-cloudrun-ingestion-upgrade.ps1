@@ -7,6 +7,11 @@ $Job = "geoacademic-ingestion"
 $Scheduler = "geoacademic-ingestion-2h"
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Image = "$Region-docker.pkg.dev/$Project/geoacademic/geoacademic-ingestion:latest"
+$OmniRouteUrl = $env:OMNIROUTE_URL
+if (-not $OmniRouteUrl) {
+    $OmniRouteUrl = "https://makes-seconds-gilbert-suited.trycloudflare.com/v1"
+    Write-Warning "OMNIROUTE_URL is not set; using the currently active Quick Tunnel. Quick Tunnel URLs are ephemeral."
+}
 
 function Test-GcloudSecret {
     param([Parameter(Mandatory=$true)][string]$SecretName)
@@ -93,8 +98,8 @@ try {
         "--image=$Image",
         "--region=$Region",
         "--project=$Project",
-        "--update-env-vars","WORKER_CONCURRENCY=8,GOOGLE_MODEL=gemini-3.8-flash,OMNIROUTE_URL=https://makes-seconds-gilbert-suited.trycloudflare.com/v1,OMNIROUTE_MODEL=auto,GEOACADEMIC_BASE_URL=https://geoacademic.app",
-        "--remove-env-vars","NVIDIA_MODEL",
+        "--update-env-vars","WORKER_CONCURRENCY=8,GOOGLE_MODEL=gemini-3.8-flash,OMNIROUTE_URL=$OmniRouteUrl,OMNIROUTE_MODEL=auto,GEOACADEMIC_BASE_URL=https://geoacademic.app",
+        "--remove-env-vars","NVIDIA_MODEL,OPENROUTER_MODEL",
         "--args=all,--max-fetch=200,--max-process=200,--max-ats-sources=10",
         "--cpu=2",
         "--memory=2Gi",
