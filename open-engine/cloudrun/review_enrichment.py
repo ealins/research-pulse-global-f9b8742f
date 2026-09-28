@@ -11,6 +11,9 @@ import httpx
 
 BASE_URL = os.getenv("GEOACADEMIC_BASE_URL", "https://geoacademic.app").rstrip("/")
 HOOK_SECRET = os.getenv("INGESTION_HOOK_SECRET", "").strip()
+OMNIROUTE_URL = os.getenv("OMNIROUTE_URL", "").strip().rstrip("/")
+OMNIROUTE_API_KEY = os.getenv("OMNIROUTE_API_KEY", "").strip()
+OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "auto").strip()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", os.getenv("Google_API_Key", "")).strip()
 GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-3.8-flash").strip()
 GOOGLE_URL = os.getenv("GOOGLE_URL", "https://generativelanguage.googleapis.com/v1beta/models").strip()
@@ -40,6 +43,8 @@ def _compact_error(response: httpx.Response) -> str:
 
 def _providers() -> list[tuple[str, str, str, str]]:
     providers: list[tuple[str, str, str, str]] = []
+    if OMNIROUTE_URL and OMNIROUTE_MODEL:
+        providers.append(("omniroute", OMNIROUTE_URL + "/chat/completions", OMNIROUTE_API_KEY, OMNIROUTE_MODEL))
     if GOOGLE_API_KEY and GOOGLE_MODEL:
         providers.append(("google", GOOGLE_URL, GOOGLE_API_KEY, GOOGLE_MODEL))
     if OPENROUTER_API_KEY and OPENROUTER_MODEL:
@@ -144,10 +149,11 @@ async def _extract(
                 content = "".join(str(part.get("text") or "") for part in parts if isinstance(part, dict))
             else:
                 headers = {
-                    "authorization": f"Bearer {api_key}",
                     "content-type": "application/json",
                     "accept": "application/json",
                 }
+                if api_key:
+                    headers["authorization"] = f"Bearer {api_key}"
                 if provider == "openrouter":
                     headers["HTTP-Referer"] = "https://geoacademic.app"
                     headers["X-Title"] = "GeoAcademic"
@@ -272,6 +278,7 @@ async def run_review_enrichment(
     if not providers:
         print(
             "PUBLIC_REVIEW skipped=missing_model_provider_credentials "
+            f"omniroute_configured={bool(OMNIROUTE_URL and OMNIROUTE_MODEL)} "
             f"google_configured={bool(GOOGLE_API_KEY)} openrouter_configured={bool(OPENROUTER_API_KEY and OPENROUTER_MODEL)}"
         )
         return {
