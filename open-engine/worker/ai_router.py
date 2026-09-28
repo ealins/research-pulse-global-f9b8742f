@@ -17,6 +17,9 @@ ALLOWED_ENTITY_TYPES = {
     "event",
 }
 
+OMNIROUTE_URL = os.getenv("OMNIROUTE_URL", "").strip().rstrip("/")
+OMNIROUTE_API_KEY = os.getenv("OMNIROUTE_API_KEY", "").strip()
+OMNIROUTE_MODEL = os.getenv("OMNIROUTE_MODEL", "auto").strip()
 OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions")
 GOOGLE_URL = os.getenv("GOOGLE_URL", "https://generativelanguage.googleapis.com/v1beta/models")
 
@@ -91,10 +94,9 @@ PAGE TEXT:
         content = "".join(str(part.get("text") or "") for part in parts if isinstance(part, dict))
         return _parse_json(content)
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json",
-    }
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
     if provider == "openrouter":
         headers["HTTP-Referer"] = "https://geoacademic.app"
         headers["X-Title"] = "GeoAcademic"
@@ -169,6 +171,8 @@ async def extract_with_ai(html: str, source_url: str):
         return []
 
     providers = []
+    if OMNIROUTE_URL and OMNIROUTE_MODEL:
+        providers.append(("omniroute", OMNIROUTE_URL + "/chat/completions", OMNIROUTE_API_KEY, OMNIROUTE_MODEL))
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     openrouter_model = os.getenv("OPENROUTER_MODEL", "").strip()
     if openrouter_key and openrouter_model:
