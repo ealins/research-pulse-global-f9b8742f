@@ -226,9 +226,9 @@ async def run_all(
 
     # 4. Emit the database acceptance signal only after all enrichments finish.
     # This is consumed by the production deployment verification script.
-    from qa_database import run_qa
+    from qa_database import main as qa_main
 
-    await run_qa()
+    await qa_main()
 
 
 def parse_args() -> argparse.Namespace:
