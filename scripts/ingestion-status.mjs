@@ -85,8 +85,8 @@ async function showSetup() {
   console.log(`${c.blu}Secret 2: GEOACADEMIC_DATABASE_URL${c.r}`);
   console.log("Get from: Supabase Dashboard → Settings → Database → Connection String\n");
 
-  console.log(`${c.blu}Secret 3: NVIDIA_API_KEY${c.r}`);
-  console.log("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\n");
+  console.log(`${c.blu}Secret 3: Google_API_Key${c.r}`);
+  console.log("[REVOKED_SECRET_NOT_STORED_IN_REPO]\n");
 
   console.log(`${c.b}Step 2: Seed Sources${c.r}`);
   console.log("https://github.com/ealins/research-pulse-global-f9b8742f/actions");
