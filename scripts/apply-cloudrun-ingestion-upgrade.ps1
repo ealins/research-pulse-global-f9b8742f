@@ -35,6 +35,26 @@ Write-Host "==> Exporting current Cloud Run job configuration"
 Write-Host "==> Pausing the 2-hour scheduler during deployment"
 Invoke-Gcloud @("scheduler","jobs","pause",$Scheduler,"--location=$Region","--project=$Project","--quiet")
 
+Write-Host "==> Syncing optional provider secrets from local environment when present"
+$providerSecrets = @(
+    @("NVIDIA_API_KEY", "geoacademic-nvidia-api-key"),
+    @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key"),
+    @("GITHUB_TOKEN", "geoacademic-github-token")
+)
+foreach ($item in $providerSecrets) {
+    $envName = $item[0]
+    $secretName = $item[1]
+    $value = [Environment]::GetEnvironmentVariable($envName)
+    if ($value) {
+        $exists = (& gcloud secrets describe $secretName --project=$Project 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            $value | & gcloud secrets versions add $secretName --data-file=- --project=$Project | Out-Null
+        } else {
+            $value | & gcloud secrets create $secretName --replication-policy=automatic --data-file=- --project=$Project | Out-Null
+        }
+    }
+}
+
 try {
     Write-Host "==> Building the updated ingestion image"
     Invoke-Gcloud @(
