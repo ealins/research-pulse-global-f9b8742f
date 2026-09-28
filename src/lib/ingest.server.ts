@@ -2217,7 +2217,7 @@ export async function leaseExternalReviewTasks(
           run_after: new Date(Date.now() + 6 * 60 * 60_000).toISOString(),
           started_at: null,
           last_error:
-            "Waiting for NVIDIA_API_KEY on the external review worker",
+            "Waiting for Google_API_Key on the external review worker",
         })
         .eq("id", task.id)
         .eq("status", "PROCESSING")
