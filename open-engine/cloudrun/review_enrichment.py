@@ -11,9 +11,9 @@ import httpx
 
 BASE_URL = os.getenv("GEOACADEMIC_BASE_URL", "https://geoacademic.app").rstrip("/")
 HOOK_SECRET = os.getenv("INGESTION_HOOK_SECRET", "").strip()
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY", "").strip()
-NVIDIA_MODEL = os.getenv("NVIDIA_MODEL", "nvidia/nemotron-3.5-lightning-30b-a3b").strip()
-NVIDIA_URL = os.getenv("NVIDIA_URL", "https://integrate.api.nvidia.com/v1/chat/completions").strip()
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", os.getenv("Google_API_Key", "")).strip()
+GOOGLE_MODEL = os.getenv("GOOGLE_MODEL", "gemini-2.5-flash").strip()
+GOOGLE_URL = os.getenv("GOOGLE_URL", "https://generativelanguage.googleapis.com/v1beta/models").strip()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "").strip()
 OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "").strip()
 OPENROUTER_URL = os.getenv("OPENROUTER_URL", "https://openrouter.ai/api/v1/chat/completions").strip()
@@ -40,8 +40,8 @@ def _compact_error(response: httpx.Response) -> str:
 
 def _providers() -> list[tuple[str, str, str, str]]:
     providers: list[tuple[str, str, str, str]] = []
-    if NVIDIA_API_KEY and NVIDIA_MODEL:
-        providers.append(("nvidia", NVIDIA_URL, NVIDIA_API_KEY, NVIDIA_MODEL))
+    if GOOGLE_API_KEY and GOOGLE_MODEL:
+        providers.append(("google", GOOGLE_URL, GOOGLE_API_KEY, GOOGLE_MODEL))
     if OPENROUTER_API_KEY and OPENROUTER_MODEL:
         providers.append(("openrouter", OPENROUTER_URL, OPENROUTER_API_KEY, OPENROUTER_MODEL))
     return providers
@@ -119,42 +119,61 @@ async def _extract(
 
     errors: list[str] = []
     for provider, url, api_key, model in providers:
-        headers = {
-            "authorization": f"Bearer {api_key}",
-            "content-type": "application/json",
-            "accept": "application/json",
-        }
-        if provider == "openrouter":
-            headers["HTTP-Referer"] = "https://geoacademic.app"
-            headers["X-Title"] = "GeoAcademic"
-
-        request_body: dict[str, Any] = {
-            "model": model,
-            "temperature": 0.1,
-            "max_tokens": 1800,
-            "messages": [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": user_content},
-            ],
-        }
-        if provider == "nvidia":
-            request_body["chat_template_kwargs"] = {"enable_thinking": False}
-
         started = time.monotonic()
         try:
-            response = await client.post(
-                url,
-                headers=headers,
-                json=request_body,
-                timeout=55.0,
-            )
+            if provider == "google":
+                endpoint = f"{url.rstrip('/')}/{model}:generateContent"
+                request_body = {
+                    "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
+                    "contents": [{"role": "user", "parts": [{"text": user_content}]}],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "maxOutputTokens": 1800,
+                        "responseMimeType": "application/json",
+                    },
+                }
+                response = await client.post(
+                    endpoint,
+                    params={"key": api_key},
+                    headers={"content-type": "application/json", "accept": "application/json"},
+                    json=request_body,
+                    timeout=55.0,
+                )
+                payload = response.json()
+                parts = (((payload.get("candidates") or [{}])[0].get("content") or {}).get("parts")) or []
+                content = "".join(str(part.get("text") or "") for part in parts if isinstance(part, dict))
+            else:
+                headers = {
+                    "authorization": f"Bearer {api_key}",
+                    "content-type": "application/json",
+                    "accept": "application/json",
+                }
+                if provider == "openrouter":
+                    headers["HTTP-Referer"] = "https://geoacademic.app"
+                    headers["X-Title"] = "GeoAcademic"
+                request_body = {
+                    "model": model,
+                    "temperature": 0.1,
+                    "max_tokens": 1800,
+                    "messages": [
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": user_content},
+                    ],
+                }
+                response = await client.post(
+                    url,
+                    headers=headers,
+                    json=request_body,
+                    timeout=55.0,
+                )
+                payload = response.json()
+                content = (((payload.get("choices") or [{}])[0].get("message") or {}).get("content"))
+
             latency_ms = round((time.monotonic() - started) * 1000)
             if response.is_error:
                 raise RuntimeError(
                     f"{provider} HTTP {response.status_code}: {_compact_error(response)}"
                 )
-            payload = response.json()
-            content = (((payload.get("choices") or [{}])[0].get("message") or {}).get("content"))
             if not isinstance(content, str) or not content.strip():
                 raise ValueError(f"{provider} returned no content")
             extraction = _validate_basic(_parse_json_object(content))
@@ -253,7 +272,7 @@ async def run_review_enrichment(
     if not providers:
         print(
             "PUBLIC_REVIEW skipped=missing_model_provider_credentials "
-            "nvidia_configured=false openrouter_configured=false"
+            f"google_configured={bool(GOOGLE_API_KEY)} openrouter_configured={bool(OPENROUTER_API_KEY and OPENROUTER_MODEL)}"
         )
         return {
             "skipped": True,
