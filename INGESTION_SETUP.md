@@ -70,9 +70,9 @@ https://github.com/ealins/research-pulse-global-f9b8742f/settings/secrets/action
    ```
    Get this from: Supabase Dashboard → Project Settings → Database
 
-3. **NVIDIA_API_KEY** (Optional)
+3. **Google_API_Key** (Optional)
    ```
-   Value: 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
+   Value: [REVOKED_SECRET_NOT_STORED_IN_REPO]
    ```
 
 ### Next Steps
