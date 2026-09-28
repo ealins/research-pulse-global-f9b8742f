@@ -59,6 +59,28 @@ try {
         "--quiet"
     )
 
+    Write-Host "==> Attaching optional provider secrets if they exist"
+    $optionalSecrets = @()
+    foreach ($secret in @(
+        @("GITHUB_TOKEN", "geoacademic-github-token"),
+        @("NVIDIA_API_KEY", "geoacademic-nvidia-api-key"),
+        @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key")
+    )) {
+        $exists = (& gcloud secrets describe $secret[1] --project=$Project 2>$null)
+        if ($LASTEXITCODE -eq 0) {
+            $optionalSecrets += "$($secret[0])=$($secret[1]):latest"
+        }
+    }
+    if ($optionalSecrets.Count -gt 0) {
+        Invoke-Gcloud @(
+            "run","jobs","update",$Job,
+            "--region=$Region",
+            "--project=$Project",
+            "--update-secrets",($optionalSecrets -join ","),
+            "--quiet"
+        )
+    }
+
     Write-Host "==> Executing one production verification run"
     Invoke-Gcloud @(
         "run","jobs","execute",$Job,
@@ -66,6 +88,31 @@ try {
         "--project=$Project",
         "--wait"
     )
+
+    Write-Host "==> Inspecting verification logs and enforcing acceptance checks"
+    $execution = (& gcloud run jobs describe $Job --region=$Region --project=$Project --format="value(status.latestCreatedExecution.name)" 2>$null).Trim()
+    if (-not $execution) { throw "Could not determine the latest Cloud Run execution name." }
+    $logs = (& gcloud beta run jobs executions logs read $execution --region=$Region --project=$Project --limit=500 2>&1 | Out-String)
+    Write-Host $logs
+    $fatalPatterns = @(
+        "server expects 2 arguments for this query, 3 were passed",
+        "GitHub search failed",
+        "QA_FAILURE",
+        "Traceback (most recent call last)",
+        "InvalidPasswordError",
+        "UndefinedColumnError"
+    )
+    foreach ($pattern in $fatalPatterns) {
+        if ($logs -match [regex]::Escape($pattern)) {
+            throw "Cloud Run acceptance check failed: $pattern"
+        }
+    }
+    if ($logs -notmatch "QA_DATABASE_OK") {
+        throw "Cloud Run acceptance check failed: QA_DATABASE_OK was not emitted."
+    }
+    if ($logs -match "PUBLIC_REVIEW skipped=missing_model_provider_credentials") {
+        Write-Warning "Semantic review provider credentials are not configured; ingestion is healthy but AI review remains disabled."
+    }
 }
 finally {
     Write-Host "==> Resuming the 2-hour scheduler"
