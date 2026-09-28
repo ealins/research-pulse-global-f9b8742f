@@ -115,6 +115,52 @@ def extract_candidates(html: str, source_url: str):
     return candidates[:40]
 
 
+def normalize_candidate_identity(candidate: dict, source_url: str) -> dict | None:
+    """Adapt all extractor outputs to the canonical entity contract."""
+    if not isinstance(candidate, dict):
+        return None
+    entity_type = str(candidate.get("entity_type") or "").strip().lower()
+    title = str(candidate.get("title") or candidate.get("name") or "").strip()
+    if not entity_type or len(title) < 3:
+        return None
+    normalized = dict(candidate)
+    normalized["entity_type"] = entity_type
+    normalized["title"] = title[:500]
+    normalized["source_url"] = str(
+        candidate.get("source_url") or candidate.get("link_url") or source_url
+    ).strip()
+    external = (
+        candidate.get("external_key")
+        or candidate.get("external_id")
+        or candidate.get("url")
+        or candidate.get("link_url")
+        or candidate.get("@id")
+        or normalized["source_url"]
+    )
+    normalized["external_key"] = hashlib.sha256(
+        f"{entity_type}|{external}|{normalized['title']}".encode("utf-8")
+    ).hexdigest()
+    normalized["country"] = (
+        candidate.get("country") if isinstance(candidate.get("country"), str) else None
+    )
+    normalized["confidence"] = float(candidate.get("confidence") or 0.70)
+    normalized["verification_status"] = candidate.get(
+        "verification_status", "auto_discovered"
+    )
+    data = candidate.get("data")
+    if not isinstance(data, dict):
+        data = {
+            key: value for key, value in candidate.items()
+            if key not in {
+                "entity_type", "title", "name", "external_key", "external_id",
+                "url", "link_url", "source_url", "country", "confidence",
+                "verification_status",
+            }
+        }
+    normalized["data"] = data
+    return normalized
+
+
 async def read_object(key: str) -> str:
     response = await asyncio.to_thread(minio.get_object, S3_BUCKET, key)
     try:
@@ -188,6 +234,11 @@ async def materialize(pool, task):
             candidates = await extract_with_ai(html, snapshot["source_url"])
             extraction_path = "ai" if candidates else "none"
 
+        candidates = [
+            normalized
+            for candidate in candidates
+            if (normalized := normalize_candidate_identity(candidate, snapshot["source_url"]))
+        ]
         candidates = [normalize_candidate_dates(candidate) for candidate in candidates]
 
         async with pool.acquire() as conn:
