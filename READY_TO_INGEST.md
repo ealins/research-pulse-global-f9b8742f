@@ -46,9 +46,9 @@ Get from: Supabase Dashboard → Project Settings → Database → Connection St
 Format: postgresql://postgres:[PASSWORD]@db.supabase.co:5432/postgres?sslmode=require
 ```
 
-**Secret 3: NVIDIA_API_KEY**
+**Secret 3: Google_API_Key**
 ```
-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
+[REVOKED_SECRET_NOT_STORED_IN_REPO]
 ```
 
 ### Step 2: Trigger Seed Workflow (2 min)
