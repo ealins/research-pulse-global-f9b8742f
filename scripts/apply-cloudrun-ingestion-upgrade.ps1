@@ -48,6 +48,7 @@ Invoke-Gcloud @("scheduler","jobs","pause",$Scheduler,"--location=$Region","--pr
 Write-Host "==> Syncing optional provider secrets from local environment when present"
 $providerSecrets = @(
     @("Google_API_Key", "geoacademic-google-api-key"),
+    @("OMNIROUTE_API_KEY", "geoacademic-omniroute-api-key"),
     @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key"),
     @("GITHUB_TOKEN", "geoacademic-github-token")
 )
@@ -92,7 +93,7 @@ try {
         "--image=$Image",
         "--region=$Region",
         "--project=$Project",
-        "--update-env-vars","WORKER_CONCURRENCY=8,GOOGLE_MODEL=gemini-3.8-flash,GEOACADEMIC_BASE_URL=https://geoacademic.app",
+        "--update-env-vars","WORKER_CONCURRENCY=8,GOOGLE_MODEL=gemini-3.8-flash,OMNIROUTE_URL=https://makes-seconds-gilbert-suited.trycloudflare.com/v1,OMNIROUTE_MODEL=auto,GEOACADEMIC_BASE_URL=https://geoacademic.app",
         "--remove-env-vars","NVIDIA_MODEL",
         "--args=all,--max-fetch=200,--max-process=200,--max-ats-sources=10",
         "--cpu=2",
@@ -106,6 +107,7 @@ try {
     foreach ($secret in @(
         @("GITHUB_TOKEN", "geoacademic-github-token"),
         @("GOOGLE_API_KEY", "geoacademic-google-api-key"),
+        @("OMNIROUTE_API_KEY", "geoacademic-omniroute-api-key"),
         @("OPENROUTER_API_KEY", "geoacademic-openrouter-api-key")
     )) {
         $oldErrorActionPreference = $ErrorActionPreference
