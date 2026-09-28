@@ -36,7 +36,7 @@ required.forEach((secret, i) => {
   const icon = secret.required ? "❗" : "ℹ️";
   console.log(`${icon} ${i + 1}. ${secret.name}`);
   console.log(`   Used by: ${secret.usedBy}`);
-  console.log(`   Value: ${secret.value === "Get from Supabase Dashboard" ? secret.value : "[copy from output below]"}`);
+  console.log(`   Value: ${secret.value}`);
   console.log("");
 });
 
