@@ -14,23 +14,23 @@ console.log("📋 Required Secrets for Data Ingestion:\n");
 const required = [
   {
     name: "INGESTION_HOOK_SECRET",
-    value: "geoacademic-development-hook-secret-2026-08-31-v1-do-not-use-production",
+    value: "[stored in GitHub Actions; never print secret values]",
     required: true,
     usedBy: "geoacademic-ingestion.yml"
   },
   {
-    name: "GEOACADEMIC_DATABASE_URL", 
-    value: "Get from Supabase Dashboard",
+    name: "GEOACADEMIC_DATABASE_URL",
+    value: "[stored in GitHub Actions]",
     required: true,
     usedBy: "geoacademic-seed-sources.yml"
   },
   {
-    name: "NVIDIA_API_KEY",
-    value: "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",
+    name: "Google_API_Key",
+    value: "[stored in GitHub Actions]",
     required: false,
-    usedBy: "geoacademic-ingestion.yml (optional)"
+    usedBy: "geoacademic-ingestion.yml / Cloud Run semantic review"
   }
-];
+]
 
 required.forEach((secret, i) => {
   const icon = secret.required ? "❗" : "ℹ️";
@@ -49,16 +49,8 @@ console.log("3. Compare with the list above\n");
 console.log("═".repeat(60));
 console.log("\n📝 COPY-PASTE VALUES:\n");
 
-console.log("Secret: INGESTION_HOOK_SECRET");
-console.log("Value:");
-console.log("geoacademic-development-hook-secret-2026-08-31-v1-do-not-use-production");
+console.log("Secrets are intentionally not printed by this script.");
 console.log("");
-
-console.log("Secret: NVIDIA_API_KEY");
-console.log("Value:");
-console.log("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");
-console.log("");
-
 console.log("Secret: GEOACADEMIC_DATABASE_URL");
 console.log("Get from: https://supabase.com/dashboard/project/rqalvagtdcqurubrsdnc/settings/database");
 console.log("Look for: 'Connection string' → URI tab");
