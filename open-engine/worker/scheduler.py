@@ -57,7 +57,23 @@ async def recover_stale(pool: asyncpg.Pool) -> int:
             """,
             STALE_AFTER_MINUTES,
         )
-    return int(result.split()[-1])
+        repaired = await conn.execute(
+            """
+            UPDATE ingestion_tasks
+            SET status='RETRY',
+                attempts=0,
+                locked_at=NULL,
+                locked_by=NULL,
+                next_attempt_at=now(),
+                updated_at=now()
+            WHERE task_type='EXTRACT'
+              AND status='DEAD'
+              AND error = '''external_key'''
+            """
+        )
+    recovered = int(result.split()[-1])
+    repaired_count = int(repaired.split()[-1])
+    return recovered + repaired_count
 
 
 async def main():
