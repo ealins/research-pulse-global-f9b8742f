@@ -139,7 +139,6 @@ foreach ($secretName in @("geoacademic-database-url","geoacademic-s3-endpoint","
     Ensure-SecretAccess -ServiceAccount $runtimeSa -SecretName $secretName
 }
 Deploy-Service -Name "geoacademic-dispatcher" -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4" -Module "distributed_dispatcher"
- -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4" -Module "distributed_dispatcher"
 Deploy-Service -Name "geoacademic-fetch-worker" -Stage "FETCH" -Max 20 -Concurrency 8 -Extra "WORKER_CONCURRENCY=4" | Out-Null
 Deploy-Service -Name "geoacademic-extract-worker" -Stage "EXTRACT" -Max 12 -Concurrency 4 -Extra "" | Out-Null
 Deploy-Service -Name "geoacademic-review-worker" -Stage "REVIEW" -Max 8 -Concurrency 2 -Extra "REVIEW_LEASE_LIMIT=16,REVIEW_CONCURRENCY=8" | Out-Null
