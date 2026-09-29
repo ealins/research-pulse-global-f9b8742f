@@ -217,24 +217,21 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           return json({ action, ...(await getExternalWorkerStatus()) });
         }
         if (action === "lease-fetch") {
-          const { getExternalWorkerStatus, leaseExternalFetchTasks } =
+          // leaseExternalFetchTasks performs the backpressure check itself.
+          // Avoid a duplicate worker-status query here: on a large backlog the
+          // exact-count queries can exceed the public request budget before the
+          // actual lease transaction even starts.
+          const { leaseExternalFetchTasks } =
             await import("@/lib/ingest.server");
-          const worker = await getExternalWorkerStatus();
-          if (worker.fetch_paused) {
-            return json({
-              action,
-              leases: [],
-              count: 0,
-              paused: true,
-              reason:
-                "vacancy review backlog reached the safety high-water mark",
-              worker,
-            });
-          }
           const leases = await leaseExternalFetchTasks(
             Math.min(20, Math.max(1, body.limit ?? 8)),
           );
-          return json({ action, leases, count: leases.length, worker });
+          return json({
+            action,
+            leases,
+            count: leases.length,
+            paused: leases.length === 0,
+          });
         }
         if (action === "complete-fetch") {
           if (!body.completion || typeof body.completion !== "object") {
