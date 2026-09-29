@@ -3,7 +3,7 @@ name: GeoAcademic legacy ingestion burst (manual fallback)
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 */2 * * *"
+    - cron: "7,17,27,37,47,57 * * * *"
 
 concurrency:
   group: geoacademic-ingestion-manual
@@ -21,8 +21,8 @@ jobs:
       INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
       OMNIROUTE_URL: "https://omniroute.geoacademic.app/v1"
       OMNIROUTE_MODEL: "auto"
-      OMNIROUTE_API_KEY: \${{ secrets.OMNIROUTE_API_KEY }}
-      GOOGLE_API_KEY: \${{ secrets.GOOGLE_API_KEY }}
+      OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
+      GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
       GOOGLE_MODEL: "gemini-2.5-flash"
       REVIEW_RUNTIME_MS: "210000"
       REVIEW_LEASE_LIMIT: "4"
@@ -32,18 +32,23 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate worker
         run: node scripts/job-review-worker.mjs --self-test
-      - name: Drain vacancy review backlog
-        run: node scripts/job-review-worker.mjs
-      - name: Crawl due sources when review is healthy
+      - name: Fetch fresh source data first
         env:
-          INGESTION_FETCH_CONCURRENCY: "2"
-          INGESTION_LEASE_LIMIT: "4"
-          INGESTION_RUNTIME_MS: "45000"
+          INGESTION_FETCH_CONCURRENCY: "6"
+          INGESTION_LEASE_LIMIT: "12"
+          INGESTION_RUNTIME_MS: "150000"
           INGESTION_BURST_MODE: "true"
-          INGESTION_WORKER_TRIGGER: "github-actions-manual-fallback"
+          INGESTION_WORKER_TRIGGER: "github-actions-fresh-first"
         run: node scripts/ingestion-worker.mjs
+      - name: Drain vacancy review backlog
+        env:
+          REVIEW_RUNTIME_MS: "120000"
+          REVIEW_LEASE_LIMIT: "6"
+          REVIEW_CONCURRENCY: "2"
+        run: node scripts/job-review-worker.mjs
       - name: Review newly fetched job pages
         env:
-          REVIEW_RUNTIME_MS: "30000"
-          REVIEW_LEASE_LIMIT: "2"
+          REVIEW_RUNTIME_MS: "45000"
+          REVIEW_LEASE_LIMIT: "4"
+          REVIEW_CONCURRENCY: "2"
         run: node scripts/job-review-worker.mjs
