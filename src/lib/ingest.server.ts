@@ -1578,154 +1578,25 @@ export async function getExternalWorkerStatus(): Promise<ExternalWorkerStatus> {
 export async function leaseExternalFetchTasks(
   limit = 8,
 ): Promise<ExternalFetchLease[]> {
-  const now = new Date();
-  // Keep the hot lease path independent of exact COUNT(*) queries. The
-  // backpressure check only needs to know whether the vacancy-review queue has
-  // crossed the safety threshold, so fetch at most high-water + 1 ids.
-  const [{ data: dueReview, error: dueReviewError }, { data: processingReview, error: processingReviewError }] =
-    await Promise.all([
-      supabaseAdmin
-        .from("ingestion_tasks")
-        .select("id")
-        .eq("task_type", "NORMALIZE")
-        .in("status", ["QUEUED", "RETRY"])
-        .lte("run_after", now.toISOString())
-        .contains("payload", { classification: "VACANCY" })
-        .limit(REVIEW_BACKPRESSURE_HIGH_WATER + 1),
-      supabaseAdmin
-        .from("ingestion_tasks")
-        .select("id")
-        .eq("task_type", "NORMALIZE")
-        .eq("status", "PROCESSING")
-        .contains("payload", { classification: "VACANCY" })
-        .limit(REVIEW_BACKPRESSURE_HIGH_WATER + 1),
-    ]);
-  if (dueReviewError) throw dueReviewError;
-  if (processingReviewError) throw processingReviewError;
-  if ((dueReview?.length ?? 0) + (processingReview?.length ?? 0) > REVIEW_BACKPRESSURE_HIGH_WATER) {
-    return [];
-  }
-
-  const staleBefore = new Date(
-    now.getTime() - EXTERNAL_FETCH_LEASE_MS,
-  ).toISOString();
-
-  const { data: stale, error: staleError } = await supabaseAdmin
-    .from("ingestion_tasks")
-    .select("id, attempts, max_attempts")
-    .eq("task_type", "FETCH")
-    .eq("status", "PROCESSING")
-    .lt("started_at", staleBefore)
-    .limit(100);
-  if (staleError) throw staleError;
-  for (const task of stale ?? []) {
-    const dead = task.attempts >= task.max_attempts;
-    await supabaseAdmin
-      .from("ingestion_tasks")
-      .update({
-        status: dead ? "DEAD" : "RETRY",
-        last_error: "External fetch lease expired before completion",
-        run_after: now.toISOString(),
-        started_at: null,
-      })
-      .eq("id", task.id)
-      .eq("status", "PROCESSING")
-      .lt("started_at", staleBefore);
-  }
-
   const requested = Math.min(20, Math.max(1, Math.floor(limit)));
-  const { data: candidates, error } = await supabaseAdmin
-    .from("ingestion_tasks")
-    .select("id, source_id, attempts, max_attempts")
-    .eq("task_type", "FETCH")
-    .in("status", ["QUEUED", "RETRY"])
-    .lte("run_after", now.toISOString())
-    // Fresh-source refreshes are intentionally newer than the historical
-    // backlog. Prefer the newest due work so today's data reaches the site
-    // before old backlog rows consume the worker budget.
-    .order("run_after", { ascending: false })
-    .limit(requested * 6);
+  const { data, error } = await supabaseAdmin.rpc(
+    "lease_external_fetch_tasks",
+    { p_limit: requested },
+  );
   if (error) throw error;
 
-  const claimed: {
-    id: string;
-    source_id: string;
-    started_at: string;
-    attempts: number;
-    max_attempts: number;
-  }[] = [];
-  for (const task of candidates ?? []) {
-    if (claimed.length >= requested) break;
-    if (!task.source_id) continue;
-    const startedAt = new Date().toISOString();
-    const { data: row, error: claimError } = await supabaseAdmin
-      .from("ingestion_tasks")
-      .update({
-        status: "PROCESSING",
-        attempts: task.attempts + 1,
-        started_at: startedAt,
-        last_error: null,
-      })
-      .eq("id", task.id)
-      .in("status", ["QUEUED", "RETRY"])
-      .select("id, source_id, started_at, attempts, max_attempts")
-      .maybeSingle();
-    if (claimError) throw claimError;
-    if (row?.source_id && row.started_at) {
-      claimed.push({
-        id: row.id,
-        source_id: row.source_id,
-        started_at: row.started_at,
-        attempts: row.attempts,
-        max_attempts: row.max_attempts,
-      });
-    }
-  }
-  if (claimed.length === 0) return [];
-
-  const { data: sources, error: sourceError } = await supabaseAdmin
-    .from("sources")
-    .select(
-      "id, url, adapter_key, category, institution_id, refresh_frequency_hours, active, status",
-    )
-    .in(
-      "id",
-      claimed.map((task) => task.source_id),
-    );
-  if (sourceError) throw sourceError;
-  const byId = new Map((sources ?? []).map((source) => [source.id, source]));
-  const leases: ExternalFetchLease[] = [];
-  for (const task of claimed) {
-    const source = byId.get(task.source_id);
-    if (!source || source.active === false || source.status === "BLOCKED") {
-      await supabaseAdmin
-        .from("ingestion_tasks")
-        .update({
-          status: "COMPLETE",
-          completed_at: new Date().toISOString(),
-          last_error: source
-            ? "Source is inactive or blocked"
-            : "Source no longer exists",
-        })
-        .eq("id", task.id)
-        .eq("status", "PROCESSING")
-        .eq("started_at", task.started_at);
-      continue;
-    }
-    leases.push({
-      task_id: task.id,
-      source_id: source.id,
-      lease_started_at: task.started_at,
-      url: source.url,
-      adapter_key: source.adapter_key,
-      category: source.category,
-      institution_id: source.institution_id,
-      refresh_frequency_hours: source.refresh_frequency_hours,
-      attempt: task.attempts,
-      max_attempts: task.max_attempts,
-    });
-  }
-  return leases;
+  return (data ?? []).map((row) => ({
+    task_id: row.task_id,
+    source_id: row.source_id,
+    lease_started_at: row.lease_started_at,
+    url: row.url,
+    adapter_key: row.adapter_key,
+    category: row.category,
+    institution_id: row.institution_id,
+    refresh_frequency_hours: row.refresh_frequency_hours,
+    attempt: row.attempt,
+    max_attempts: row.max_attempts,
+  }));
 }
 
 function boundedResponseTime(value: number | undefined): number | null {
