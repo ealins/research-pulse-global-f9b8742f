@@ -1,4 +1,4 @@
-name: GeoAcademic legacy ingestion burst (manual fallback)
+name: GeoAcademic fresh ingestion
 
 on:
   workflow_dispatch:
