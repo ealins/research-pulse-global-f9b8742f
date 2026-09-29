@@ -10,9 +10,12 @@ const BASE_URL = (
   process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
 ).replace(/\/$/, "");
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
-const NVIDIA_API_KEY = process.env.NVIDIA_API_KEY || process.env.Nvidia || "";
-const NVIDIA_MODEL =
-  process.env.NVIDIA_MODEL_NANO || "nvidia/nemotron-3.5-lightning-30b-a3b";
+const OMNIROUTE_URL = (process.env.OMNIROUTE_URL || "https://omniroute.geoacademic.app/v1").replace(/\/$/, "");
+const OMNIROUTE_API_KEY = process.env.OMNIROUTE_API_KEY || "";
+const OMNIROUTE_MODEL = process.env.OMNIROUTE_MODEL || "auto";
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || process.env.Google_API_Key || "";
+const GOOGLE_MODEL = process.env.GOOGLE_MODEL || "gemini-2.5-flash";
+const GOOGLE_URL = process.env.GOOGLE_URL || "https://generativelanguage.googleapis.com/v1beta/models";
 const RUNTIME_MS = clamp(
   process.env.REVIEW_RUNTIME_MS,
   30_000,
@@ -54,7 +57,7 @@ function parseJsonObject(value) {
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
   if (start < 0 || end <= start)
-    throw new Error("Nemotron response has no JSON object");
+    throw new Error("AI response has no JSON object");
   return JSON.parse(text.slice(start, end + 1));
 }
 
@@ -107,49 +110,67 @@ async function callHook(action, payload = {}) {
   return body;
 }
 
-async function extractWithNvidia(lease) {
-  if (!NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
+async function extractWithAI(lease) {
   const pageText = String(lease.text_content || "").slice(0, 8_000);
   if (pageText.length < 120) throw new Error("Page text too short for review");
-
-  const response = await fetch(
-    "https://integrate.api.nvidia.com/v1/chat/completions",
-    {
-      method: "POST",
-      headers: {
-        authorization: `Bearer ${NVIDIA_API_KEY}`,
-        "content-type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify({
-        model: NVIDIA_MODEL,
-        temperature: 0.1,
-        max_tokens: 1800,
-        chat_template_kwargs: { enable_thinking: false },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: `SOURCE URL: ${lease.url || ""}\nPAGE TITLE: ${lease.title || ""}\nPAGE TEXT:\n${pageText}`,
-          },
-        ],
-      }),
-      signal: AbortSignal.timeout(55_000),
-    },
-  );
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`NVIDIA HTTP ${response.status}: ${text.slice(0, 500)}`);
+  const userContent =
+    \`SOURCE URL: \${lease.url || ""}\\nPAGE TITLE: \${lease.title || ""}\\nPAGE TEXT:\\n\${pageText}\`;
+  const providers = [
+    { name: "omniroute", url: \`\${OMNIROUTE_URL}/chat/completions\`, model: OMNIROUTE_MODEL, apiKey: OMNIROUTE_API_KEY },
+    { name: "google", url: \`\${GOOGLE_URL}/\${GOOGLE_MODEL}:generateContent\`, model: GOOGLE_MODEL, apiKey: GOOGLE_API_KEY },
+  ];
+  const errors = [];
+  for (const provider of providers) {
+    if (provider.name === "google" && !provider.apiKey) continue;
+    try {
+      let content = "";
+      if (provider.name === "google") {
+        const response = await fetch(provider.url, {
+          method: "POST",
+          headers: { "content-type": "application/json", accept: "application/json" },
+          body: JSON.stringify({
+            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
+            contents: [{ role: "user", parts: [{ text: userContent }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 1800, responseMimeType: "application/json" },
+          }),
+          signal: AbortSignal.timeout(55_000),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(\`Google HTTP \${response.status}: \${JSON.stringify(body).slice(0, 500)}\`);
+        content = (body?.candidates?.[0]?.content?.parts || []).map((part) => part?.text || "").join("");
+      } else {
+        const headers = { "content-type": "application/json", accept: "application/json" };
+        if (provider.apiKey) headers.authorization = \`Bearer \${provider.apiKey}\`;
+        const response = await fetch(provider.url, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            model: provider.model,
+            temperature: 0.1,
+            max_tokens: 1800,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: userContent },
+            ],
+          }),
+          signal: AbortSignal.timeout(55_000),
+        });
+        const body = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(\`OmniRoute HTTP \${response.status}: \${JSON.stringify(body).slice(0, 500)}\`);
+        content = body?.choices?.[0]?.message?.content || "";
+      }
+      if (!content) throw new Error(\`\${provider.name} returned no content\`);
+      return { extraction: validateBasicExtraction(parseJsonObject(content)), model: provider.model, provider: provider.name };
+    } catch (error) {
+      errors.push(\`\${provider.name}: \${error instanceof Error ? error.message : String(error)}\`);
+    }
   }
-  const payload = JSON.parse(text);
-  const content = payload?.choices?.[0]?.message?.content;
-  if (!content) throw new Error("NVIDIA returned no content");
-  return validateBasicExtraction(parseJsonObject(content));
+  throw new Error(errors.join("; ").slice(0, 900) || "No AI provider configured");
 }
 
 async function processLease(lease) {
   try {
-    const extraction = await extractWithNvidia(lease);
+    const modelResult = await extractWithAI(lease);
     return await callHook("complete-review", {
       completion: {
         task_id: lease.task_id,
@@ -157,8 +178,9 @@ async function processLease(lease) {
         raw_record_id: lease.raw_record_id,
         lease_started_at: lease.lease_started_at,
         success: true,
-        model: NVIDIA_MODEL,
-        extraction,
+        model: modelResult.model,
+        provider: modelResult.provider,
+        extraction: modelResult.extraction,
       },
     });
   } catch (error) {
@@ -171,7 +193,7 @@ async function processLease(lease) {
           raw_record_id: lease.raw_record_id,
           lease_started_at: lease.lease_started_at,
           success: false,
-          model: NVIDIA_MODEL,
+          model: OMNIROUTE_MODEL,
           error: message.slice(0, 900),
         },
       });
@@ -185,7 +207,6 @@ async function processLease(lease) {
 
 async function runWorker() {
   if (!HOOK_SECRET) throw new Error("Missing INGESTION_HOOK_SECRET");
-  if (!NVIDIA_API_KEY) throw new Error("Missing NVIDIA_API_KEY");
 
   const deadline = Date.now() + RUNTIME_MS;
   let processed = 0;
@@ -216,7 +237,7 @@ async function runWorker() {
   }
 
   console.log(
-    `REVIEW_WORKER processed=${processed} succeeded=${succeeded} failed=${failed} model=${NVIDIA_MODEL}`,
+    `REVIEW_WORKER processed=${processed} succeeded=${succeeded} failed=${failed} provider=omniroute model=${OMNIROUTE_MODEL}`,
   );
 }
 
@@ -230,7 +251,7 @@ function selfTest() {
     topics: ["InSAR"],
   });
   if (!accepted.is_single_real_position) throw new Error("self-test failed");
-  console.log(`REVIEW_WORKER_SELF_TEST_OK model=${NVIDIA_MODEL}`);
+  console.log(`REVIEW_WORKER_SELF_TEST_OK provider=omniroute model=${OMNIROUTE_MODEL}`);
 }
 
 if (process.argv.includes("--self-test")) {
