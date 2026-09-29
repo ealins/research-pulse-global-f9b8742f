@@ -10,9 +10,9 @@ $Root = Split-Path -Parent $PSScriptRoot
 $Image = "$Region-docker.pkg.dev/$Project/geoacademic/geoacademic-distributed:latest"
 
 function Invoke-Gcloud {
-    param([string[]]$Args)
-    & gcloud @Args
-    if ($LASTEXITCODE -ne 0) { throw "gcloud failed: gcloud $($Args -join ' ')" }
+    param([string[]]$GcloudArgs)
+    & gcloud @GcloudArgs
+    if ($LASTEXITCODE -ne 0) { throw "gcloud failed: gcloud $($GcloudArgs -join ' ')" }
 }
 
 function Ensure-Sa {
@@ -30,23 +30,23 @@ function Ensure-Sa {
 }
 
 function Runtime-Args {
-    param([string[]]$Args)
+    param([string[]]$RuntimeArgs)
     $job = (& gcloud run jobs describe $Job --region=$Region --project=$Project --format=json | ConvertFrom-Json)
     $template = $job.template.template
     $runtime = [string]$template.serviceAccount
     if (-not $runtime) { $runtime = "geoacademic-run@$Project.iam.gserviceaccount.com" }
-    $Args += "--service-account=$runtime"
+    $RuntimeArgs += "--service-account=$runtime"
     $container = @($template.containers)[0]
     $secretPairs = [System.Collections.Generic.List[string]]::new()
     foreach ($item in @($container.env)) {
         if ($item.valueSource.secretKeyRef.name) {
             $secretPairs.Add("$($item.name)=$($item.valueSource.secretKeyRef.name):latest")
         } elseif ($null -ne $item.value) {
-            $Args += "--set-env-vars=$($item.name)=$($item.value)"
+            $RuntimeArgs += "--set-env-vars=$($item.name)=$($item.value)"
         }
     }
-    if ($secretPairs.Count -gt 0) { $Args += "--set-secrets=$($secretPairs -join ",")" }
-    return @{ Args=$Args; ServiceAccount=$runtime }
+    if ($secretPairs.Count -gt 0) { $RuntimeArgs += "--set-secrets=$($secretPairs -join ",")" }
+    return @{ Args=$RuntimeArgs; ServiceAccount=$runtime }
 }
 
 function Deploy-Service {
@@ -62,13 +62,13 @@ function Deploy-Service {
         $args += "--command=uvicorn"
         $args += "--args=$Module`:app,--host=0.0.0.0,--port=8080,--app-dir=/app/cloudrun"
     }
-    $runtime = Runtime-Args -Args $args
+    $runtime = Runtime-Args -RuntimeArgs $args
     $args = $runtime.Args
     $args += "--set-env-vars=PUBSUB_PROJECT_ID=$Project"
     $args += "--set-env-vars=PUBSUB_TOPIC_PREFIX=$Prefix"
     if ($Stage) { $args += "--set-env-vars=WORKER_STAGE=$Stage" }
     if ($Extra) { $args += "--set-env-vars=$Extra" }
-    Invoke-Gcloud $args
+    Invoke-Gcloud -GcloudArgs $args
     return $runtime.ServiceAccount
 }
 
