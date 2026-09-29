@@ -37,13 +37,15 @@ function Runtime-Args {
     if (-not $runtime) { $runtime = "geoacademic-run@$Project.iam.gserviceaccount.com" }
     $Args += "--service-account=$runtime"
     $container = @($template.containers)[0]
+    $secretPairs = [System.Collections.Generic.List[string]]::new()
     foreach ($item in @($container.env)) {
         if ($item.valueSource.secretKeyRef.name) {
-            $Args += "--set-secrets=$($item.name)=$($item.valueSource.secretKeyRef.name):latest"
+            $secretPairs.Add("$($item.name)=$($item.valueSource.secretKeyRef.name):latest")
         } elseif ($null -ne $item.value) {
             $Args += "--set-env-vars=$($item.name)=$($item.value)"
         }
     }
+    if ($secretPairs.Count -gt 0) { $Args += "--set-secrets=$($secretPairs -join ",")" }
     return @{ Args=$Args; ServiceAccount=$runtime }
 }
 
@@ -69,7 +71,8 @@ function Deploy-Service {
 Write-Host "==> Building distributed image"
 Invoke-Gcloud @(
     "builds","submit","$Root/open-engine",
-    "--tag=$Image","--project=$Project","--quiet"
+    "--config=$Root/open-engine/cloudrun/cloudbuild-distributed.yaml",
+    "--substitutions=_IMAGE=$Image","--project=$Project","--quiet"
 )
 
 $runtimeSa = Deploy-Service -Name "geoacademic-dispatcher" -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4"
