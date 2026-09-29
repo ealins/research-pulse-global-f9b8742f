@@ -2,6 +2,8 @@ name: GeoAcademic legacy ingestion burst (manual fallback)
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "17 */2 * * *"
 
 
 concurrency:
