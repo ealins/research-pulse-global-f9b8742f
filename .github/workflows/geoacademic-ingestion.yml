@@ -19,8 +19,11 @@ jobs:
     env:
       GEOACADEMIC_BASE_URL: https://geoacademic.app
       INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
-      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
-      NVIDIA_MODEL_NANO: nvidia/nemotron-3.5-lightning-30b-a3b
+      OMNIROUTE_URL: "https://omniroute.geoacademic.app/v1"
+      OMNIROUTE_MODEL: "auto"
+      OMNIROUTE_API_KEY: \${{ secrets.OMNIROUTE_API_KEY }}
+      GOOGLE_API_KEY: \${{ secrets.GOOGLE_API_KEY }}
+      GOOGLE_MODEL: "gemini-2.5-flash"
       REVIEW_RUNTIME_MS: "210000"
       REVIEW_LEASE_LIMIT: "4"
       REVIEW_CONCURRENCY: "2"
