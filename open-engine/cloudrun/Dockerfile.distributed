@@ -1,0 +1,23 @@
+FROM python:3.12-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PORT=8080
+
+WORKDIR /app
+
+COPY worker/requirements.txt /app/worker/requirements.txt
+COPY cloudrun/requirements-distributed.txt /app/cloudrun/requirements-distributed.txt
+RUN pip install --no-cache-dir -r /app/worker/requirements.txt -r /app/cloudrun/requirements-distributed.txt
+
+COPY worker /app/worker
+COPY cloudrun /app/cloudrun
+
+RUN python -m py_compile \
+      /app/cloudrun/distributed_service.py \
+      /app/cloudrun/distributed_dispatcher.py \
+      /app/cloudrun/source_adapters.py \
+      /app/worker/worker.py \
+      /app/worker/processor.py
+
+ENTRYPOINT ["uvicorn","distributed_service:app","--host","0.0.0.0","--port","8080","--app-dir","/app/cloudrun"]
