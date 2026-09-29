@@ -1,4 +1,5 @@
 $ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
 
 $Project = "geoacademic-506304"
 $Region = "europe-west3"
@@ -8,6 +9,25 @@ $Scheduler = "geoacademic-dispatcher-5m"
 $Prefix = "geoacademic"
 $Root = Split-Path -Parent $PSScriptRoot
 $Image = "$Region-docker.pkg.dev/$Project/geoacademic/geoacademic-distributed:latest"
+$OpenEngine = Join-Path $Root "open-engine"
+$BuildConfig = Join-Path $OpenEngine "cloudrun/cloudbuild-distributed.yaml"
+$Dockerfile = Join-Path $OpenEngine "cloudrun/Dockerfile.distributed"
+
+function Assert-Prerequisites {
+    if (-not (Get-Command gcloud -ErrorAction SilentlyContinue)) {
+        throw "gcloud CLI was not found on PATH. Install Google Cloud CLI and restart PowerShell."
+    }
+    foreach ($path in @($OpenEngine, $BuildConfig, $Dockerfile)) {
+        if (-not (Test-Path -LiteralPath $path)) {
+            throw "Required deployment path is missing: $path"
+        }
+    }
+    $activeProject = (& gcloud config get-value project 2>$null).Trim()
+    if ($activeProject -and $activeProject -ne $Project) {
+        Write-Warning "gcloud active project is '$activeProject'; deployment will explicitly use '$Project'."
+    }
+}
+
 
 function Invoke-Gcloud {
     param([string[]]$GcloudArgs)
@@ -31,7 +51,11 @@ function Ensure-Sa {
 
 function Runtime-Args {
     param([string[]]$RuntimeArgs)
-    $job = (& gcloud run jobs describe $Job --region=$Region --project=$Project --format=json | ConvertFrom-Json)
+    $jobJson = (& gcloud run jobs describe $Job --region=$Region --project=$Project --format=json 2>$null)
+    if ($LASTEXITCODE -ne 0 -or -not $jobJson) {
+        throw "Required legacy Cloud Run Job '$Job' was not found in project '$Project' / region '$Region'. It is used as the source of the runtime service account and Secret Manager environment bindings."
+    }
+    $job = ($jobJson -join [Environment]::NewLine) | ConvertFrom-Json
     $template = $job.template.template
     $runtime = [string]$template.serviceAccount
     if (-not $runtime) { $runtime = "geoacademic-run@$Project.iam.gserviceaccount.com" }
@@ -72,10 +96,12 @@ function Deploy-Service {
     return $runtime.ServiceAccount
 }
 
+Assert-Prerequisites
+
 Write-Host "==> Building distributed image"
 Invoke-Gcloud @(
-    "builds","submit","$Root/open-engine",
-    "--config=$Root/open-engine/cloudrun/cloudbuild-distributed.yaml",
+    "builds","submit",$OpenEngine,
+    "--config=$BuildConfig",
     "--substitutions=_IMAGE=$Image","--project=$Project","--quiet"
 )
 
