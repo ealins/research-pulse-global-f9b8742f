@@ -113,11 +113,13 @@ async function callHook(action, payload = {}) {
 async function extractWithAI(lease) {
   const pageText = String(lease.text_content || "").slice(0, 8_000);
   if (pageText.length < 120) throw new Error("Page text too short for review");
-  const userContent =
-    \`SOURCE URL: \${lease.url || ""}\\nPAGE TITLE: \${lease.title || ""}\\nPAGE TEXT:\\n\${pageText}\`;
+  const userContent = `SOURCE URL: ${lease.url || ""}
+PAGE TITLE: ${lease.title || ""}
+PAGE TEXT:
+${pageText}`;
   const providers = [
-    { name: "omniroute", url: \`\${OMNIROUTE_URL}/chat/completions\`, model: OMNIROUTE_MODEL, apiKey: OMNIROUTE_API_KEY },
-    { name: "google", url: \`\${GOOGLE_URL}/\${GOOGLE_MODEL}:generateContent\`, model: GOOGLE_MODEL, apiKey: GOOGLE_API_KEY },
+    { name: "omniroute", url: `${OMNIROUTE_URL}/chat/completions`, model: OMNIROUTE_MODEL, apiKey: OMNIROUTE_API_KEY },
+    { name: "google", url: `${GOOGLE_URL}/${GOOGLE_MODEL}:generateContent`, model: GOOGLE_MODEL, apiKey: GOOGLE_API_KEY },
   ];
   const errors = [];
   for (const provider of providers) {
@@ -136,11 +138,11 @@ async function extractWithAI(lease) {
           signal: AbortSignal.timeout(55_000),
         });
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(\`Google HTTP \${response.status}: \${JSON.stringify(body).slice(0, 500)}\`);
+        if (!response.ok) throw new Error(`Google HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
         content = (body?.candidates?.[0]?.content?.parts || []).map((part) => part?.text || "").join("");
       } else {
         const headers = { "content-type": "application/json", accept: "application/json" };
-        if (provider.apiKey) headers.authorization = \`Bearer \${provider.apiKey}\`;
+        if (provider.apiKey) headers.authorization = `Bearer ${provider.apiKey}`;
         const response = await fetch(provider.url, {
           method: "POST",
           headers,
@@ -156,13 +158,13 @@ async function extractWithAI(lease) {
           signal: AbortSignal.timeout(55_000),
         });
         const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(\`OmniRoute HTTP \${response.status}: \${JSON.stringify(body).slice(0, 500)}\`);
+        if (!response.ok) throw new Error(`OmniRoute HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
         content = body?.choices?.[0]?.message?.content || "";
       }
-      if (!content) throw new Error(\`\${provider.name} returned no content\`);
+      if (!content) throw new Error(`${provider.name} returned no content`);
       return { extraction: validateBasicExtraction(parseJsonObject(content)), model: provider.model, provider: provider.name };
     } catch (error) {
-      errors.push(\`\${provider.name}: \${error instanceof Error ? error.message : String(error)}\`);
+      errors.push(`${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   throw new Error(errors.join("; ").slice(0, 900) || "No AI provider configured");
