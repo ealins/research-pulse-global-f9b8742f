@@ -12,8 +12,8 @@ const BASE_URL = (
   process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
 ).replace(/\/$/, "");
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
-const CONCURRENCY = clamp(process.env.INGESTION_FETCH_CONCURRENCY, 1, 5, 3);
-const LEASE_LIMIT = clamp(process.env.INGESTION_LEASE_LIMIT, 1, 20, 8);
+const CONCURRENCY = clamp(process.env.INGESTION_FETCH_CONCURRENCY, 1, 8, 6);
+const LEASE_LIMIT = clamp(process.env.INGESTION_LEASE_LIMIT, 1, 20, 12);
 const ACTIVE_DELAY_MS = clamp(
   process.env.INGESTION_ACTIVE_DELAY_MS,
   250,
