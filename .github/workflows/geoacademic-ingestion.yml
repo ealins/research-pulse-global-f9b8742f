@@ -2,6 +2,9 @@ name: GeoAcademic legacy ingestion burst (manual fallback)
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["Deploy GeoAcademic to Cloudflare"]
+    types: [completed]
   schedule:
     - cron: "7,17,27,37,47,57 * * * *"
 
@@ -14,6 +17,7 @@ permissions:
 
 jobs:
   review-jobs:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 6
     env:
