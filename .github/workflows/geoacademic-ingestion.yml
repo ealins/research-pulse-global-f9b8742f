@@ -5,7 +5,6 @@ on:
   schedule:
     - cron: "17 */2 * * *"
 
-
 concurrency:
   group: geoacademic-ingestion-manual
   cancel-in-progress: false
@@ -20,8 +19,8 @@ jobs:
     env:
       GEOACADEMIC_BASE_URL: https://geoacademic.app
       INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
-      GOOGLE_API_KEY: ${{ secrets.Google_API_Key }}
-      GOOGLE_MODEL: gemini-2.5-flash
+      NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      NVIDIA_MODEL_NANO: nvidia/nemotron-3.5-lightning-30b-a3b
       REVIEW_RUNTIME_MS: "210000"
       REVIEW_LEASE_LIMIT: "4"
       REVIEW_CONCURRENCY: "2"
