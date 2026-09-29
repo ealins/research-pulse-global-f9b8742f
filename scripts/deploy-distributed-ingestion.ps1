@@ -144,7 +144,7 @@ Deploy-Service -Name "geoacademic-extract-worker" -Stage "EXTRACT" -Max 12 -Conc
 Deploy-Service -Name "geoacademic-review-worker" -Stage "REVIEW" -Max 8 -Concurrency 2 -Extra "REVIEW_LEASE_LIMIT=16,REVIEW_CONCURRENCY=8" | Out-Null
 
 $pushSa = Ensure-Sa -Id "geoacademic-pubsub-invoker" -DisplayName "GeoAcademic Pub/Sub Cloud Run invoker"
-$schedulerSa = Ensure-Sa -Id "geoacademic-dispatcher-scheduler" -DisplayName "GeoAcademic dispatcher scheduler"
+$schedulerSa = Ensure-Sa -Id "geoacademic-scheduler" -DisplayName "GeoAcademic dispatcher scheduler"
 
 $projectNumber = (& gcloud projects describe $Project --format="value(projectNumber)").Trim()
 $pubsubAgent = "service-$projectNumber@gcp-sa-pubsub.iam.gserviceaccount.com"
