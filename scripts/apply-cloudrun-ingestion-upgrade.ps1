@@ -9,8 +9,8 @@ $RepoRoot = Split-Path -Parent $PSScriptRoot
 $Image = "$Region-docker.pkg.dev/$Project/geoacademic/geoacademic-ingestion:latest"
 $OmniRouteUrl = $env:OMNIROUTE_URL
 if (-not $OmniRouteUrl) {
-    $OmniRouteUrl = "https://makes-seconds-gilbert-suited.trycloudflare.com/v1"
-    Write-Warning "OMNIROUTE_URL is not set; using the currently active Quick Tunnel. Quick Tunnel URLs are ephemeral."
+    $OmniRouteUrl = "https://omniroute.geoacademic.app/v1"
+    Write-Host "OMNIROUTE_URL is not set; using the stable Cloudflare Named Tunnel endpoint: $OmniRouteUrl"
 }
 
 function Test-GcloudSecret {
@@ -73,8 +73,6 @@ foreach ($item in $providerSecrets) {
             $value | & gcloud secrets create $secretName --replication-policy=automatic --data-file=- --project=$Project | Out-Null
         }
 
-        # Ensure the Cloud Run execution identity can read the secret whether it
-        # already existed or was created above. This is idempotent.
         & gcloud secrets add-iam-policy-binding $secretName `
             --member="serviceAccount:geoacademic-run@$Project.iam.gserviceaccount.com" `
             --role="roles/secretmanager.secretAccessor" `
