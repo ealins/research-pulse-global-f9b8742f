@@ -3,7 +3,7 @@ steps:
     args:
       - build
       - -f
-      - Dockerfile.distributed
+      - cloudrun/Dockerfile.distributed
       - -t
       - ${_IMAGE}
       - .
