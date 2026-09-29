@@ -48,6 +48,24 @@ function Ensure-Sa {
     return $email
 }
 
+function Ensure-SecretAccess {
+    param([string]$ServiceAccount,[string]$SecretName)
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & gcloud secrets describe $SecretName --project=$Project 2>$null | Out-Null
+    $exists = ($LASTEXITCODE -eq 0)
+    $ErrorActionPreference = $old
+    if (-not $exists) {
+        throw "Required Secret Manager secret '$SecretName' does not exist in project '$Project'."
+    }
+    Invoke-Gcloud @(
+        "secrets","add-iam-policy-binding",$SecretName,
+        "--member=serviceAccount:$ServiceAccount",
+        "--role=roles/secretmanager.secretAccessor",
+        "--project=$Project","--quiet"
+    )
+}
+
 function Runtime-Args {
     param([string[]]$RuntimeArgs)
     $jobJson = (& gcloud run jobs describe $Job --region=$Region --project=$Project --format=json 2>$null)
@@ -61,12 +79,24 @@ function Runtime-Args {
     $RuntimeArgs += "--service-account=$runtime"
     $container = @($template.containers)[0]
     $secretPairs = [System.Collections.Generic.List[string]]::new()
+    $requiredSecrets = @{
+        "DATABASE_URL" = "geoacademic-database-url"
+        "S3_ENDPOINT" = "geoacademic-s3-endpoint"
+        "S3_ACCESS_KEY" = "geoacademic-s3-access-key"
+        "S3_SECRET_KEY" = "geoacademic-s3-secret-key"
+        "S3_BUCKET" = "geoacademic-s3-bucket"
+    }
     foreach ($item in @($container.env)) {
         if ($null -ne $item.valueSource -and $null -ne $item.valueSource.secretKeyRef -and $item.valueSource.secretKeyRef.name) {
-            $secretPairs.Add("$($item.name)=$($item.valueSource.secretKeyRef.name):latest")
+            if (-not $requiredSecrets.ContainsKey([string]$item.name)) {
+                $secretPairs.Add("$($item.name)=$($item.valueSource.secretKeyRef.name):latest")
+            }
         } elseif ($null -ne $item.value) {
             $RuntimeArgs += "--set-env-vars=$($item.name)=$($item.value)"
         }
+    }
+    foreach ($name in $requiredSecrets.Keys) {
+        $secretPairs.Add("$name=$($requiredSecrets[$name]):latest")
     }
     if ($secretPairs.Count -gt 0) { $RuntimeArgs += "--set-secrets=$($secretPairs -join ",")" }
     return @{ Args=$RuntimeArgs; ServiceAccount=$runtime }
@@ -104,7 +134,12 @@ Invoke-Gcloud @(
     "--substitutions=_IMAGE=$Image","--project=$Project","--quiet"
 )
 
-$runtimeSa = Deploy-Service -Name "geoacademic-dispatcher" -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4" -Module "distributed_dispatcher"
+$runtimeSa = "geoacademic-run@$Project.iam.gserviceaccount.com"
+foreach ($secretName in @("geoacademic-database-url","geoacademic-s3-endpoint","geoacademic-s3-access-key","geoacademic-s3-secret-key","geoacademic-s3-bucket")) {
+    Ensure-SecretAccess -ServiceAccount $runtimeSa -SecretName $secretName
+}
+Deploy-Service -Name "geoacademic-dispatcher" -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4" -Module "distributed_dispatcher"
+ -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4" -Module "distributed_dispatcher"
 Deploy-Service -Name "geoacademic-fetch-worker" -Stage "FETCH" -Max 20 -Concurrency 8 -Extra "WORKER_CONCURRENCY=4" | Out-Null
 Deploy-Service -Name "geoacademic-extract-worker" -Stage "EXTRACT" -Max 12 -Concurrency 4 -Extra "" | Out-Null
 Deploy-Service -Name "geoacademic-review-worker" -Stage "REVIEW" -Max 8 -Concurrency 2 -Extra "REVIEW_LEASE_LIMIT=16,REVIEW_CONCURRENCY=8" | Out-Null
