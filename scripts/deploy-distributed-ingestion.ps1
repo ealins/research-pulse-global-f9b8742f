@@ -1,5 +1,4 @@
 $ErrorActionPreference = "Stop"
-Set-StrictMode -Version Latest
 
 $Project = "geoacademic-506304"
 $Region = "europe-west3"
@@ -63,7 +62,7 @@ function Runtime-Args {
     $container = @($template.containers)[0]
     $secretPairs = [System.Collections.Generic.List[string]]::new()
     foreach ($item in @($container.env)) {
-        if ($item.valueSource.secretKeyRef.name) {
+        if ($null -ne $item.valueSource -and $null -ne $item.valueSource.secretKeyRef -and $item.valueSource.secretKeyRef.name) {
             $secretPairs.Add("$($item.name)=$($item.valueSource.secretKeyRef.name):latest")
         } elseif ($null -ne $item.value) {
             $RuntimeArgs += "--set-env-vars=$($item.name)=$($item.value)"
