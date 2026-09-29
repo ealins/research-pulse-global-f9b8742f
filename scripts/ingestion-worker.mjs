@@ -91,7 +91,7 @@ for (const signal of ["SIGINT", "SIGTERM"]) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function callHook(action, payload = {}, timeoutMs = 60_000) {
+async function callHook(action, payload = {}, timeoutMs = 120_000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
