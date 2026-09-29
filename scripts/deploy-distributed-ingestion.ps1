@@ -50,7 +50,7 @@ function Runtime-Args {
 }
 
 function Deploy-Service {
-    param([string]$Name,[string]$Stage,[int]$Max,[int]$Concurrency,[string]$Extra)
+    param([string]$Name,[string]$Stage,[int]$Max,[int]$Concurrency,[string]$Extra,[string]$Module)
     $args = @(
         "run","deploy",$Name,
         "--image=$Image","--region=$Region","--project=$Project",
@@ -58,6 +58,10 @@ function Deploy-Service {
         "--concurrency=$Concurrency","--min=0","--max=$Max",
         "--no-allow-unauthenticated"
     )
+    if ($Module) {
+        $args += "--command=uvicorn"
+        $args += "--args=$Module`:app,--host=0.0.0.0,--port=8080,--app-dir=/app/cloudrun"
+    }
     $runtime = Runtime-Args -Args $args
     $args = $runtime.Args
     $args += "--set-env-vars=PUBSUB_PROJECT_ID=$Project"
@@ -75,7 +79,7 @@ Invoke-Gcloud @(
     "--substitutions=_IMAGE=$Image","--project=$Project","--quiet"
 )
 
-$runtimeSa = Deploy-Service -Name "geoacademic-dispatcher" -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4"
+$runtimeSa = Deploy-Service -Name "geoacademic-dispatcher" -Stage "" -Max 3 -Concurrency 4 -Extra "DISPATCH_LIMIT=500,REVIEW_TICKS=4" -Module "distributed_dispatcher"
 Deploy-Service -Name "geoacademic-fetch-worker" -Stage "FETCH" -Max 20 -Concurrency 8 -Extra "WORKER_CONCURRENCY=4" | Out-Null
 Deploy-Service -Name "geoacademic-extract-worker" -Stage "EXTRACT" -Max 12 -Concurrency 4 -Extra "" | Out-Null
 Deploy-Service -Name "geoacademic-review-worker" -Stage "REVIEW" -Max 8 -Concurrency 2 -Extra "REVIEW_LEASE_LIMIT=16,REVIEW_CONCURRENCY=8" | Out-Null
