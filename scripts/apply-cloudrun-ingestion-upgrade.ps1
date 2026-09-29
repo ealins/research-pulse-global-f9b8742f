@@ -90,7 +90,7 @@ try {
         "--quiet"
     )
 
-    Write-Host "==> Updating Cloud Run: 2 vCPU / 2 GiB / concurrency 8 / 200+200+10"
+    Write-Host "==> Updating Cloud Run: 2 vCPU / 2 GiB / concurrency 8 / 200+200+10 / curated adapters + retention"
     Invoke-Gcloud @(
         "run","jobs","update",$Job,
         "--image=$Image",
@@ -170,8 +170,11 @@ try {
     if ($logs -notmatch "QA_DATABASE_OK") {
         throw "Cloud Run acceptance check failed: QA_DATABASE_OK was not emitted within 5 minutes."
     }
-    if ($logs -notmatch "GITHUB_DISCOVERY_VERSION=2026-09-28-v2") {
-        throw "Cloud Run acceptance check failed: expected GitHub discovery version marker was not emitted."
+    if ($logs -notmatch "BATCH_SOURCE_ADAPTERS") {
+        throw "Cloud Run acceptance check failed: curated source adapter stage did not run."
+    }
+    if ($logs -notmatch "BATCH_RETENTION") {
+        throw "Cloud Run acceptance check failed: retention stage did not run."
     }
     if ($logs -match "PUBLIC_REVIEW skipped=missing_model_provider_credentials") {
         Write-Warning "Semantic review provider credentials are not configured; ingestion is healthy but AI review remains disabled."

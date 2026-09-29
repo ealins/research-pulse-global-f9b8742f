@@ -70,17 +70,23 @@ async def run_exa_discovery() -> None:
         await pool.close()
 
 
-async def run_github_discovery() -> None:
-    import github_discovery
+async def run_source_adapters() -> None:
+    import source_adapters
 
-    pool = await asyncpg.create_pool(**pool_kwargs(3))
+    pool = await asyncpg.create_pool(**pool_kwargs(8))
     try:
-        result = await github_discovery.run_github_discovery(pool)
-        print(f"BATCH_GITHUB_DISCOVERY queued={result}")
+        result = await source_adapters.run_source_adapters(pool)
+        print(f"BATCH_SOURCE_ADAPTERS {json.dumps(result, sort_keys=True)}")
     except Exception as e:
-        print(f"BATCH_GITHUB_DISCOVERY FAILED: {e}")
+        print(f"BATCH_SOURCE_ADAPTERS FAILED: {e}")
     finally:
         await pool.close()
+
+
+async def run_github_discovery() -> None:
+    # Compatibility entry point. GitHub discovery is now handled by the
+    # provider-neutral source adapter registry.
+    await run_source_adapters()
 
 
 async def run_schedule() -> None:
@@ -189,6 +195,17 @@ async def run_publications(max_institutions: int) -> None:
         await pool.close()
 
 
+async def run_retention() -> None:
+    from retention import purge
+
+    pool = await asyncpg.create_pool(**pool_kwargs(4))
+    try:
+        result = await purge(pool)
+        print(f"BATCH_RETENTION {json.dumps(result, sort_keys=True)}")
+    finally:
+        await pool.close()
+
+
 async def run_ats(max_sources: int) -> None:
     from ats_enrichment import run_ats_enrichment
 
@@ -205,26 +222,32 @@ async def run_all(
     max_ats_sources: int,
     max_publication_institutions: int,
 ) -> None:
-    # 1. Discovery and scheduling can run in parallel (independent queues)
+    # 1. Curated adapters discover only from the registered source universe.
+    # Exa remains optional and disabled by default.
     await asyncio.gather(
+        run_source_adapters(),
         run_exa_discovery(),
-        run_github_discovery(),
-        run_schedule(),
     )
 
-    # 2. Core pipeline runs sequentially to propagate data in a single execution
-    await run_fetch(max_fetch)
-    await run_process(max_process)
+    # 2. Schedule the newly discovered content URLs immediately.
+    await run_schedule()
 
-    # 3. Final steps and independent enrichments can run in parallel
+    # 3. Fetch and extract are independent queue stages and can overlap.
+    await asyncio.gather(
+        run_fetch(max_fetch),
+        run_process(max_process),
+    )
+
+    # 4. Enrichment and retention are independent after extraction.
     await asyncio.gather(
         run_verify(),
         run_public(),
         run_publications(max_publication_institutions),
         run_ats(max_ats_sources),
+        run_retention(),
     )
 
-    # 4. Emit the database acceptance signal only after all enrichments finish.
+    # 5. Emit the database acceptance signal only after all enrichments finish.
     # This is consumed by the production deployment verification script.
     from qa_database import main as qa_main
 
@@ -237,6 +260,8 @@ def parse_args() -> argparse.Namespace:
         "mode",
         choices=(
             "exa",
+            "source_adapters",
+            "retention",
             "schedule",
             "fetch",
             "process",
@@ -258,6 +283,10 @@ async def main() -> None:
     args = parse_args()
     if args.mode == "exa":
         await run_exa_discovery()
+    elif args.mode == "source_adapters":
+        await run_source_adapters()
+    elif args.mode == "retention":
+        await run_retention()
     elif args.mode == "schedule":
         await run_schedule()
     elif args.mode == "fetch":

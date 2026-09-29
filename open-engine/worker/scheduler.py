@@ -24,6 +24,7 @@ async def enqueue_due(pool: asyncpg.Pool) -> int:
                 )
             FROM source_registry s
             WHERE s.active = true
+              AND coalesce(s.source_kind,'content') = 'content'
               AND coalesce(s.next_check_at, s.created_at) <= now()
               AND NOT EXISTS (
                   SELECT 1

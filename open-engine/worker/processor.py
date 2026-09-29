@@ -115,6 +115,21 @@ def extract_candidates(html: str, source_url: str):
     return candidates[:40]
 
 
+def publication_timestamp(candidate: dict) -> str | None:
+    if str(candidate.get("entity_type") or "").lower() != "publication":
+        return None
+    data = candidate.get("data")
+    if not isinstance(data, dict):
+        return None
+    for key in ("datePublished", "publication_date", "published_at", "dateCreated"):
+        value = data.get(key)
+        if isinstance(value, str):
+            match = re.match(r"^(20\\d{2}-\\d{2}-\\d{2})", value.strip())
+            if match:
+                return match.group(1) + "T00:00:00+00:00"
+    return None
+
+
 def normalize_candidate_identity(candidate: dict, source_url: str) -> dict | None:
     """Adapt all extractor outputs to the canonical entity contract."""
     if not isinstance(candidate, dict):
@@ -217,7 +232,14 @@ async def materialize(pool, task):
     try:
         async with pool.acquire() as conn:
             snapshot = await conn.fetchrow(
-                "SELECT source_url, object_key, content_hash FROM source_snapshots WHERE id=$1",
+                """
+                SELECT ss.source_url, ss.object_key, ss.content_hash,
+                       coalesce(sr.retention_days, 30) AS retention_days,
+                       coalesce(sr.category, 'general') AS source_category
+                FROM source_snapshots ss
+                LEFT JOIN source_registry sr ON sr.id=ss.source_id
+                WHERE ss.id=$1
+                """,
                 snapshot_id,
             )
         if not snapshot or not snapshot["object_key"]:
@@ -294,7 +316,7 @@ async def materialize(pool, task):
                             INSERT INTO canonical_entities(
                                 entity_type, external_key, title, country, verification_status,
                                 confidence, source_url, published_at, data
-                            ) VALUES($1,$2,$3,$4,$5,$6,$7,now(),$8::jsonb)
+                            ) VALUES($1,$2,$3,$4,$5,$6,$7,$8::timestamptz,$9::jsonb)
                             ON CONFLICT (entity_type, external_key) WHERE external_key IS NOT NULL
                             DO UPDATE SET
                                 title=excluded.title,
@@ -305,6 +327,7 @@ async def materialize(pool, task):
                                 END,
                                 confidence=greatest(canonical_entities.confidence, excluded.confidence),
                                 source_url=excluded.source_url,
+                                published_at=coalesce(excluded.published_at, canonical_entities.published_at),
                                 last_seen_at=now(),
                                 last_changed_at=CASE WHEN canonical_entities.data IS DISTINCT FROM excluded.data THEN now() ELSE canonical_entities.last_changed_at END,
                                 data=excluded.data,
@@ -313,7 +336,8 @@ async def materialize(pool, task):
                             """,
                             candidate["entity_type"], candidate["external_key"], candidate["title"],
                             candidate["country"], verification_status, candidate["confidence"],
-                            candidate["source_url"], json.dumps(candidate["data"]),
+                            candidate["source_url"], publication_timestamp(candidate),
+                            json.dumps(candidate["data"]),
                         )
                     await conn.execute(
                         """
@@ -369,12 +393,18 @@ async def materialize(pool, task):
                             """
                             INSERT INTO signals(
                                 signal_type, entity_id, entity_type, title, country,
-                                importance_score, confidence, verification_status, source_url, data
-                            ) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb)
+                                importance_score, confidence, verification_status,
+                                source_url, expires_at, retention_class, data
+                            ) VALUES(
+                                $1,$2,$3,$4,$5,$6,$7,$8,$9,
+                                now() + ($10 * interval '1 day'),$11,$12::jsonb
+                            )
                             """,
                             signal_type, entity_id, candidate["entity_type"], candidate["title"],
                             candidate["country"], 55 if existing is None else 35,
                             candidate["confidence"], verification_status, candidate["source_url"],
+                            int(snapshot["retention_days"] or 30),
+                            candidate["entity_type"],
                             json.dumps(signal_data),
                         )
                 await conn.execute(
