@@ -306,6 +306,81 @@ export const hybridPulseQuery = queryOptions({
       // deployment or ingestion restart, the public Supabase surface remains
       // usable and must continue to populate the homepage.
       if (openEngineItems.length > 0) return openEngineItems;
+
+      // If the signal projection is temporarily empty, build the homepage feed
+      // from the same public entity projection that powers /jobs and /events.
+      // This keeps data visible during pulse refresh/rebuild windows.
+      const [opportunities, events, projects, publications] = await Promise.all([
+        openEngine.latest("opportunity", 40),
+        openEngine.latest("event", 20),
+        openEngine.latest("project", 20),
+        openEngine.latest("publication", 20),
+      ]);
+      const entityItems = [
+        ...(opportunities.items as unknown as EngineEntity[]).map((item) => ({
+          ...mapOpportunity(item),
+          id: String(item.id),
+          category: "PHD",
+          event_date: item.last_changed_at ?? item.last_seen_at,
+          title: item.title,
+          summary: text(dataOf(item)["description"]),
+          importance: 80,
+          link_url: absoluteUrl(text(dataOf(item)["detail_url"]), item.source_url),
+          source_url: item.source_url,
+          verification_status: item.verification_status,
+          confidence: confidenceLabel(Number(item.confidence) || 0),
+          is_demo: false,
+          country: item.country,
+        })),
+        ...(events.items as unknown as EngineEntity[]).map((item) => ({
+          ...mapEvent(item),
+          id: String(item.id),
+          category: "EVENT",
+          event_date: item.start_date ?? item.last_changed_at ?? item.last_seen_at,
+          title: item.title,
+          summary: text(dataOf(item)["description"]),
+          importance: 70,
+          link_url: item.source_url,
+          source_url: item.source_url,
+          verification_status: item.verification_status,
+          confidence: confidenceLabel(Number(item.confidence) || 0),
+          is_demo: false,
+          country: item.country,
+        })),
+        ...(projects.items as unknown as EngineEntity[]).map((item) => ({
+          id: String(item.id),
+          category: "PROJECT",
+          event_date: item.last_changed_at ?? item.last_seen_at,
+          title: item.title,
+          summary: text(dataOf(item)["description"]),
+          importance: 60,
+          link_url: item.source_url,
+          source_url: item.source_url,
+          verification_status: item.verification_status,
+          confidence: confidenceLabel(Number(item.confidence) || 0),
+          is_demo: false,
+          country: item.country,
+        })),
+        ...(publications.items as unknown as EngineEntity[]).map((item) => ({
+          id: String(item.id),
+          category: "PAPER",
+          event_date: item.published_at ?? item.last_changed_at ?? item.last_seen_at,
+          title: item.title,
+          summary: text(dataOf(item)["description"]),
+          importance: 55,
+          link_url: item.source_url,
+          source_url: item.source_url,
+          verification_status: item.verification_status,
+          confidence: confidenceLabel(Number(item.confidence) || 0),
+          is_demo: false,
+          country: item.country,
+        })),
+      ];
+      if (entityItems.length > 0) {
+        return entityItems
+          .sort((a, b) => (a.event_date < b.event_date ? 1 : a.event_date > b.event_date ? -1 : 0))
+          .slice(0, 100);
+      }
     } catch {
       // Fall through to the existing public Supabase pulse surface.
     }
@@ -322,15 +397,23 @@ export const hybridCountsQuery = queryOptions({
     if (!openEngineConfigured) return legacy;
 
     try {
-      const [events, opportunities] = await Promise.all([
-        openEngine.latest("event", 200),
-        openEngine.latest("opportunity", 200),
-      ]);
+      const [institutions, researchers, opportunities, publications, projects, events] =
+        await Promise.all([
+          openEngine.latest("institution", 200),
+          openEngine.latest("researcher", 200),
+          openEngine.latest("opportunity", 200),
+          openEngine.latest("publication", 200),
+          openEngine.latest("project", 200),
+          openEngine.latest("event", 200),
+        ]);
       return {
         ...legacy,
+        institutions: institutions.items.length > 0 ? institutions.items.length : legacy.institutions,
+        researchers: researchers.items.length > 0 ? researchers.items.length : legacy.researchers,
+        opportunities: opportunities.items.length > 0 ? opportunities.items.length : legacy.opportunities,
+        publications: publications.items.length > 0 ? publications.items.length : legacy.publications,
+        projects: projects.items.length > 0 ? projects.items.length : legacy.projects,
         events: events.items.length > 0 ? events.items.length : legacy.events,
-        opportunities:
-          opportunities.items.length > 0 ? opportunities.items.length : legacy.opportunities,
       };
     } catch {
       // Never blank the homepage because the optional Open Engine read path is
