@@ -1520,7 +1520,7 @@ export type ExternalFetchCompletion = {
 
 const EXTERNAL_FETCH_LEASE_MS = 15 * 60_000;
 const EXTERNAL_REVIEW_LEASE_MS = 20 * 60_000;
-const REVIEW_BACKPRESSURE_HIGH_WATER = 120;
+const REVIEW_BACKPRESSURE_HIGH_WATER = 1000;
 
 export type ExternalWorkerStatus = {
   due_fetch: number;
