@@ -1615,8 +1615,11 @@ export async function leaseExternalFetchTasks(
     .eq("task_type", "FETCH")
     .in("status", ["QUEUED", "RETRY"])
     .lte("run_after", now.toISOString())
-    .order("run_after")
-    .limit(requested * 3);
+    // Fresh-source refreshes are intentionally newer than the historical
+    // backlog. Prefer the newest due work so today's data reaches the site
+    // before old backlog rows consume the worker budget.
+    .order("run_after", { ascending: false })
+    .limit(requested * 6);
   if (error) throw error;
 
   const claimed: {
