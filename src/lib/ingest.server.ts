@@ -1579,8 +1579,33 @@ export async function leaseExternalFetchTasks(
   limit = 8,
 ): Promise<ExternalFetchLease[]> {
   const now = new Date();
-  const workerStatus = await getExternalWorkerStatus();
-  if (workerStatus.fetch_paused) return [];
+  // Keep the hot lease path independent of exact COUNT(*) queries. The
+  // backpressure check only needs to know whether the vacancy-review queue has
+  // crossed the safety threshold, so fetch at most high-water + 1 ids.
+  const [{ data: dueReview, error: dueReviewError }, { data: processingReview, error: processingReviewError }] =
+    await Promise.all([
+      supabaseAdmin
+        .from("ingestion_tasks")
+        .select("id")
+        .eq("task_type", "NORMALIZE")
+        .in("status", ["QUEUED", "RETRY"])
+        .lte("run_after", now.toISOString())
+        .contains("payload", { classification: "VACANCY" })
+        .limit(REVIEW_BACKPRESSURE_HIGH_WATER + 1),
+      supabaseAdmin
+        .from("ingestion_tasks")
+        .select("id")
+        .eq("task_type", "NORMALIZE")
+        .eq("status", "PROCESSING")
+        .contains("payload", { classification: "VACANCY" })
+        .limit(REVIEW_BACKPRESSURE_HIGH_WATER + 1),
+    ]);
+  if (dueReviewError) throw dueReviewError;
+  if (processingReviewError) throw processingReviewError;
+  if ((dueReview?.length ?? 0) + (processingReview?.length ?? 0) > REVIEW_BACKPRESSURE_HIGH_WATER) {
+    return [];
+  }
+
   const staleBefore = new Date(
     now.getTime() - EXTERNAL_FETCH_LEASE_MS,
   ).toISOString();
