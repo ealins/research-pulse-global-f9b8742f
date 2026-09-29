@@ -85,6 +85,36 @@ async def robots_allowed(client: httpx.AsyncClient, url: str) -> bool:
     return parser.can_fetch(USER_AGENT, url)
 
 
+async def claim_task_by_id(pool: asyncpg.Pool, task_id: int):
+    async with pool.acquire() as conn:
+        async with conn.transaction():
+            row = await conn.fetchrow(
+                """
+                SELECT id, payload, attempts, max_attempts
+                FROM ingestion_tasks
+                WHERE id=$1
+                  AND task_type='FETCH'
+                  AND status IN ('QUEUED','RETRY')
+                  AND next_attempt_at <= now()
+                FOR UPDATE SKIP LOCKED
+                """,
+                task_id,
+            )
+            if not row:
+                return None
+            await conn.execute(
+                """
+                UPDATE ingestion_tasks
+                SET status='PROCESSING', dispatch_state='PROCESSING',
+                    locked_at=now(), locked_by=$2,
+                    attempts=attempts+1, updated_at=now()
+                WHERE id=$1
+                """,
+                row["id"], WORKER_ID,
+            )
+            return dict(row)
+
+
 async def claim_task(pool: asyncpg.Pool):
     async with pool.acquire() as conn:
         async with conn.transaction():
@@ -105,7 +135,7 @@ async def claim_task(pool: asyncpg.Pool):
             await conn.execute(
                 """
                 UPDATE ingestion_tasks
-                SET status='PROCESSING', locked_at=now(), locked_by=$2,
+                SET status='PROCESSING', dispatch_state='PROCESSING', locked_at=now(), locked_by=$2,
                     attempts=attempts+1, updated_at=now()
                 WHERE id=$1
                 """,
@@ -132,7 +162,7 @@ async def complete_task(pool: asyncpg.Pool, task_id: int, *, success: bool, erro
     async with pool.acquire() as conn:
         if success:
             await conn.execute(
-                "UPDATE ingestion_tasks SET status='DONE', error=NULL, updated_at=now() WHERE id=$1",
+                "UPDATE ingestion_tasks SET status='DONE', dispatch_state='DONE', error=NULL, updated_at=now() WHERE id=$1",
                 task_id,
             )
         else:
@@ -141,7 +171,7 @@ async def complete_task(pool: asyncpg.Pool, task_id: int, *, success: bool, erro
             await conn.execute(
                 """
                 UPDATE ingestion_tasks
-                SET status=$2, error=$3,
+                SET status=$2, dispatch_state=CASE WHEN $2='DEAD' THEN 'DEAD' ELSE 'PENDING' END, error=$3,
                     next_attempt_at=now() + (least(3600, power(2, attempts)::int * 30) * interval '1 second'),
                     updated_at=now()
                 WHERE id=$1

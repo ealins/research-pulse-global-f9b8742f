@@ -48,6 +48,7 @@ async def recover_stale(pool: asyncpg.Pool) -> int:
             """
             UPDATE ingestion_tasks
             SET status='RETRY',
+                dispatch_state='PENDING',
                 locked_at=NULL,
                 locked_by=NULL,
                 error=coalesce(error, 'stale processing lease recovered'),
@@ -62,6 +63,7 @@ async def recover_stale(pool: asyncpg.Pool) -> int:
             """
             UPDATE ingestion_tasks
             SET status='RETRY',
+                dispatch_state='PENDING',
                 attempts=0,
                 locked_at=NULL,
                 locked_by=NULL,
