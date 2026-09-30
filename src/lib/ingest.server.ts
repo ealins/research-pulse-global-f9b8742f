@@ -1279,7 +1279,12 @@ export async function runQueueBatch(
       if (ap !== bp) return ap - bp;
       return new Date(a.run_after).getTime() - new Date(b.run_after).getTime();
     });
-    selected = selected.slice(0, limit);
+    // Vacancy NORMALIZE tasks are owned exclusively by the external semantic-review worker.
+    // The generic drain uses the legacy in-app model path, so allowing it to claim
+    // vacancy tasks would bypass the canonical OmniRoute provider.
+    selected = selected
+      .filter((task) => queuedClassification(task) !== "VACANCY")
+      .slice(0, limit);
   }
 
   const out = {
