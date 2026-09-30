@@ -25,6 +25,7 @@ type Body = {
   limit?: number;
   trigger?: string;
   model_available?: boolean;
+  probe?: boolean;
   completion?: ExternalFetchCompletion | ExternalReviewCompletion;
 };
 
@@ -216,6 +217,24 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           return json({ action, ...(await getExternalWorkerStatus()) });
         }
         if (action === "lease-fetch") {
+          // Probe mode is non-mutating and exists for production smoke tests.
+          // It proves the public route can reach the ingestion queue without
+          // claiming a task just to test health.
+          if (body.probe === true) {
+            const { data, error } = await supabaseAdmin
+              .from("ingestion_tasks")
+              .select("id")
+              .eq("task_type", "FETCH")
+              .in("status", ["QUEUED", "RETRY"])
+              .lte("run_after", new Date().toISOString())
+              .limit(1);
+            if (error) return json({ action, probe: true, error: error.message }, 500);
+            return json({
+              action,
+              probe: true,
+              due: (data ?? []).length > 0,
+            });
+          }
           // leaseExternalFetchTasks performs the backpressure check itself.
           // Avoid a duplicate worker-status query here: on a large backlog the
           // exact-count queries can exceed the public request budget before the
