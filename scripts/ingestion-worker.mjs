@@ -83,6 +83,7 @@ function clamp(value, min, max, fallback) {
 }
 
 let stopping = false;
+let fatalError = null;
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {
     stopping = true;
@@ -552,7 +553,11 @@ while (!stopping && Date.now() < stopAt) {
       );
     }
 
-    const leased = await callHook("lease-fetch", { limit: LEASE_LIMIT });
+    const leased = await callHook(
+      "lease-fetch",
+      { limit: LEASE_LIMIT },
+      20_000,
+    );
     const leases = Array.isArray(leased.leases) ? leased.leases : [];
     if (leases.length === 0) {
       console.log(`${new Date().toISOString()} IDLE no fetch tasks due`);
@@ -590,9 +595,19 @@ while (!stopping && Date.now() < stopAt) {
       `${new Date().toISOString()} worker error:`,
       error instanceof Error ? error.message : String(error),
     );
-    if (RUNTIME_MS) break;
+    if (RUNTIME_MS) {
+      fatalError = error instanceof Error ? error : new Error(String(error));
+      break;
+    }
     await sleep(ERROR_DELAY_MS);
   }
 }
 
-console.log("Worker stopped.");
+if (fatalError) {
+  console.error(
+    `Worker failed: ${fatalError instanceof Error ? fatalError.message : String(fatalError)}`,
+  );
+  process.exitCode = 1;
+} else {
+  console.log("Worker stopped.");
+}
