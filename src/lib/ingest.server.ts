@@ -1878,11 +1878,18 @@ export async function completeExternalFetch(
     });
   }
 
+  // Completion is idempotent by task id. The fetch payload is already
+  // persisted above; a concurrent queue maintenance pass may legitimately
+  // have changed the transient lease state while we were doing enrichment.
+  // Do not turn that into a false STALE result after accepting the snapshot.
   const { data: completed } = await supabaseAdmin
     .from("ingestion_tasks")
-    .update({ status: "COMPLETE", completed_at: new Date().toISOString() })
+    .update({
+      status: "COMPLETE",
+      completed_at: new Date().toISOString(),
+      started_at: null,
+    })
     .eq("id", task.id)
-    .eq("status", "PROCESSING")
     .select("id")
     .maybeSingle();
   return {
