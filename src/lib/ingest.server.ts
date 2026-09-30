@@ -1862,7 +1862,12 @@ export async function completeExternalFetch(
       .eq("id", rawId);
   }
 
-  const links = externalLinks(input.links);
+  // Cloudflare Workers cap a single invocation at 50 subrequests. A fetched
+  // listing can contain hundreds of links, and expanding each link performs
+  // additional Supabase reads. Bound the completion fan-out so the fetch itself
+  // can always commit successfully; the next scheduled discovery pass can expand
+  // the remaining links without losing the canonical raw snapshot.
+  const links = externalLinks(input.links).slice(0, 12);
   await registerDetailSourcesFromLinks({
     links,
     finalUrl,
