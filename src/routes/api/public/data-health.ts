@@ -25,7 +25,7 @@ export const Route = createFileRoute("/api/public/data-health")({
           // Open Engine feeds are folded into the visible event/opportunity counts
           // because those entities currently live in the Open Engine read model,
           // not the legacy public tables counted by public_surface_counts().
-          const [publicSurface, engineHealth, engineEvents, engineOpportunities] = await Promise.all([
+          const [publicSurface, engineHealth, engineEvents, engineOpportunities, rawHealth, fetchQueue] = await Promise.all([
             supabase.rpc("public_surface_counts"),
             openEngine
               .health()
@@ -48,6 +48,27 @@ export const Route = createFileRoute("/api/public/data-health")({
                 console.warn("[data-health] Open Engine opportunity count failed", error);
                 return { ok: false, count: 0 };
               }),
+            supabase
+              .from("raw_records")
+              .select("fetched_at")
+              .order("fetched_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+              .then(({ data, error }) => ({
+                ok: !error,
+                latest_fetched_at: data?.fetched_at ?? null,
+              })),
+            supabase
+              .from("ingestion_tasks")
+              .select("status, task_type")
+              .eq("task_type", "FETCH")
+              .in("status", ["QUEUED", "RETRY", "PROCESSING"])
+              .then(({ data, error }) => ({
+                ok: !error,
+                queued: (data ?? []).filter((row) => row.status === "QUEUED").length,
+                retry: (data ?? []).filter((row) => row.status === "RETRY").length,
+                processing: (data ?? []).filter((row) => row.status === "PROCESSING").length,
+              })),
           ]);
 
           if (publicSurface.error) {
@@ -71,6 +92,15 @@ export const Route = createFileRoute("/api/public/data-health")({
               ok: engineHealth.ok && engineEvents.ok && engineOpportunities.ok,
               events: engineEvents.count,
               opportunities: engineOpportunities.count,
+            },
+            ingestion: {
+              ok: rawHealth.ok && fetchQueue.ok,
+              latest_fetched_at: rawHealth.latest_fetched_at,
+              fetch_queue: {
+                queued: fetchQueue.queued,
+                retry: fetchQueue.retry,
+                processing: fetchQueue.processing,
+              },
             },
           });
         } catch (error) {
