@@ -1882,19 +1882,18 @@ export async function completeExternalFetch(
   // persisted above; a concurrent queue maintenance pass may legitimately
   // have changed the transient lease state while we were doing enrichment.
   // Do not turn that into a false STALE result after accepting the snapshot.
-  const { data: completed } = await supabaseAdmin
+  const { error: completionError } = await supabaseAdmin
     .from("ingestion_tasks")
     .update({
       status: "COMPLETE",
       completed_at: new Date().toISOString(),
       started_at: null,
     })
-    .eq("id", task.id)
-    .select("id")
-    .maybeSingle();
+    .eq("id", task.id);
+  if (completionError) throw completionError;
   return {
-    accepted: Boolean(completed),
-    status: completed ? "COMPLETE" : "STALE",
+    accepted: true,
+    status: "COMPLETE",
     changed,
     classification,
     raw_record_id: rawId,
