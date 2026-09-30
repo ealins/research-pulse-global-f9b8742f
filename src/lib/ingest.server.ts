@@ -1506,6 +1506,7 @@ export type ExternalFetchCompletion = {
   task_id: string;
   source_id: string;
   lease_started_at: string;
+  attempt: number;
   success: boolean;
   http_status?: number;
   final_url?: string;
@@ -1656,25 +1657,12 @@ export async function completeExternalFetch(
     !task ||
     task.task_type !== "FETCH" ||
     task.source_id !== input.source_id ||
-    task.status !== "PROCESSING"
+    task.status !== "PROCESSING" ||
+    task.attempts !== input.attempt
   ) {
     return { accepted: false, status: "STALE" };
   }
 
-  // PostgREST can serialize timestamptz with different textual precision/offset
-  // formatting than the RPC response used to create the lease. Compare the
-  // lease timestamp semantically, not as a raw string, before accepting it.
-  const taskStartedAt = task.started_at
-    ? new Date(task.started_at).getTime()
-    : NaN;
-  const leaseStartedAt = new Date(input.lease_started_at).getTime();
-  if (
-    !Number.isFinite(taskStartedAt) ||
-    !Number.isFinite(leaseStartedAt) ||
-    taskStartedAt !== leaseStartedAt
-  ) {
-    return { accepted: false, status: "STALE" };
-  }
 
   const { data: source, error: sourceError } = await supabaseAdmin
     .from("sources")
@@ -1741,7 +1729,7 @@ export async function completeExternalFetch(
       })
       .eq("id", task.id)
       .eq("status", "PROCESSING")
-      .eq("started_at", input.lease_started_at)
+      .eq("attempts", input.attempt)
       .select("id")
       .maybeSingle();
     return { accepted: Boolean(updated), status: dead ? "DEAD" : "RETRY" };
@@ -1886,7 +1874,7 @@ export async function completeExternalFetch(
     .update({ status: "COMPLETE", completed_at: new Date().toISOString() })
     .eq("id", task.id)
     .eq("status", "PROCESSING")
-    .eq("started_at", input.lease_started_at)
+    .eq("attempts", input.attempt)
     .select("id")
     .maybeSingle();
   return {
