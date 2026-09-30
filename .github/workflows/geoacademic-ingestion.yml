@@ -10,7 +10,7 @@ on:
 
 concurrency:
   group: geoacademic-ingestion-manual
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
   review-jobs:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 12
     env:
       GEOACADEMIC_BASE_URL: https://geoacademic.app
       INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
