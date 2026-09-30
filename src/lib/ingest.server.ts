@@ -318,7 +318,10 @@ export function extractLinks(
   const re = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let m: RegExpExecArray | null;
   while ((m = re.exec(html)) !== null) {
-    const href = m[1];
+    // Decode HTML entities in hrefs before URL resolution. Without this,
+    // links such as "?page=1&amp;page=1" become literal "amp;page" query keys
+    // and create thousands of duplicate source URLs during discovery.
+    const href = decodeEntities(m[1] ?? "");
     if (
       !href ||
       href.startsWith("mailto:") ||
