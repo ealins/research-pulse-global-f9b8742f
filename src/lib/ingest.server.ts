@@ -1653,13 +1653,18 @@ export async function completeExternalFetch(
     .eq("id", input.task_id)
     .maybeSingle();
   if (taskError) throw taskError;
-  if (
-    !task ||
-    task.task_type !== "FETCH" ||
-    task.source_id !== input.source_id ||
-    task.status !== "PROCESSING"
-  ) {
-    return { accepted: false, status: "STALE" };
+  if (!task) {
+    return { accepted: false, status: "STALE", stale_reason: "task_missing" };
+  }
+  if (task.task_type !== "FETCH" || task.source_id !== input.source_id) {
+    return { accepted: false, status: "STALE", stale_reason: "task_identity_mismatch" };
+  }
+  if (task.status !== "PROCESSING") {
+    return {
+      accepted: false,
+      status: "STALE",
+      stale_reason: "task_status_" + task.status,
+    };
   }
 
 
