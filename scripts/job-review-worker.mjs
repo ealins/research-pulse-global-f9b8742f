@@ -23,7 +23,7 @@ const RUNTIME_MS = clamp(
   210_000,
 );
 const LEASE_LIMIT = clamp(process.env.REVIEW_LEASE_LIMIT, 1, 10, 4);
-const CONCURRENCY = clamp(process.env.REVIEW_CONCURRENCY, 1, 2, 2);
+const CONCURRENCY = clamp(process.env.REVIEW_CONCURRENCY, 1, 8, 8);
 const HOOK_TIMEOUT_MS = 90_000;
 
 const SYSTEM_PROMPT = `You extract job facts for GeoAcademic, which covers photogrammetry, remote sensing, geodesy, geoinformatics, GIS, GeoAI, Earth observation, LiDAR, SAR, point clouds and spatial data science.
