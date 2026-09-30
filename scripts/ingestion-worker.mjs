@@ -588,9 +588,20 @@ while (!stopping && Date.now() < stopAt) {
     const retries = results.filter(
       (result) => result?.result?.status === "RETRY",
     ).length;
-    const stale = results.filter(
+    const staleResults = results.filter(
       (result) => result?.result?.status === "STALE",
-    ).length;
+    );
+    const stale = staleResults.length;
+    if (staleResults.length) {
+      console.error(
+        `${new Date().toISOString()} FETCH_STALE_DETAILS ${JSON.stringify(
+          staleResults.map((result) => ({
+            task_id: result?.lease?.task_id,
+            stale_reason: result?.result?.stale_reason ?? "unknown",
+          })),
+        )}`,
+      );
+    }
     console.log(
       `${new Date().toISOString()} FETCH leased=${leases.length} complete=${completed} retry=${retries} stale=${stale}`,
     );
