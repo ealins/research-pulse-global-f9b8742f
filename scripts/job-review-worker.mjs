@@ -172,6 +172,22 @@ ${pageText}`;
 
 async function processLease(lease) {
   try {
+    // Deterministic/structured vacancy pages must never be sent through OmniRoute.
+    // The server lease already decides whether semantic interpretation is required.
+    if (lease.requires_model !== true) {
+      return await callHook("complete-review", {
+        completion: {
+          task_id: lease.task_id,
+          source_id: lease.source_id,
+          raw_record_id: lease.raw_record_id,
+          lease_started_at: lease.lease_started_at,
+          success: true,
+          model: "deterministic",
+          provider: "deterministic",
+        },
+      });
+    }
+
     const modelResult = await extractWithAI(lease);
     return await callHook("complete-review", {
       completion: {
