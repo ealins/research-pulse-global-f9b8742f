@@ -222,7 +222,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           // exact-count queries can exceed the public request budget before the
           // actual lease transaction even starts.
           const { leaseExternalFetchTasks } =
-            await import("@/lib/ingest.server");
+            await import("@/lib/external-fetch-lease.server");
           const leases = await leaseExternalFetchTasks(
             Math.min(20, Math.max(1, body.limit ?? 8)),
           );
