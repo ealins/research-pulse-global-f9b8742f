@@ -541,7 +541,11 @@ let lastReseedAt = 0;
 const stopAt = RUNTIME_MS ? Date.now() + RUNTIME_MS : Number.POSITIVE_INFINITY;
 while (!stopping && Date.now() < stopAt) {
   try {
-    if (Date.now() - lastMaintenanceAt >= MAINTENANCE_INTERVAL_MS) {
+    // Burst runs are dedicated to fresh FETCH work. Do not put maintenance
+    // hooks ahead of the fetch queue: any slow projection/discovery hook would
+    // otherwise consume the entire burst runtime before a single source page
+    // is downloaded.
+    if (!BURST_MODE && Date.now() - lastMaintenanceAt >= MAINTENANCE_INTERVAL_MS) {
       await runMaintenance();
       lastMaintenanceAt = Date.now();
     }
