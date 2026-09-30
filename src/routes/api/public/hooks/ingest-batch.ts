@@ -434,15 +434,12 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           }
 
           if (result.processed === 0) {
-            taskGroup = "FETCH_DISCOVER";
-            const externalFetchWorker =
-              (
-                process.env["EXTERNAL_FETCH_WORKER_ENABLED"] ?? ""
-              ).toLowerCase() === "true";
-            const collection = await runQueueBatch(
-              batch,
-              externalFetchWorker ? ["DISCOVER"] : ["FETCH", "DISCOVER"],
-            );
+            // FETCH is exclusively owned by the external fetch worker. The
+            // Cloudflare queue drain must never claim FETCH tasks itself:
+            // production does not inherit the legacy Fly-only environment flag,
+            // and a second consumer would invalidate the external worker lease.
+            taskGroup = "DISCOVER";
+            const collection = await runQueueBatch(batch, ["DISCOVER"]);
             result.processed = collection.processed;
             result.ok = collection.ok;
             result.failed = collection.failed;
