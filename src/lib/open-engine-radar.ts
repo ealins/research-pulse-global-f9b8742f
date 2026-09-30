@@ -393,7 +393,15 @@ export const hybridPulseQuery = queryOptions({
 export const hybridCountsQuery = queryOptions({
   queryKey: openEngineConfigured ? ["counts", "hybrid-open-engine"] : ["counts"],
   queryFn: async (context): Promise<any> => {
-    const legacy = await runLegacy<any>(legacyCountsQuery, context);
+    let legacy: any = {};
+    try {
+      legacy = await runLegacy<any>(legacyCountsQuery, context);
+    } catch {
+      // The legacy public aggregate is optional. Open Engine is the canonical
+      // public read path and must still populate the homepage when the legacy
+      // RPC/table surface is unavailable.
+    }
+
     if (!openEngineConfigured) return legacy;
 
     try {
@@ -408,16 +416,16 @@ export const hybridCountsQuery = queryOptions({
         ]);
       return {
         ...legacy,
-        institutions: institutions.items.length > 0 ? institutions.items.length : legacy.institutions,
-        researchers: researchers.items.length > 0 ? researchers.items.length : legacy.researchers,
-        opportunities: opportunities.items.length > 0 ? opportunities.items.length : legacy.opportunities,
-        publications: publications.items.length > 0 ? publications.items.length : legacy.publications,
-        projects: projects.items.length > 0 ? projects.items.length : legacy.projects,
-        events: events.items.length > 0 ? events.items.length : legacy.events,
+        institutions: institutions.items.length > 0 ? institutions.items.length : legacy.institutions ?? 0,
+        researchers: researchers.items.length > 0 ? researchers.items.length : legacy.researchers ?? 0,
+        opportunities: opportunities.items.length > 0 ? opportunities.items.length : legacy.opportunities ?? 0,
+        publications: publications.items.length > 0 ? publications.items.length : legacy.publications ?? 0,
+        projects: projects.items.length > 0 ? projects.items.length : legacy.projects ?? 0,
+        events: events.items.length > 0 ? events.items.length : legacy.events ?? 0,
       };
     } catch {
       // Never blank the homepage because the optional Open Engine read path is
-      // unhealthy. The database-backed aggregate is already available.
+      // unhealthy. The legacy database-backed aggregate is the fallback.
       return legacy;
     }
   },
