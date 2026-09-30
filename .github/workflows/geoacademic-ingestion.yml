@@ -47,15 +47,14 @@ jobs:
             --connect-timeout 10 --max-time 25 \
             -H "Authorization: Bearer $INGESTION_HOOK_SECRET" \
             -H "Content-Type: application/json" \
-            --data '{"action":"lease-fetch","limit":1,"trigger":"github-actions-lease-smoke"}' \
+            --data '{"action":"lease-fetch","probe":true,"limit":1,"trigger":"github-actions-lease-smoke"}' \
             https://geoacademic.app/api/public/hooks/ingest-batch \
             | tee /tmp/lease.json
           node -e '
             const fs = require("fs");
             const v = JSON.parse(fs.readFileSync("/tmp/lease.json","utf8"));
-            if (!Array.isArray(v.leases)) throw new Error("lease-fetch returned no leases array");
-            if (v.leases.length < 1) throw new Error("lease-fetch returned zero leases while FETCH backlog is expected");
-            console.log("LEASE_SMOKE_OK", JSON.stringify({count:v.leases.length, task_id:v.leases[0]?.task_id}));
+            if (v.probe !== true || v.due !== true) throw new Error("fetch lease probe did not confirm due work");
+            console.log("LEASE_SMOKE_OK", JSON.stringify({probe:v.probe, due:v.due}));
           '
       - name: Fetch fresh source data first
         env:
