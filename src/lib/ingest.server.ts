@@ -1643,6 +1643,7 @@ export async function completeExternalFetch(
 ): Promise<{
   accepted: boolean;
   status: "COMPLETE" | "RETRY" | "DEAD" | "STALE";
+  stale_reason?: string;
   changed?: boolean;
   classification?: string | null;
   raw_record_id?: string | null;
