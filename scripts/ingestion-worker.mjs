@@ -593,6 +593,10 @@ while (!stopping && Date.now() < stopAt) {
     console.log(
       `${new Date().toISOString()} FETCH leased=${leases.length} complete=${completed} retry=${retries} stale=${stale}`,
     );
+    if (BURST_MODE && stale > 0) {
+      fatalError = new Error(`Burst fetch produced ${stale} stale lease result(s)`);
+      break;
+    }
     if (Date.now() + ACTIVE_DELAY_MS < stopAt) await sleep(ACTIVE_DELAY_MS);
   } catch (error) {
     console.error(
