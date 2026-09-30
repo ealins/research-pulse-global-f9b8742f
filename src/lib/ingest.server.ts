@@ -2258,8 +2258,8 @@ export async function completeExternalReview(
         ? `${validation.code}: ${validation.message}`
         : "BUSINESS_RULE_FAILURE: evidence is missing or not present in the source page";
       await supabaseAdmin.from("llm_processing_runs").insert({
-        provider: "NVIDIA",
-        model: (input.model || "external-nemotron").slice(0, 200),
+        provider: (input.provider || "external").slice(0, 100),
+        model: (input.model || "external").slice(0, 200),
         operation: "VACANCY_EXTRACTION",
         source_id: input.source_id,
         raw_page_id: raw.id,
@@ -2279,8 +2279,8 @@ export async function completeExternalReview(
     }
     extraction = validation.value;
     await supabaseAdmin.from("llm_processing_runs").insert({
-      provider: "NVIDIA",
-      model: (input.model || "external-nemotron").slice(0, 200),
+      provider: (input.provider || "external").slice(0, 100),
+      model: (input.model || "external").slice(0, 200),
       operation: "VACANCY_EXTRACTION",
       source_id: input.source_id,
       raw_page_id: raw.id,
