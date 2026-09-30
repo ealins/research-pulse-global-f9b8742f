@@ -497,6 +497,7 @@ async function fetchLease(lease) {
         task_id: lease.task_id,
         source_id: lease.source_id,
         lease_started_at: lease.lease_started_at,
+        attempt: lease.attempt,
         ...completion,
       },
     },
