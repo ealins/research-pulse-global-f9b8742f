@@ -1,6 +1,8 @@
 name: GeoAcademic fresh ingestion
 
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
   workflow_run:
     workflows: ["Deploy GeoAcademic to Cloudflare"]
