@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import { openEngine } from "@/lib/open-engine-client";
 
 const DEPLOYMENT_MARKER = "ssr-prefetch-v1";
@@ -26,7 +26,7 @@ export const Route = createFileRoute("/api/public/data-health")({
           // because those entities currently live in the Open Engine read model,
           // not the legacy public tables counted by public_surface_counts().
           const [publicSurface, engineHealth, engineEvents, engineOpportunities, rawHealth, fetchQueue] = await Promise.all([
-            supabase.rpc("public_surface_counts"),
+            supabaseAdmin.rpc("public_surface_counts"),
             openEngine
               .health()
               .then((value) => ({ ok: Boolean(value?.ok) }))
@@ -48,7 +48,7 @@ export const Route = createFileRoute("/api/public/data-health")({
                 console.warn("[data-health] Open Engine opportunity count failed", error);
                 return { ok: false, count: 0 };
               }),
-            supabase
+            supabaseAdmin
               .from("raw_records")
               .select("fetched_at")
               .order("fetched_at", { ascending: false })
@@ -58,7 +58,7 @@ export const Route = createFileRoute("/api/public/data-health")({
                 ok: !error,
                 latest_fetched_at: data?.fetched_at ?? null,
               })),
-            supabase
+            supabaseAdmin
               .from("ingestion_tasks")
               .select("status, task_type")
               .eq("task_type", "FETCH")
