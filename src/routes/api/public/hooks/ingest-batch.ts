@@ -91,9 +91,8 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         try {
           const { supabaseAdmin } =
             await import("@/integrations/supabase/client.server");
-        const { enqueue, runQueueBatch } = await import("@/lib/ingest.server");
-
         if (action === "enqueue-discovery") {
+          const { enqueue } = await import("@/lib/ingest.server");
           const { data: withSources } = await supabaseAdmin
             .from("sources")
             .select("institution_id")
@@ -301,6 +300,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         }
 
         // Queue processing: waking up is cheap, working is not. Check first.
+        const { runQueueBatch } = await import("@/lib/ingest.server");
         const { loadSchedule, readQueueState } =
           await import("@/lib/schedule.server");
         const schedule = await loadSchedule();
