@@ -1656,8 +1656,22 @@ export async function completeExternalFetch(
     !task ||
     task.task_type !== "FETCH" ||
     task.source_id !== input.source_id ||
-    task.status !== "PROCESSING" ||
-    task.started_at !== input.lease_started_at
+    task.status !== "PROCESSING"
+  ) {
+    return { accepted: false, status: "STALE" };
+  }
+
+  // PostgREST can serialize timestamptz with different textual precision/offset
+  // formatting than the RPC response used to create the lease. Compare the
+  // lease timestamp semantically, not as a raw string, before accepting it.
+  const taskStartedAt = task.started_at
+    ? new Date(task.started_at).getTime()
+    : NaN;
+  const leaseStartedAt = new Date(input.lease_started_at).getTime();
+  if (
+    !Number.isFinite(taskStartedAt) ||
+    !Number.isFinite(leaseStartedAt) ||
+    taskStartedAt !== leaseStartedAt
   ) {
     return { accepted: false, status: "STALE" };
   }
