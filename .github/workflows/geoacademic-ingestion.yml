@@ -8,7 +8,7 @@ on:
     workflows: ["Deploy GeoAcademic to Cloudflare"]
     types: [completed]
   schedule:
-    - cron: "7,17,27,37,47,57 * * * *"
+    - cron: "*/5 * * * *"
 
 concurrency:
   group: geoacademic-ingestion-manual
@@ -95,12 +95,12 @@ jobs:
       - name: Drain vacancy review backlog
         env:
           REVIEW_RUNTIME_MS: "300000"
-          REVIEW_LEASE_LIMIT: "16"
-          REVIEW_CONCURRENCY: "2"
+          REVIEW_LEASE_LIMIT: "10"
+          REVIEW_CONCURRENCY: "8"
         run: node scripts/job-review-worker.mjs
       - name: Review newly fetched job pages
         env:
           REVIEW_RUNTIME_MS: "60000"
-          REVIEW_LEASE_LIMIT: "4"
-          REVIEW_CONCURRENCY: "2"
+          REVIEW_LEASE_LIMIT: "10"
+          REVIEW_CONCURRENCY: "8"
         run: node scripts/job-review-worker.mjs
