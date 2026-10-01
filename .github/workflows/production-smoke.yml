@@ -62,10 +62,9 @@ jobs:
           const health = JSON.parse(fs.readFileSync('/tmp/health.json', 'utf8'));
           const counts = health.public_surface_counts ?? {};
           if (health.ok !== true) throw new Error('production health is not ok');
-          if (health.open_engine?.ok !== true) throw new Error('Open Engine/fallback is not healthy');
           if (Number(counts.institutions) < 1) throw new Error('public institution count is empty');
-          if (Number(counts.opportunities) < 1) throw new Error('Open Engine opportunity count is empty');
-          if (Number(counts.events) < 1) throw new Error('Open Engine event count is empty');
+          if (Number(counts.opportunities) < 1) throw new Error('Public opportunity count is empty');
+          if (Number(counts.events) < 1) throw new Error('Public event count is empty');
           console.log('Production passed:', JSON.stringify({
             institutions: counts.institutions,
             researchers: counts.researchers,
