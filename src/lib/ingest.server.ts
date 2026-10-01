@@ -2781,6 +2781,12 @@ export async function normalizeSource(
   const isPhd =
     /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
   const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
+  const deadline = deterministicDeadline ?? structuredDeadline ?? null;
+  const status = deriveStatus(deadline, rolling);
+  const usedStructured = Boolean(structuredJob);
+  const verificationStatus = "auto_discovered";
+  const verifiedAt = null;
+
   const safeApplicationUrl = (() => {
     const candidate = structuredJob?.application_url ?? null;
     if (!candidate) return raw.final_url;
@@ -2830,8 +2836,7 @@ export async function normalizeSource(
     normalized_title: title.toLowerCase().slice(0, 300),
     institution_id: raw.institution_id,
     employer_name: institution?.name ?? null,
-    opportunity_type: (ex?.opportunity_type ??
-      (isPhd ? "phd" : "other")) as string as never,
+    opportunity_type: (isPhd ? "phd" : "other") as string as never,
     sector,
     description: (structuredJob?.description ?? text).slice(0, 2000),
     requirements: null,
