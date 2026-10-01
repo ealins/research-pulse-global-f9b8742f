@@ -1282,12 +1282,11 @@ export async function runQueueBatch(
       if (ap !== bp) return ap - bp;
       return new Date(a.run_after).getTime() - new Date(b.run_after).getTime();
     });
-    // Vacancy NORMALIZE tasks are owned exclusively by the external semantic-review worker.
-    // The generic drain uses the legacy in-app model path, so allowing it to claim
-    // vacancy tasks would bypass the canonical OmniRoute provider.
-    selected = selected
-      .filter((task) => queuedClassification(task) !== "VACANCY")
-      .slice(0, limit);
+    // Vacancy records are source-backed and must not wait for semantic review.
+    // The canonical writer publishes the crawled source first; semantic enrichment
+    // is optional and asynchronous. Let the generic drain process vacancy tasks
+    // so a review backlog cannot block fresh authoritative records.
+    selected = selected.slice(0, limit);
   }
 
   const out = {
@@ -2766,131 +2765,22 @@ export async function normalizeSource(
   }
 
   const text = raw.text_content ?? "";
-  const gate = looksLikeSinglePosting(raw.final_url ?? "", title, text);
-  if (!gate.ok) {
-    await mark("SKIPPED", `not a single vacancy posting: ${gate.reason}`);
-    return {
-      status: "SKIPPED",
-      reason: `not a single vacancy posting: ${gate.reason}`,
-    };
-  }
+
+  // The crawled official page is the authority. Publication must not depend on
+  // a second semantic validation pass. Keep the source URL and raw snapshot as
+  // provenance, extract only interoperable fields deterministically, and let
+  // optional semantic enrichment happen after publication.
   const rolling =
     /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
   const deterministicDeadline = parseDeadline(text);
-  // Only the posting's own title decides the type: body text mentioning a
-  // doctoral programme must not turn a staff role into a PhD position.
-  const isPhd =
-    /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
-  const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
-
-  // Fast path: an official single-posting page with an explicit deadline or
-  // schema.org JobPosting metadata does not need an LLM just to prove that it
-  // exists. Nemotron is reserved for ambiguous postings that need semantic
-  // interpretation. This keeps verification source-backed and dramatically
-  // reduces model calls.
   const structuredJob = structuredVacancyFromPayload(
     raw.payload,
     raw.final_url ?? "",
   );
   const structuredDeadline = structuredJob?.application_deadline ?? null;
-  const deterministicEvidence = Boolean(
-    structuredJob || deterministicDeadline || rolling,
-  );
-  const deterministicEnough =
-    deterministicEvidence && hasStrongGeospatialEvidence(title, text);
-
-  let ex: VacancyExtraction | null = externalReview?.extraction ?? null;
-  if (!deterministicEnough) {
-    if (!externalReview?.provided) {
-      const { enrichVacancy } = await import("./extraction/enrich.server");
-      const enriched = await enrichVacancy({
-        url: raw.final_url ?? "",
-        title,
-        text,
-        sourceId: raw.source_id,
-        rawRecordId: raw.id,
-        contentHash: raw.content_hash,
-      });
-      ex = enriched.extraction;
-    }
-    if (!ex) {
-      await mark(
-        "FAILED",
-        "semantic vacancy review is required but no validated result is available",
-      );
-      return {
-        status: "FAILED",
-        reason:
-          "semantic vacancy review is required but no validated result is available",
-      };
-    }
-    if (ex && !ex.is_single_real_position) {
-      await mark(
-        "SKIPPED",
-        `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`,
-      );
-      return {
-        status: "SKIPPED",
-        reason: `intelligence engine rejected: ${ex.rejection_reason ?? "not a single real position"}`,
-      };
-    }
-    if (!ex.geospatial_relevance) {
-      await mark(
-        "SKIPPED",
-        "intelligence engine rejected: role is not geospatially relevant",
-      );
-      return { status: "SKIPPED", reason: "role is not geospatially relevant" };
-    }
-    if (ex.confidence < 0.65) {
-      await mark(
-        "SKIPPED",
-        `intelligence engine confidence too low (${ex.confidence.toFixed(2)})`,
-      );
-      return {
-        status: "SKIPPED",
-        reason: `intelligence engine confidence too low (${ex.confidence.toFixed(2)})`,
-      };
-    }
-    if (!evidenceIsSupported(ex, text)) {
-      await mark(
-        "FAILED",
-        "model evidence is missing or not supported by the fetched page",
-      );
-      return {
-        status: "FAILED",
-        reason:
-          "model evidence is missing or not supported by the fetched page",
-      };
-    }
-  }
-
-  const deadline =
-    deterministicDeadline ??
-    structuredDeadline ??
-    ex?.application_deadline ??
-    null;
-
-  // Date-only deadlines stay active for the full advertised UTC calendar day.
-  // Comparing Date objects would incorrectly expire a job at midnight.
-  const today = new Date().toISOString().slice(0, 10);
-  if (deadline && !rolling && deadline < today) {
-    await mark("SKIPPED", "job application deadline has passed");
-    return {
-      status: "SKIPPED",
-      reason: "job application deadline has passed",
-    };
-  }
-
-  const status = deriveStatus(deadline, rolling);
-  const usedModel = !deterministicEnough && Boolean(ex);
-  const usedStructured = Boolean(structuredJob);
-  const verifiedAt = deterministicEnough ? new Date().toISOString() : null;
-  const verificationStatus = deterministicEnough
-    ? "verified"
-    : ex && ex.confidence >= 0.86
-      ? "auto_discovered"
-      : "needs_review";
-
+  const isPhd =
+    /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
+  const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
   const safeApplicationUrl = (() => {
     const candidate =
       ex?.application_url ?? structuredJob?.application_url ?? null;
@@ -2958,26 +2848,16 @@ export async function normalizeSource(
     application_url: safeApplicationUrl,
     official_source_url: raw.final_url,
     status: status as never,
-    confidence: (deterministicEnough && usedStructured
-      ? "high"
-      : deterministicEnough || (ex?.confidence ?? 0) >= 0.86
-        ? "medium"
-        : "low") as never,
+    confidence: (usedStructured ? "high" : "medium") as never,
     verification_status: verificationStatus as never,
     last_checked_at: new Date().toISOString(),
     last_verified_at: verifiedAt,
     application_deadline: deadline,
     is_demo: false,
-    extracted_by: usedModel
-      ? "AI_SEMANTIC_REVIEW"
-      : usedStructured
-        ? "STRUCTURED_METADATA"
-        : "DETERMINISTIC",
-    extraction_model: usedModel
-      ? (externalReview?.model ?? "nvidia/nemotron-routed")
-      : null,
-    extraction_confidence: ex?.confidence ?? null,
-    extraction_timestamp: usedModel ? new Date().toISOString() : null,
+    extracted_by: usedStructured ? "STRUCTURED_METADATA" : "DETERMINISTIC",
+    extraction_model: null,
+    extraction_confidence: null,
+    extraction_timestamp: null,
   };
 
   let entityId = existing?.id;
@@ -3029,9 +2909,7 @@ export async function normalizeSource(
       original_title: raw.page_title,
       claim: "Vacancy page fetched from the institution's own website",
       verification_status: verificationStatus as never,
-      confidence: (deterministicEnough && usedStructured
-        ? "high"
-        : "medium") as never,
+      confidence: usedStructured ? ("high" as never) : "medium" as never,
       is_primary: true,
       last_checked_at: new Date().toISOString(),
       last_verified_at: verifiedAt,
