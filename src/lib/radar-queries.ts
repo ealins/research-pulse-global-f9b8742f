@@ -49,7 +49,15 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
   if (row.confidence === "low") return false;
   if (NON_POSTING_TITLE.test(row.title.trim())) return false;
   try {
-    return !NON_POSTING_PATH.test(new URL(row.official_source_url).pathname);
+    const parsedUrl = new URL(row.official_source_url);
+    const path = parsedUrl.pathname.replace(/\/+$/, "");
+    if (
+      /\/(jobs?|vacancies|careers|recruitment)$/i.test(path) &&
+      /\b(jobs?|vacancies|careers?|recruitment)\b/i.test(row.title)
+    ) {
+      return false;
+    }
+    return !NON_POSTING_PATH.test(parsedUrl.pathname);
   } catch {
     return false;
   }
@@ -76,11 +84,12 @@ export const opportunitiesQuery = queryOptions({
       .not("official_source_url", "is", null)
       .order("is_demo", { ascending: true })
       .order("application_deadline", { ascending: true, nullsFirst: false })
-      .limit(200);
+      .limit(1000);
     if (error) throw error;
     return ((data ?? []) as unknown as OpportunityRow[])
       .map((row) => ({ ...row, country: canonicalCountry(row.country) }))
-      .filter(isPlausibleOpportunity);
+      .filter(isPlausibleOpportunity)
+      .slice(0, 200);
   },
 });
 
