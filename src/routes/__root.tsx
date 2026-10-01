@@ -113,6 +113,17 @@ function RootShell({ children }: { children: ReactNode }) {
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(() => {
+              const removeBuilderBranding = () => {
+                document.querySelectorAll('#lovable-badge,[id*="lovable"],[class*="lovable"],a[href*="lovable.app"]').forEach((node) => node.remove());
+              };
+              removeBuilderBranding();
+              new MutationObserver(removeBuilderBranding).observe(document.documentElement, { childList: true, subtree: true });
+            })();`,
+          }}
+        />
       </head>
       <body>
         {children}
