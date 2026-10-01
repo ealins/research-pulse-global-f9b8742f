@@ -2782,8 +2782,7 @@ export async function normalizeSource(
     /(phd|ph\.d|doctoral researcher|doktorand|promotionsstelle)/i.test(title);
   const slug = slugify(title) || slugify(raw.final_url ?? raw.id);
   const safeApplicationUrl = (() => {
-    const candidate =
-      ex?.application_url ?? structuredJob?.application_url ?? null;
+    const candidate = structuredJob?.application_url ?? null;
     if (!candidate) return raw.final_url;
     try {
       const application = new URL(candidate, raw.final_url ?? undefined);
@@ -2804,7 +2803,7 @@ export async function normalizeSource(
       : institution?.institution_type &&
           institution.institution_type !== "other"
         ? "academic"
-        : (ex?.sector ?? "industry");
+        : "industry";
 
   const { data: existing } = await supabaseAdmin
     .from("opportunities")
@@ -2834,17 +2833,14 @@ export async function normalizeSource(
     opportunity_type: (ex?.opportunity_type ??
       (isPhd ? "phd" : "other")) as string as never,
     sector,
-    description: (ex?.summary ?? structuredJob?.description ?? text).slice(
-      0,
-      2000,
-    ),
-    requirements: ex?.requirements ?? null,
-    funding_type: ex?.funding_type ?? null,
-    salary_text: ex?.salary_text ?? null,
-    supervisor_name: ex?.supervisor_name ?? null,
-    city: ex?.city ?? structuredJob?.city ?? null,
-    country: ex?.country ?? structuredJob?.country ?? null,
-    start_date: ex?.start_date ?? structuredJob?.start_date ?? null,
+    description: (structuredJob?.description ?? text).slice(0, 2000),
+    requirements: null,
+    funding_type: null,
+    salary_text: null,
+    supervisor_name: null,
+    city: structuredJob?.city ?? null,
+    country: structuredJob?.country ?? null,
+    start_date: structuredJob?.start_date ?? null,
     application_url: safeApplicationUrl,
     official_source_url: raw.final_url,
     status: status as never,
