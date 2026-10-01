@@ -389,12 +389,15 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             queueState.mode === "BACKLOG"
               ? Math.min(8, batch)
               : Math.min(2, batch);
+          // Vacancy normalization is deterministic and source-backed.
+          // Keep requests below the Cloudflare request budget while using
+          // parallel workers; semantic enrichment remains asynchronous.
           const normalizeWave =
             queueState.mode === "BACKLOG"
-              ? Math.min(4, normalizeTarget)
+              ? Math.min(8, normalizeTarget)
               : Math.min(2, normalizeTarget);
           const normalizeBudgetMs =
-            queueState.mode === "BACKLOG" ? 42_000 : 30_000;
+            queueState.mode === "BACKLOG" ? 24_000 : 20_000;
           const emptyResult = () => ({
             processed: 0,
             ok: 0,
@@ -416,7 +419,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             const wave = await runQueueBatch(
               Math.min(normalizeWave, remaining),
               ["NORMALIZE"],
-              2,
+              queueState.mode === "BACKLOG" ? 8 : 2,
             );
             normalizeWaves += 1;
             result.processed += wave.processed;
