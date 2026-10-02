@@ -25,73 +25,22 @@ The intended production split is:
 
 - **Cloudflare Workers**: TanStack Start web application and SSR at `https://geoacademic.app`.
 - **Supabase PostgreSQL/Auth**: canonical records, provenance/evidence, user data, queues, read models and RPCs.
-- **Google Cloud Run Job**: bounded Python ingestion and normalization.
-- **Google Cloud Scheduler**: executes the Cloud Run ingestion job every two hours.
-- **GitHub Actions**: CI, data QA, deployment checks and a temporary/manual ingestion fallback only.
+- **GitHub Actions/manual ingestion runner**: bounded ingestion and normalization when explicitly invoked.
+- **OmniRoute**: primary AI review/enrichment provider.
 
-Oracle is no longer part of the required production deployment path.
+Google Cloud Compute is **not part of the production architecture**. GeoAcademic no longer provisions or deploys Cloud Run services/jobs, Cloud Scheduler triggers, Cloud Build workloads, Artifact Registry images, or GCP runtime service accounts from this repository.
 
-## Cloud Run ingestion job
+The legacy `geoacademic-dispatcher-5m` remains paused and must not be resumed automatically.
 
-The production ingestion container is defined by:
+The repository may retain Python ingestion/runtime code under `open-engine/cloudrun/` because the code is reusable as a local/GitHub Actions execution target; the directory name does not imply a Google Cloud deployment.
 
-- `open-engine/Dockerfile.ingestion`
-- `open-engine/cloudrun/run-ingestion-job.sh`
-- `open-engine/cloudrun/batch_runner.py`
-- `open-engine/cloudrun/qa_database.py`
+## Ingestion workflow
 
-Each Cloud Run execution performs the bounded ingestion cycle and then runs database QA. A failed QA exits the job non-zero so data-quality failures are visible in Cloud Run execution history.
+The canonical refresh path is a bounded ingestion cycle that writes to Supabase and uses OmniRoute as the primary AI provider. The production workflow must not depend on a Google Cloud scheduler or Cloud Run job.
 
-The default bounded cycle remains:
+The former Google Cloud provisioning scripts have been removed from the repository. Do not recreate them as part of normal maintenance.
 
-```text
-max fetch:   40
-max process: 40
-schedule:    43 */2 * * * UTC
-```
-
-### One-time Google Cloud bootstrap
-
-Run this from Google Cloud Shell or another workstation where `gcloud` is authenticated to the intended project:
-
-```bash
-export DATABASE_URL='postgresql://...'
-export S3_ENDPOINT='https://...'
-export S3_ACCESS_KEY='...'
-export S3_SECRET_KEY='...'
-export S3_BUCKET='...'
-
-# Optional AI enrichment
-export OPENROUTER_API_KEY='...'
-export OPENROUTER_MODEL='...'
-export NVIDIA_API_KEY='...'
-export NVIDIA_MODEL='...'
-
-bash open-engine/cloudrun/bootstrap-ingestion-job.sh
-```
-
-The bootstrap script:
-
-1. enables Cloud Run, Cloud Scheduler, Cloud Build, Artifact Registry, Secret Manager and IAM APIs;
-2. creates the runtime and scheduler service accounts if needed;
-3. stores ingestion secrets in Google Secret Manager;
-4. builds `open-engine/Dockerfile.ingestion` using Cloud Build;
-5. deploys the `geoacademic-ingestion` Cloud Run Job;
-6. grants the scheduler service account permission to invoke the job;
-7. creates/updates the `geoacademic-ingestion-2h` Cloud Scheduler trigger using `43 */2 * * *` UTC;
-8. executes one job immediately and waits for completion.
-
-Default region: `europe-west3`.
-
-Override names or cadence with environment variables such as `GCP_REGION`, `GCP_INGESTION_JOB`, `GCP_INGESTION_SCHEDULER`, `GCP_INGESTION_CRON`, `MAX_FETCH`, and `MAX_PROCESS`.
-
-## Transitional GitHub ingestion fallback
-
-`.github/workflows/geoacademic-cloudrun-ingestion.yml` still carries the same two-hour cron **temporarily** so ingestion does not stop before the Cloud Run scheduler is actually provisioned and verified.
-
-After the bootstrap succeeds and at least one Cloud Scheduler-triggered execution is confirmed in Google Cloud, remove the `schedule:` block from that workflow. The workflow should then remain only as a manual emergency fallback.
-
-`.github/workflows/geoacademic-ingestion.yml` is already manual-only; its old Fly-based scheduled ingestion path is no longer part of normal production operation.
+The manual GitHub Actions workflow `.github/workflows/geoacademic-cloudrun-ingestion.yml` is a runner workflow only; despite its historical filename, it does **not** provision or invoke Google Cloud. It should remain manual-only.
 
 ## Database migrations and backups
 
