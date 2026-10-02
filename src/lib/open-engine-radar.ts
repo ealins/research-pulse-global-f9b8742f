@@ -278,11 +278,18 @@ const openEnginePulseQuery = queryOptions({
 });
 
 export const hybridOpportunitiesQuery = queryOptions({
-  queryKey: openEngineConfigured ? ["opportunities", "open-engine"] : ["opportunities"],
-  queryFn: async (context): Promise<OpportunityRow[]> =>
-    openEngineConfigured
-      ? openEngineOpportunitiesQuery.queryFn!(context as never)
-      : runLegacy<OpportunityRow[]>(legacyOpportunitiesQuery, context),
+  queryKey: ["opportunities", "hybrid-public"],
+  queryFn: async (context): Promise<OpportunityRow[]> => {
+    if (openEngineConfigured) {
+      try {
+        const items = await openEngineOpportunitiesQuery.queryFn!(context as never);
+        if (items.length > 0) return items;
+      } catch {
+        // Keep the legacy table path as a last-resort availability fallback.
+      }
+    }
+    return runLegacy<OpportunityRow[]>(legacyOpportunitiesQuery, context);
+  },
   staleTime: 60_000,
 });
 
