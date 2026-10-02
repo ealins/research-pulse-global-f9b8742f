@@ -7,10 +7,10 @@ const OPEN_ENGINE_SNAPSHOT_URL = import.meta.env["VITE_GEOACADEMIC_SNAPSHOT_URL"
 
 // The open-engine read model is available through Supabase even when no separate
 // HTTP API URL is configured.
-// Open Engine is an optional acceleration layer. The live public Supabase tables
-// remain the default source of truth so a stale/decommissioned Open Engine cannot
-// blank the knowledge hub. Re-enable it explicitly once its ingestion loop is healthy.
-export const openEngineConfigured = import.meta.env["VITE_GEOACADEMIC_USE_OPEN_ENGINE"] === "true";
+// The Supabase Open Engine projection is the canonical public read model. It is
+// backed by the same curated verification boundary used by ingestion and remains
+// available even when the separate API runtime is down.
+export const openEngineConfigured = true;
 
 export type OpenEngineFeed<T = Record<string, unknown>> = {
   entity_type: string;
