@@ -79,9 +79,6 @@ jobs:
           bash -n open-engine/deploy-oracle.sh
           bash -n open-engine/deploy.sh
           bash -n open-engine/oci/bootstrap-cloud-shell.sh
-          bash -n open-engine/cloudrun/bootstrap-cloud-shell.sh
-          bash -n open-engine/cloudrun/bootstrap-ingestion-job.sh
-          bash -n open-engine/cloudrun/redeploy-api.sh
 
       - name: Build ingestion container
         run: docker build -f open-engine/Dockerfile.ingestion open-engine
