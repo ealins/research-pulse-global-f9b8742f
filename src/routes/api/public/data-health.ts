@@ -49,11 +49,13 @@ export const Route = createFileRoute("/api/public/data-health")({
               })),
           ]);
 
-          if (publicSurface.error) {
-            throw new Error(`public_surface_counts: ${publicSurface.error.message}`);
-          }
-
           const counts = { ...(publicSurface.data ?? {}) };
+          if (publicSurface.error) {
+            console.warn(
+              "[data-health] public_surface_counts failed; serving degraded payload",
+              publicSurface.error,
+            );
+          }
 
           return json({
             ok: true,

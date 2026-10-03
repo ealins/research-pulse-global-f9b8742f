@@ -88,10 +88,41 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         }
         const action = body.action ?? "drain";
         const limit = Math.min(50, Math.max(1, body.limit ?? 8));
+        const { supabaseAdmin } = await import(
+          "@/integrations/supabase/client.server"
+        );
+
+        const recordSkippedPipelineRun = async (
+          reason: string,
+          details: Record<string, unknown>,
+        ) => {
+          const startedAt = new Date();
+          const { data: run, error } = await supabaseAdmin
+            .from("pipeline_runs")
+            .insert({
+              trigger: body.trigger ?? "cron",
+              started_at: startedAt.toISOString(),
+              finished_at: startedAt.toISOString(),
+              duration_ms: 0,
+              tasks_processed: 0,
+              tasks_ok: 0,
+              tasks_failed: 0,
+              tasks_dead: 0,
+              errors: 0,
+              details: {
+                skipped: true,
+                reason,
+                ...details,
+              } as never,
+            } as never)
+            .select("id")
+            .maybeSingle();
+          if (error) throw error;
+
+          return run?.id ?? null;
+        };
 
         try {
-          const { supabaseAdmin } =
-            await import("@/integrations/supabase/client.server");
         if (action === "enqueue-discovery") {
           const { enqueue } = await import("@/lib/ingest.server");
           const { data: withSources } = await supabaseAdmin
@@ -327,8 +358,13 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
 
         if (queueState.due_tasks === 0) {
           // Nothing to do: no fetch, no extraction, no NVIDIA call.
+          const runId = await recordSkippedPipelineRun("queue empty", {
+            mode: queueState.mode,
+            due_tasks: queueState.due_tasks,
+          });
           return json({
             action: "drain",
+            run_id: runId,
             skipped: true,
             reason: "queue empty",
             ...queueState,
@@ -349,8 +385,18 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             .limit(1)
             .maybeSingle();
           if (recent) {
+            const runId = await recordSkippedPipelineRun(
+              "steady-state interval not elapsed",
+              {
+              mode: queueState.mode,
+              interval_minutes: queueState.interval_minutes,
+              due_tasks: queueState.due_tasks,
+              recent_run_id: recent.id,
+              },
+            );
             return json({
               action: "drain",
+              run_id: runId,
               skipped: true,
               reason: "steady-state interval not elapsed",
               ...queueState,
