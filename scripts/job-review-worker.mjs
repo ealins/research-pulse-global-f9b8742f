@@ -93,6 +93,11 @@ async function callHook(action, payload = {}) {
     body = { raw: text.slice(0, 500) };
   }
   if (!response.ok) {
+    if (response.status === 401) {
+      throw new Error(
+        `Hook ${action} HTTP 401: INGESTION_HOOK_SECRET does not match the production hook secret`,
+      );
+    }
     throw new Error(
       `Hook ${action} HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`,
     );
