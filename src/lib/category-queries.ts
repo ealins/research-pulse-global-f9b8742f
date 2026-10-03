@@ -96,7 +96,7 @@ async function fetchLandscape() {
     supabase
       .from("opportunities")
       .select(
-        "id, institution_id, country, status, application_deadline, opportunity_topics!inner(topic_id)",
+        "id, institution_id, country, status, application_deadline, opportunity_topics(topic_id)",
       )
       .eq("is_demo", false)
       .in("status", LIVE_OPPORTUNITY_STATUSES)
@@ -105,27 +105,27 @@ async function fetchLandscape() {
       .not("official_source_url", "is", null),
     supabase
       .from("courses")
-      .select("id, institution_id, degree_type, course_topics!inner(topic_id)")
+      .select("id, institution_id, degree_type, course_topics(topic_id)")
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
     supabase
       .from("projects")
-      .select("id, institution_id, status, project_topics!inner(topic_id)")
+      .select("id, institution_id, status, project_topics(topic_id)")
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
     supabase
       .from("publications")
-      .select("id, institution_id, publication_date, year, publication_topics!inner(topic_id)")
+      .select("id, institution_id, publication_date, year, publication_topics(topic_id)")
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
     supabase
       .from("researchers")
-      .select("id, institution_id, researcher_topics!inner(topic_id)")
+      .select("id, institution_id, researcher_topics(topic_id)")
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
     supabase
       .from("events")
-      .select("id, country, start_date, event_topics!inner(topic_id)")
+      .select("id, country, start_date, event_topics(topic_id)")
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
   ]);
@@ -279,7 +279,7 @@ export function countryDetailQuery(slug: string) {
           .select(
             `id, title, slug, opportunity_type, status, application_deadline, city, funding_type,
              verification_status, confidence, official_source_url, is_demo,
-             institutions ( name, slug ), opportunity_topics!inner ( topic_id )`,
+             institutions ( name, slug ), opportunity_topics ( topic_id )`,
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
@@ -294,7 +294,7 @@ export function countryDetailQuery(slug: string) {
           .from("courses")
           .select(
             `id, title, slug, degree_type, language, duration, summary,
-             institutions ( name, slug ), course_topics!inner ( topic_id )`,
+             institutions ( name, slug ), course_topics ( topic_id )`,
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
@@ -304,7 +304,7 @@ export function countryDetailQuery(slug: string) {
         supabase
           .from("events")
           .select(
-            "id, title, slug, start_date, location, organization, website, country, event_topics!inner(topic_id)",
+            "id, title, slug, start_date, location, organization, website, country, event_topics(topic_id)",
           )
           .eq("is_demo", false)
           .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
@@ -313,7 +313,7 @@ export function countryDetailQuery(slug: string) {
         supabase
           .from("researchers")
           .select(
-            "id, full_name, slug, academic_title, current_position, institutions ( name, slug ), researcher_topics!inner(topic_id)",
+            "id, full_name, slug, academic_title, current_position, institutions ( name, slug ), researcher_topics(topic_id)",
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
@@ -322,7 +322,7 @@ export function countryDetailQuery(slug: string) {
         supabase
           .from("projects")
           .select(
-            "id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug ), project_topics!inner(topic_id)",
+            "id, name, slug, status, funding_organization, institutions!projects_institution_id_fkey ( name, slug ), project_topics(topic_id)",
           )
           .in("institution_id", ids)
           .eq("is_demo", false)
@@ -388,7 +388,7 @@ export const programmeCatalogueQuery = queryOptions({
         `id, title, slug, degree_type, language, duration, website, summary,
          verification_status, is_demo,
          institutions ( name, slug, country, city, continent ),
-         course_topics!inner ( research_topics ( name, slug ) )`,
+         course_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
@@ -416,7 +416,7 @@ export function programmeDetailQuery(slug: string) {
            verification_status, last_verified_at, is_demo, institution_id,
            institutions ( id, name, slug, country, city, continent, official_url, research_url, description, is_demo ),
            departments ( name, slug, website ),
-           course_topics!inner ( research_topics ( name, slug, category, description ) ),
+           course_topics ( research_topics ( name, slug, category, description ) ),
            course_researchers ( researchers ( full_name, slug, academic_title, current_position, is_demo ) )`,
         )
         .eq("slug", slug)
@@ -432,7 +432,7 @@ export function programmeDetailQuery(slug: string) {
           ? supabase
               .from("opportunities")
               .select(
-                "id, title, slug, opportunity_type, status, application_deadline, opportunity_topics!inner(topic_id)",
+                "id, title, slug, opportunity_type, status, application_deadline, opportunity_topics(topic_id)",
               )
               .eq("institution_id", instId)
               .eq("is_demo", false)
@@ -446,9 +446,7 @@ export function programmeDetailQuery(slug: string) {
         instId
           ? supabase
               .from("courses")
-              .select(
-                "id, title, slug, degree_type, language, duration, course_topics!inner(topic_id)",
-              )
+              .select("id, title, slug, degree_type, language, duration, course_topics(topic_id)")
               .eq("institution_id", instId)
               .eq("is_demo", false)
               .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
@@ -458,7 +456,7 @@ export function programmeDetailQuery(slug: string) {
         instId
           ? supabase
               .from("projects")
-              .select("id, name, slug, status, summary, project_topics!inner(topic_id)")
+              .select("id, name, slug, status, summary, project_topics(topic_id)")
               .eq("institution_id", instId)
               .eq("is_demo", false)
               .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
