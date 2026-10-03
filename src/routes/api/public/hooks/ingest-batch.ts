@@ -1,12 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
-import type {
-  ExternalFetchCompletion,
-  ExternalReviewCompletion,
-} from "@/lib/ingest.server";
+import type { ExternalFetchCompletion, ExternalReviewCompletion } from "@/lib/ingest.server";
 
 type Body = {
   action?:
     | "enqueue-discovery"
+    | "discover-programmes"
     | "drain"
     | "refresh-due"
     | "deadline-sweep"
@@ -67,9 +65,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
       POST: async ({ request }) => {
         const expected = process.env["INGESTION_HOOK_SECRET"] ?? "";
         if (!expected) {
-          console.error(
-            "[ingestion-hook] INGESTION_HOOK_SECRET is not configured",
-          );
+          console.error("[ingestion-hook] INGESTION_HOOK_SECRET is not configured");
           return json({ error: "Ingestion hook is not configured" }, 503);
         }
         const authorization = request.headers.get("authorization") ?? "";
@@ -88,9 +84,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         }
         const action = body.action ?? "drain";
         const limit = Math.min(50, Math.max(1, body.limit ?? 8));
-        const { supabaseAdmin } = await import(
-          "@/integrations/supabase/client.server"
-        );
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
         const recordSkippedPipelineRun = async (
           reason: string,
@@ -123,438 +117,403 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
         };
 
         try {
-        if (action === "enqueue-discovery") {
-          const { enqueue } = await import("@/lib/ingest.server");
-          const { data: withSources } = await supabaseAdmin
-            .from("sources")
-            .select("institution_id")
-            .not("institution_id", "is", null);
-          const covered = new Set(
-            (withSources ?? []).map((r) => r.institution_id as string),
-          );
+          if (action === "enqueue-discovery") {
+            const { enqueue } = await import("@/lib/ingest.server");
+            const { data: withSources } = await supabaseAdmin
+              .from("sources")
+              .select("institution_id")
+              .not("institution_id", "is", null);
+            const covered = new Set((withSources ?? []).map((r) => r.institution_id as string));
 
-          const { data: pendingTasks } = await supabaseAdmin
-            .from("ingestion_tasks")
-            .select("institution_id")
-            .eq("task_type", "DISCOVER")
-            .in("status", ["QUEUED", "PROCESSING", "RETRY"]);
-          for (const t of pendingTasks ?? []) {
-            if (t.institution_id) covered.add(t.institution_id);
-          }
-
-          const { data: institutions, error } = await supabaseAdmin
-            .from("institutions")
-            .select("id, name, official_url, research_url, careers_url")
-            .not("official_url", "is", null)
-            .limit(500);
-          if (error) return json({ error: error.message }, 500);
-
-          // Institutions with a dedicated research/careers URL crawl best, so go first.
-          const backlog = (institutions ?? [])
-            .filter((i) => !covered.has(i.id))
-            .sort((a, b) => {
-              const score = (i: {
-                research_url: string | null;
-                careers_url: string | null;
-              }) => (i.research_url ? 2 : 0) + (i.careers_url ? 1 : 0);
-              return score(b) - score(a);
-            });
-          const targets = backlog.slice(0, limit);
-          for (const inst of targets) {
-            await enqueue("DISCOVER", { institution_id: inst.id });
-          }
-          return json({
-            action,
-            queued: targets.length,
-            names: targets.map((t) => t.name),
-            remaining: backlog.length - targets.length,
-          });
-        }
-
-        // One-time backfill planners. They only ENQUEUE work from data that is
-        // already stored; the autonomous drain loop does the processing.
-        if (action === "backfill-raw") {
-          const { enqueueRawBackfill } = await import("@/lib/backfill.server");
-          const result = await enqueueRawBackfill(
-            Math.min(1000, Math.max(1, body.limit ?? 400)),
-          );
-          return json({ action, ...result });
-        }
-        if (action === "backfill-providers") {
-          const { enqueueProviderBackfill } =
-            await import("@/lib/backfill.server");
-          const result = await enqueueProviderBackfill(
-            Math.min(400, Math.max(1, body.limit ?? 120)),
-          );
-          return json({ action, ...result });
-        }
-
-        if (action === "sync-pulse") {
-          const { backfillPulseEvents } = await import("@/lib/pulse.server");
-          const result = await backfillPulseEvents(
-            Math.min(250, Math.max(10, body.limit ?? 120)),
-          );
-          return json({ action, ...result });
-        }
-
-        if (action === "refresh-insights") {
-          const { backfillPulseEvents } = await import("@/lib/pulse.server");
-          const pulse = await backfillPulseEvents(
-            Math.min(250, Math.max(20, body.limit ?? 160)),
-          );
-          const { data: insights, error } = await supabaseAdmin.rpc(
-            "refresh_public_insights",
-          );
-          if (!error) return json({ action, pulse, insights });
-
-          // Compatibility path during a rolling deployment: momentum existed
-          // before the combined insight refresh migration. Keep it fresh while
-          // clearly reporting that collaboration refresh is not available yet.
-          const { data: momentum, error: momentumError } =
-            await supabaseAdmin.rpc("refresh_topic_momentum");
-          if (momentumError) return json({ error: error.message }, 500);
-          return json({
-            action,
-            pulse,
-            insights: { momentum_topics: momentum, collaboration: null },
-            partial: true,
-            migration_pending: true,
-          });
-        }
-
-        if (action === "reseed-high-value") {
-          const { enqueueHighValueReseed } =
-            await import("@/lib/ingest.server");
-          const result = await enqueueHighValueReseed(
-            Math.min(300, Math.max(10, body.limit ?? 150)),
-          );
-          return json({ action, ...result });
-        }
-
-        if (action === "recover-detail-sources") {
-          const { enqueueExistingDetailRecovery } =
-            await import("@/lib/ingest.server");
-          const result = await enqueueExistingDetailRecovery(
-            Math.min(1000, Math.max(10, body.limit ?? 300)),
-          );
-          return json({ action, ...result });
-        }
-
-        // Expensive network fetching runs on the persistent worker. The app
-        // only leases bounded tasks and stores validated, compact snapshots.
-        if (action === "worker-status") {
-          const { getExternalWorkerStatus } =
-            await import("@/lib/ingest.server");
-          return json({ action, ...(await getExternalWorkerStatus()) });
-        }
-        if (action === "lease-fetch") {
-          // Probe mode is non-mutating and exists for production smoke tests.
-          // It proves the public route can reach the ingestion queue without
-          // claiming a task just to test health.
-          if (body.probe === true) {
-            const { data, error } = await supabaseAdmin
+            const { data: pendingTasks } = await supabaseAdmin
               .from("ingestion_tasks")
-              .select("id")
-              .eq("task_type", "FETCH")
-              .in("status", ["QUEUED", "RETRY"])
-              .lte("run_after", new Date().toISOString())
-              .limit(1);
-            if (error) return json({ action, probe: true, error: error.message }, 500);
+              .select("institution_id")
+              .eq("task_type", "DISCOVER")
+              .in("status", ["QUEUED", "PROCESSING", "RETRY"]);
+            for (const t of pendingTasks ?? []) {
+              if (t.institution_id) covered.add(t.institution_id);
+            }
+
+            const { data: institutions, error } = await supabaseAdmin
+              .from("institutions")
+              .select("id, name, official_url, research_url, careers_url")
+              .not("official_url", "is", null)
+              .limit(500);
+            if (error) return json({ error: error.message }, 500);
+
+            // Institutions with a dedicated research/careers URL crawl best, so go first.
+            const backlog = (institutions ?? [])
+              .filter((i) => !covered.has(i.id))
+              .sort((a, b) => {
+                const score = (i: { research_url: string | null; careers_url: string | null }) =>
+                  (i.research_url ? 2 : 0) + (i.careers_url ? 1 : 0);
+                return score(b) - score(a);
+              });
+            const targets = backlog.slice(0, limit);
+            for (const inst of targets) {
+              await enqueue("DISCOVER", { institution_id: inst.id });
+            }
             return json({
               action,
-              probe: true,
-              due: (data ?? []).length > 0,
+              queued: targets.length,
+              names: targets.map((t) => t.name),
+              remaining: backlog.length - targets.length,
             });
           }
-          // leaseExternalFetchTasks performs the backpressure check itself.
-          // Avoid a duplicate worker-status query here: on a large backlog the
-          // exact-count queries can exceed the public request budget before the
-          // actual lease transaction even starts.
-          const { leaseExternalFetchTasks } =
-            await import("@/lib/external-fetch-lease.server");
-          const leases = await leaseExternalFetchTasks(
-            Math.min(20, Math.max(1, body.limit ?? 8)),
-          );
-          return json({
-            action,
-            leases,
-            count: leases.length,
-            paused: leases.length === 0,
-          });
-        }
-        if (action === "complete-fetch") {
-          if (!body.completion || typeof body.completion !== "object") {
-            return json({ error: "Missing completion payload" }, 400);
-          }
-          const { completeExternalFetch } = await import("@/lib/ingest.server");
-          const result = await completeExternalFetch(
-            body.completion as ExternalFetchCompletion,
-          );
-          return json(
-            { action, ...result },
-            result.status === "STALE" ? 409 : 200,
-          );
-        }
-        if (action === "lease-review") {
-          const { leaseExternalReviewTasks } =
-            await import("@/lib/ingest.server");
-          const leases = await leaseExternalReviewTasks(
-            Math.min(10, Math.max(1, body.limit ?? 4)),
-            body.model_available === true,
-          );
-          return json({ action, leases, count: leases.length });
-        }
-        if (action === "complete-review") {
-          if (!body.completion || typeof body.completion !== "object") {
-            return json({ error: "Missing completion payload" }, 400);
-          }
-          const { completeExternalReview } =
-            await import("@/lib/ingest.server");
-          const result = await completeExternalReview(
-            body.completion as ExternalReviewCompletion,
-          );
-          return json(
-            { action, ...result },
-            result.status === "STALE" ? 409 : 200,
-          );
-        }
-
-        // Structured-provider drain (ROR/OpenAIRE/Crossref). Never calls a model,
-        // so it is safe to run on its own cheap cadence.
-        if (action === "drain-providers") {
-          const { runQueueBatch } = await import("@/lib/ingest.server");
-          const result = await runQueueBatch(
-            Math.min(30, Math.max(1, body.limit ?? 12)),
-            ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"],
-            2,
-          );
-          return json({ action, ...result });
-        }
-
-        // Time-based source refresh: turns elapsed intervals into fetch work.
-        // Only sources whose own cadence is due are queued.
-        if (action === "refresh-due") {
-          const { enqueueDueRefreshes } = await import("@/lib/schedule.server");
-          const result = await enqueueDueRefreshes(
-            Math.min(200, Math.max(1, body.limit ?? 40)),
-          );
-          return json({ action, ...result });
-        }
-
-        // Deterministic deadline maintenance — pure date arithmetic, no model call.
-        if (action === "deadline-sweep") {
-          const { sweepOpportunityDeadlines } =
-            await import("@/lib/schedule.server");
-          const result = await sweepOpportunityDeadlines();
-          return json({ action, ...result });
-        }
-
-        // Queue processing: waking up is cheap, working is not. Check first.
-        const { runQueueBatch } = await import("@/lib/ingest.server");
-        const { loadSchedule, readQueueState } =
-          await import("@/lib/schedule.server");
-        const schedule = await loadSchedule();
-        const queueState = await readQueueState(schedule);
-
-        if (queueState.due_tasks === 0) {
-          // Nothing to do: no fetch, no extraction, no NVIDIA call.
-          const runId = await recordSkippedPipelineRun("queue empty", {
-            mode: queueState.mode,
-            due_tasks: queueState.due_tasks,
-          });
-          return json({
-            action: "drain",
-            run_id: runId,
-            skipped: true,
-            reason: "queue empty",
-            ...queueState,
-          });
-        }
-
-        // In steady state the processor only works every steady_interval_minutes
-        // even though the scheduler wakes on the backlog cadence.
-        if (queueState.mode === "STEADY_STATE") {
-          const cutoff = new Date(
-            Date.now() - queueState.interval_minutes * 60_000,
-          ).toISOString();
-          const { data: recent } = await supabaseAdmin
-            .from("pipeline_runs")
-            .select("id")
-            .gt("started_at", cutoff)
-            .gt("tasks_processed", 0)
-            .limit(1)
-            .maybeSingle();
-          if (recent) {
-            const runId = await recordSkippedPipelineRun(
-              "steady-state interval not elapsed",
-              {
-              mode: queueState.mode,
-              interval_minutes: queueState.interval_minutes,
-              due_tasks: queueState.due_tasks,
-              recent_run_id: recent.id,
-              },
+          if (action === "discover-programmes") {
+            const { enqueueProgrammeDiscovery } = await import("@/lib/ingest.server");
+            const result = await enqueueProgrammeDiscovery(
+              Math.min(200, Math.max(1, body.limit ?? 100)),
             );
+            return json({ action, ...result });
+          }
+
+          // One-time backfill planners. They only ENQUEUE work from data that is
+          // already stored; the autonomous drain loop does the processing.
+          if (action === "backfill-raw") {
+            const { enqueueRawBackfill } = await import("@/lib/backfill.server");
+            const result = await enqueueRawBackfill(Math.min(1000, Math.max(1, body.limit ?? 400)));
+            return json({ action, ...result });
+          }
+          if (action === "backfill-providers") {
+            const { enqueueProviderBackfill } = await import("@/lib/backfill.server");
+            const result = await enqueueProviderBackfill(
+              Math.min(400, Math.max(1, body.limit ?? 120)),
+            );
+            return json({ action, ...result });
+          }
+
+          if (action === "sync-pulse") {
+            const { backfillPulseEvents } = await import("@/lib/pulse.server");
+            const result = await backfillPulseEvents(
+              Math.min(250, Math.max(10, body.limit ?? 120)),
+            );
+            return json({ action, ...result });
+          }
+
+          if (action === "refresh-insights") {
+            const { backfillPulseEvents } = await import("@/lib/pulse.server");
+            const pulse = await backfillPulseEvents(Math.min(250, Math.max(20, body.limit ?? 160)));
+            const { data: insights, error } = await supabaseAdmin.rpc("refresh_public_insights");
+            if (!error) return json({ action, pulse, insights });
+
+            // Compatibility path during a rolling deployment: momentum existed
+            // before the combined insight refresh migration. Keep it fresh while
+            // clearly reporting that collaboration refresh is not available yet.
+            const { data: momentum, error: momentumError } =
+              await supabaseAdmin.rpc("refresh_topic_momentum");
+            if (momentumError) return json({ error: error.message }, 500);
+            return json({
+              action,
+              pulse,
+              insights: { momentum_topics: momentum, collaboration: null },
+              partial: true,
+              migration_pending: true,
+            });
+          }
+
+          if (action === "reseed-high-value") {
+            const { enqueueHighValueReseed } = await import("@/lib/ingest.server");
+            const result = await enqueueHighValueReseed(
+              Math.min(300, Math.max(10, body.limit ?? 150)),
+            );
+            return json({ action, ...result });
+          }
+
+          if (action === "recover-detail-sources") {
+            const { enqueueExistingDetailRecovery } = await import("@/lib/ingest.server");
+            const result = await enqueueExistingDetailRecovery(
+              Math.min(1000, Math.max(10, body.limit ?? 300)),
+            );
+            return json({ action, ...result });
+          }
+
+          // Expensive network fetching runs on the persistent worker. The app
+          // only leases bounded tasks and stores validated, compact snapshots.
+          if (action === "worker-status") {
+            const { getExternalWorkerStatus } = await import("@/lib/ingest.server");
+            return json({ action, ...(await getExternalWorkerStatus()) });
+          }
+          if (action === "lease-fetch") {
+            // Probe mode is non-mutating and exists for production smoke tests.
+            // It proves the public route can reach the ingestion queue without
+            // claiming a task just to test health.
+            if (body.probe === true) {
+              const { data, error } = await supabaseAdmin
+                .from("ingestion_tasks")
+                .select("id")
+                .eq("task_type", "FETCH")
+                .in("status", ["QUEUED", "RETRY"])
+                .lte("run_after", new Date().toISOString())
+                .limit(1);
+              if (error) return json({ action, probe: true, error: error.message }, 500);
+              return json({
+                action,
+                probe: true,
+                due: (data ?? []).length > 0,
+              });
+            }
+            // leaseExternalFetchTasks performs the backpressure check itself.
+            // Avoid a duplicate worker-status query here: on a large backlog the
+            // exact-count queries can exceed the public request budget before the
+            // actual lease transaction even starts.
+            const { leaseExternalFetchTasks } = await import("@/lib/external-fetch-lease.server");
+            const leases = await leaseExternalFetchTasks(
+              Math.min(20, Math.max(1, body.limit ?? 8)),
+            );
+            return json({
+              action,
+              leases,
+              count: leases.length,
+              paused: leases.length === 0,
+            });
+          }
+          if (action === "complete-fetch") {
+            if (!body.completion || typeof body.completion !== "object") {
+              return json({ error: "Missing completion payload" }, 400);
+            }
+            const { completeExternalFetch } = await import("@/lib/ingest.server");
+            const result = await completeExternalFetch(body.completion as ExternalFetchCompletion);
+            return json({ action, ...result }, result.status === "STALE" ? 409 : 200);
+          }
+          if (action === "lease-review") {
+            const { leaseExternalReviewTasks } = await import("@/lib/ingest.server");
+            const leases = await leaseExternalReviewTasks(
+              Math.min(10, Math.max(1, body.limit ?? 4)),
+              body.model_available === true,
+            );
+            return json({ action, leases, count: leases.length });
+          }
+          if (action === "complete-review") {
+            if (!body.completion || typeof body.completion !== "object") {
+              return json({ error: "Missing completion payload" }, 400);
+            }
+            const { completeExternalReview } = await import("@/lib/ingest.server");
+            const result = await completeExternalReview(
+              body.completion as ExternalReviewCompletion,
+            );
+            return json({ action, ...result }, result.status === "STALE" ? 409 : 200);
+          }
+
+          // Structured-provider drain (ROR/OpenAIRE/Crossref). Never calls a model,
+          // so it is safe to run on its own cheap cadence.
+          if (action === "drain-providers") {
+            const { runQueueBatch } = await import("@/lib/ingest.server");
+            const result = await runQueueBatch(
+              Math.min(30, Math.max(1, body.limit ?? 12)),
+              ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"],
+              2,
+            );
+            return json({ action, ...result });
+          }
+
+          // Time-based source refresh: turns elapsed intervals into fetch work.
+          // Only sources whose own cadence is due are queued.
+          if (action === "refresh-due") {
+            const { enqueueDueRefreshes } = await import("@/lib/schedule.server");
+            const result = await enqueueDueRefreshes(Math.min(200, Math.max(1, body.limit ?? 40)));
+            return json({ action, ...result });
+          }
+
+          // Deterministic deadline maintenance — pure date arithmetic, no model call.
+          if (action === "deadline-sweep") {
+            const { sweepOpportunityDeadlines } = await import("@/lib/schedule.server");
+            const result = await sweepOpportunityDeadlines();
+            return json({ action, ...result });
+          }
+
+          // Queue processing: waking up is cheap, working is not. Check first.
+          const { runQueueBatch } = await import("@/lib/ingest.server");
+          const { loadSchedule, readQueueState } = await import("@/lib/schedule.server");
+          const schedule = await loadSchedule();
+          const queueState = await readQueueState(schedule);
+
+          if (queueState.due_tasks === 0) {
+            // Nothing to do: no fetch, no extraction, no NVIDIA call.
+            const runId = await recordSkippedPipelineRun("queue empty", {
+              mode: queueState.mode,
+              due_tasks: queueState.due_tasks,
+            });
             return json({
               action: "drain",
               run_id: runId,
               skipped: true,
-              reason: "steady-state interval not elapsed",
+              reason: "queue empty",
               ...queueState,
             });
           }
-        }
 
-        const batch = Math.min(
-          50,
-          Math.max(1, body.limit ?? queueState.batch_size),
-        );
+          // In steady state the processor only works every steady_interval_minutes
+          // even though the scheduler wakes on the backlog cadence.
+          if (queueState.mode === "STEADY_STATE") {
+            const cutoff = new Date(
+              Date.now() - queueState.interval_minutes * 60_000,
+            ).toISOString();
+            const { data: recent } = await supabaseAdmin
+              .from("pipeline_runs")
+              .select("id")
+              .gt("started_at", cutoff)
+              .gt("tasks_processed", 0)
+              .limit(1)
+              .maybeSingle();
+            if (recent) {
+              const runId = await recordSkippedPipelineRun("steady-state interval not elapsed", {
+                mode: queueState.mode,
+                interval_minutes: queueState.interval_minutes,
+                due_tasks: queueState.due_tasks,
+                recent_run_id: recent.id,
+              });
+              return json({
+                action: "drain",
+                run_id: runId,
+                skipped: true,
+                reason: "steady-state interval not elapsed",
+                ...queueState,
+              });
+            }
+          }
 
-        // Every autonomous tick is recorded so /admin/pipeline-health can prove
-        // that scheduled processing is really running.
-        const startedAt = new Date();
-        const { data: run } = await supabaseAdmin
-          .from("pipeline_runs")
-          .insert({
-            trigger: body.trigger ?? "cron",
-            started_at: startedAt.toISOString(),
-            details: {
+          const batch = Math.min(50, Math.max(1, body.limit ?? queueState.batch_size));
+
+          // Every autonomous tick is recorded so /admin/pipeline-health can prove
+          // that scheduled processing is really running.
+          const startedAt = new Date();
+          const { data: run } = await supabaseAdmin
+            .from("pipeline_runs")
+            .insert({
+              trigger: body.trigger ?? "cron",
+              started_at: startedAt.toISOString(),
+              details: {
+                mode: queueState.mode,
+                batch_size: batch,
+                due_tasks: queueState.due_tasks,
+              } as never,
+            } as never)
+            .select("id")
+            .maybeSingle();
+
+          try {
+            // Backlog draining is adaptive: process NORMALIZE in small waves with
+            // NVIDIA concurrency fixed at 2, but keep draining cheap deterministic
+            // rejects within the same cron invocation. The request limit remains a
+            // real upper bound, and a short wall-clock budget prevents Worker timeouts.
+            const normalizeTarget =
+              queueState.mode === "BACKLOG" ? Math.min(8, batch) : Math.min(2, batch);
+            // Vacancy normalization is deterministic and source-backed.
+            // Keep requests below the Cloudflare request budget while using
+            // parallel workers; semantic enrichment remains asynchronous.
+            const normalizeWave =
+              queueState.mode === "BACKLOG"
+                ? Math.min(8, normalizeTarget)
+                : Math.min(2, normalizeTarget);
+            const normalizeBudgetMs = queueState.mode === "BACKLOG" ? 24_000 : 20_000;
+            const emptyResult = () => ({
+              processed: 0,
+              ok: 0,
+              failed: 0,
+              dead: 0,
+              normalized: 0,
+              skipped: 0,
+              details: [] as string[],
+            });
+            const result = emptyResult();
+            let normalizeWaves = 0;
+            let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
+
+            while (
+              result.processed < normalizeTarget &&
+              Date.now() - startedAt.getTime() < normalizeBudgetMs
+            ) {
+              const remaining = normalizeTarget - result.processed;
+              const wave = await runQueueBatch(
+                Math.min(normalizeWave, remaining),
+                ["NORMALIZE"],
+                queueState.mode === "BACKLOG" ? 8 : 2,
+              );
+              normalizeWaves += 1;
+              result.processed += wave.processed;
+              result.ok += wave.ok;
+              result.failed += wave.failed;
+              result.dead += wave.dead;
+              result.normalized += wave.normalized;
+              result.skipped += wave.skipped;
+              result.details.push(...wave.details);
+
+              if (wave.processed === 0) break;
+              // If a wave ends with multiple hard failures, stop this tick and let
+              // exponential retry/backoff cool the provider down before the next wake.
+              if (wave.failed + wave.dead >= 2) break;
+            }
+
+            if (result.processed === 0) {
+              // FETCH is exclusively owned by the external fetch worker. The
+              // Cloudflare queue drain must never claim FETCH tasks itself:
+              // production does not inherit the legacy Fly-only environment flag,
+              // and a second consumer would invalidate the external worker lease.
+              taskGroup = "DISCOVER";
+              const collection = await runQueueBatch(batch, ["DISCOVER"]);
+              result.processed = collection.processed;
+              result.ok = collection.ok;
+              result.failed = collection.failed;
+              result.dead = collection.dead;
+              result.normalized = collection.normalized;
+              result.skipped = collection.skipped;
+              result.details.push(...collection.details);
+            }
+            const { data: llm } = await supabaseAdmin
+              .from("llm_processing_runs")
+              .select("cached")
+              .gte("created_at", startedAt.toISOString());
+            const calls = llm ?? [];
+            if (run?.id) {
+              await supabaseAdmin
+                .from("pipeline_runs")
+                .update({
+                  finished_at: new Date().toISOString(),
+                  duration_ms: Date.now() - startedAt.getTime(),
+                  tasks_processed: result.processed,
+                  tasks_ok: result.ok,
+                  tasks_failed: result.failed,
+                  tasks_dead: result.dead,
+                  nvidia_calls: calls.length,
+                  nvidia_cached: calls.filter((c) => c.cached).length,
+                  errors: result.failed + result.dead,
+                  details: {
+                    mode: queueState.mode,
+                    batch_size: taskGroup === "NORMALIZE" ? normalizeTarget : batch,
+                    task_group: taskGroup,
+                    normalize_waves: taskGroup === "NORMALIZE" ? normalizeWaves : 0,
+                    normalize_target: taskGroup === "NORMALIZE" ? normalizeTarget : 0,
+                    normalize_budget_ms: taskGroup === "NORMALIZE" ? normalizeBudgetMs : 0,
+                    normalized: result.normalized,
+                    skipped: result.skipped,
+                    sample: result.details.slice(0, 20),
+                  } as never,
+                })
+                .eq("id", run.id);
+            }
+            return json({
+              action: "drain",
+              run_id: run?.id ?? null,
               mode: queueState.mode,
-              batch_size: batch,
-              due_tasks: queueState.due_tasks,
-            } as never,
-          } as never)
-          .select("id")
-          .maybeSingle();
-
-        try {
-          // Backlog draining is adaptive: process NORMALIZE in small waves with
-          // NVIDIA concurrency fixed at 2, but keep draining cheap deterministic
-          // rejects within the same cron invocation. The request limit remains a
-          // real upper bound, and a short wall-clock budget prevents Worker timeouts.
-          const normalizeTarget =
-            queueState.mode === "BACKLOG"
-              ? Math.min(8, batch)
-              : Math.min(2, batch);
-          // Vacancy normalization is deterministic and source-backed.
-          // Keep requests below the Cloudflare request budget while using
-          // parallel workers; semantic enrichment remains asynchronous.
-          const normalizeWave =
-            queueState.mode === "BACKLOG"
-              ? Math.min(8, normalizeTarget)
-              : Math.min(2, normalizeTarget);
-          const normalizeBudgetMs =
-            queueState.mode === "BACKLOG" ? 24_000 : 20_000;
-          const emptyResult = () => ({
-            processed: 0,
-            ok: 0,
-            failed: 0,
-            dead: 0,
-            normalized: 0,
-            skipped: 0,
-            details: [] as string[],
-          });
-          const result = emptyResult();
-          let normalizeWaves = 0;
-          let taskGroup: "NORMALIZE" | "FETCH_DISCOVER" = "NORMALIZE";
-
-          while (
-            result.processed < normalizeTarget &&
-            Date.now() - startedAt.getTime() < normalizeBudgetMs
-          ) {
-            const remaining = normalizeTarget - result.processed;
-            const wave = await runQueueBatch(
-              Math.min(normalizeWave, remaining),
-              ["NORMALIZE"],
-              queueState.mode === "BACKLOG" ? 8 : 2,
-            );
-            normalizeWaves += 1;
-            result.processed += wave.processed;
-            result.ok += wave.ok;
-            result.failed += wave.failed;
-            result.dead += wave.dead;
-            result.normalized += wave.normalized;
-            result.skipped += wave.skipped;
-            result.details.push(...wave.details);
-
-            if (wave.processed === 0) break;
-            // If a wave ends with multiple hard failures, stop this tick and let
-            // exponential retry/backoff cool the provider down before the next wake.
-            if (wave.failed + wave.dead >= 2) break;
+              task_group: taskGroup,
+              ...result,
+            });
+          } catch (e) {
+            const message = errorMessage(e);
+            if (run?.id) {
+              await supabaseAdmin
+                .from("pipeline_runs")
+                .update({
+                  finished_at: new Date().toISOString(),
+                  duration_ms: Date.now() - startedAt.getTime(),
+                  errors: 1,
+                  error_message: message.slice(0, 1000),
+                })
+                .eq("id", run.id);
+            }
+            return json({ error: message }, 500);
           }
-
-          if (result.processed === 0) {
-            // FETCH is exclusively owned by the external fetch worker. The
-            // Cloudflare queue drain must never claim FETCH tasks itself:
-            // production does not inherit the legacy Fly-only environment flag,
-            // and a second consumer would invalidate the external worker lease.
-            taskGroup = "DISCOVER";
-            const collection = await runQueueBatch(batch, ["DISCOVER"]);
-            result.processed = collection.processed;
-            result.ok = collection.ok;
-            result.failed = collection.failed;
-            result.dead = collection.dead;
-            result.normalized = collection.normalized;
-            result.skipped = collection.skipped;
-            result.details.push(...collection.details);
-          }
-          const { data: llm } = await supabaseAdmin
-            .from("llm_processing_runs")
-            .select("cached")
-            .gte("created_at", startedAt.toISOString());
-          const calls = llm ?? [];
-          if (run?.id) {
-            await supabaseAdmin
-              .from("pipeline_runs")
-              .update({
-                finished_at: new Date().toISOString(),
-                duration_ms: Date.now() - startedAt.getTime(),
-                tasks_processed: result.processed,
-                tasks_ok: result.ok,
-                tasks_failed: result.failed,
-                tasks_dead: result.dead,
-                nvidia_calls: calls.length,
-                nvidia_cached: calls.filter((c) => c.cached).length,
-                errors: result.failed + result.dead,
-                details: {
-                  mode: queueState.mode,
-                  batch_size:
-                    taskGroup === "NORMALIZE" ? normalizeTarget : batch,
-                  task_group: taskGroup,
-                  normalize_waves:
-                    taskGroup === "NORMALIZE" ? normalizeWaves : 0,
-                  normalize_target:
-                    taskGroup === "NORMALIZE" ? normalizeTarget : 0,
-                  normalize_budget_ms:
-                    taskGroup === "NORMALIZE" ? normalizeBudgetMs : 0,
-                  normalized: result.normalized,
-                  skipped: result.skipped,
-                  sample: result.details.slice(0, 20),
-                } as never,
-              })
-              .eq("id", run.id);
-          }
-          return json({
-            action: "drain",
-            run_id: run?.id ?? null,
-            mode: queueState.mode,
-            task_group: taskGroup,
-            ...result,
-          });
-        } catch (e) {
-          const message = errorMessage(e);
-          if (run?.id) {
-            await supabaseAdmin
-              .from("pipeline_runs")
-              .update({
-                finished_at: new Date().toISOString(),
-                duration_ms: Date.now() - startedAt.getTime(),
-                errors: 1,
-                error_message: message.slice(0, 1000),
-              })
-              .eq("id", run.id);
-          }
-          return json({ error: message }, 500);
-        }
         } catch (error) {
           const message = errorMessage(error);
           console.error(`[ingestion-hook] ${action} failed`, error);
