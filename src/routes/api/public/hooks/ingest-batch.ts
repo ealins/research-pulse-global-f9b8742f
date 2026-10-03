@@ -11,8 +11,6 @@ type Body = {
     | "backfill-raw"
     | "backfill-providers"
     | "drain-providers"
-    | "sync-pulse"
-    | "refresh-insights"
     | "reseed-high-value"
     | "recover-detail-sources"
     | "worker-status"
@@ -397,15 +395,11 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             // NVIDIA concurrency fixed at 2, but keep draining cheap deterministic
             // rejects within the same cron invocation. The request limit remains a
             // real upper bound, and a short wall-clock budget prevents Worker timeouts.
-            const normalizeTarget =
-              queueState.mode === "BACKLOG" ? Math.min(8, batch) : Math.min(2, batch);
+            const normalizeTarget = queueState.mode === "BACKLOG" ? Math.min(2, batch) : 1;
             // Vacancy normalization is deterministic and source-backed.
             // Keep requests below the Cloudflare request budget while using
             // parallel workers; semantic enrichment remains asynchronous.
-            const normalizeWave =
-              queueState.mode === "BACKLOG"
-                ? Math.min(8, normalizeTarget)
-                : Math.min(2, normalizeTarget);
+            const normalizeWave = 1;
             const normalizeBudgetMs = queueState.mode === "BACKLOG" ? 24_000 : 20_000;
             const emptyResult = () => ({
               processed: 0,
@@ -428,7 +422,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
               const wave = await runQueueBatch(
                 Math.min(normalizeWave, remaining),
                 ["NORMALIZE"],
-                queueState.mode === "BACKLOG" ? 8 : 2,
+                1,
               );
               normalizeWaves += 1;
               result.processed += wave.processed;
