@@ -7,6 +7,7 @@
  */
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
+import { pathToFileURL } from "node:url";
 
 const BASE_URL = (
   process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
@@ -70,16 +71,23 @@ const WORKER_TRIGGER =
 const USER_AGENT =
   "GeoAcademicRadarBot/1.0 (+https://geoacademic.app; academic source indexing)";
 
-if (!HOOK_SECRET) {
-  console.error("Missing INGESTION_HOOK_SECRET in environment.");
-  process.exit(1);
-}
-
 function clamp(value, min, max, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed)
     ? Math.min(max, Math.max(min, Math.floor(parsed)))
     : fallback;
+}
+
+export function shouldQueueMaintenance({
+  burstMode,
+  lastMaintenanceAtMs,
+  nowMs,
+  maintenanceIntervalMs,
+  fetchLeaseCount,
+}) {
+  if (fetchLeaseCount === 0) return true;
+  if (burstMode) return nowMs - lastMaintenanceAtMs >= maintenanceIntervalMs;
+  return nowMs - lastMaintenanceAtMs >= maintenanceIntervalMs;
 }
 
 let stopping = false;
@@ -533,101 +541,119 @@ async function runMaintenance() {
   );
 }
 
-console.log(
-  `GeoAcademic external fetch worker -> ${BASE_URL} concurrency=${CONCURRENCY} lease=${LEASE_LIMIT}${RUNTIME_MS ? ` runtime=${Math.round(RUNTIME_MS / 1000)}s` : " continuous"}`,
-);
+const shouldRunDirectly =
+  typeof process.argv[1] === "string" &&
+  import.meta.url === pathToFileURL(process.argv[1]).href;
 
-let lastMaintenanceAt = 0;
-let lastReseedAt = 0;
-const stopAt = RUNTIME_MS ? Date.now() + RUNTIME_MS : Number.POSITIVE_INFINITY;
-while (!stopping && Date.now() < stopAt) {
-  try {
-    // Burst runs are dedicated to fresh FETCH work. Do not put maintenance
-    // hooks ahead of the fetch queue: any slow projection/discovery hook would
-    // otherwise consume the entire burst runtime before a single source page
-    // is downloaded.
-    if (!BURST_MODE && Date.now() - lastMaintenanceAt >= MAINTENANCE_INTERVAL_MS) {
-      await runMaintenance();
-      lastMaintenanceAt = Date.now();
-    }
-    if (!BURST_MODE && Date.now() - lastReseedAt >= RESEED_INTERVAL_MS) {
-      const reseed = await callHook("reseed-high-value", { limit: 100 });
-      lastReseedAt = Date.now();
-      console.log(
-        `${new Date().toISOString()} RESEED queued=${reseed.queued ?? 0}`,
-      );
-    }
-
-    const leased = await callHook(
-      "lease-fetch",
-      { limit: LEASE_LIMIT },
-      20_000,
-    );
-    const leases = Array.isArray(leased.leases) ? leased.leases : [];
-    if (leases.length === 0) {
-      console.log(`${new Date().toISOString()} IDLE no fetch tasks due`);
-      if (RUNTIME_MS) break;
-      await sleep(IDLE_DELAY_MS);
-      continue;
-    }
-
-    const results = await mapConcurrent(leases, CONCURRENCY, async (lease) => {
-      try {
-        return await fetchLease(lease);
-      } catch (error) {
-        console.error(
-          `${new Date().toISOString()} COMPLETE_FAILED task=${lease.task_id}:`,
-          error instanceof Error ? error.message : String(error),
-        );
-        return null;
-      }
-    });
-    const completed = results.filter(
-      (result) => result?.result?.status === "COMPLETE",
-    ).length;
-    const retries = results.filter(
-      (result) => result?.result?.status === "RETRY",
-    ).length;
-    const staleResults = results.filter(
-      (result) => result?.result?.status === "STALE",
-    );
-    const stale = staleResults.length;
-    if (staleResults.length) {
-      console.error(
-        `${new Date().toISOString()} FETCH_STALE_DETAILS ${JSON.stringify(
-          staleResults.map((result) => ({
-            task_id: result?.lease?.task_id,
-            stale_reason: result?.result?.stale_reason ?? "unknown",
-          })),
-        )}`,
-      );
-    }
-    console.log(
-      `${new Date().toISOString()} FETCH leased=${leases.length} complete=${completed} retry=${retries} stale=${stale}`,
-    );
-    if (BURST_MODE && stale > 0) {
-      fatalError = new Error(`Burst fetch produced ${stale} stale lease result(s)`);
-      break;
-    }
-    if (Date.now() + ACTIVE_DELAY_MS < stopAt) await sleep(ACTIVE_DELAY_MS);
-  } catch (error) {
-    console.error(
-      `${new Date().toISOString()} worker error:`,
-      error instanceof Error ? error.message : String(error),
-    );
-    if (RUNTIME_MS) {
-      fatalError = error instanceof Error ? error : new Error(String(error));
-      break;
-    }
-    await sleep(ERROR_DELAY_MS);
+if (shouldRunDirectly) {
+  if (!HOOK_SECRET) {
+    console.error("Missing INGESTION_HOOK_SECRET in environment.");
+    process.exit(1);
   }
-}
 
-if (fatalError) {
-  console.error(
-    `Worker failed: ${fatalError instanceof Error ? fatalError.message : String(fatalError)}`,
+  console.log(
+    `GeoAcademic external fetch worker -> ${BASE_URL} concurrency=${CONCURRENCY} lease=${LEASE_LIMIT}${RUNTIME_MS ? ` runtime=${Math.round(RUNTIME_MS / 1000)}s` : " continuous"}`,
   );
-  process.exitCode = 1;
-} else {
-  console.log("Worker stopped.");
+
+  let lastMaintenanceAt = 0;
+  let lastReseedAt = 0;
+  const stopAt = RUNTIME_MS ? Date.now() + RUNTIME_MS : Number.POSITIVE_INFINITY;
+  while (!stopping && Date.now() < stopAt) {
+    try {
+      if (!BURST_MODE && Date.now() - lastMaintenanceAt >= MAINTENANCE_INTERVAL_MS) {
+        await runMaintenance();
+        lastMaintenanceAt = Date.now();
+      }
+      if (!BURST_MODE && Date.now() - lastReseedAt >= RESEED_INTERVAL_MS) {
+        const reseed = await callHook("reseed-high-value", { limit: 100 });
+        lastReseedAt = Date.now();
+        console.log(
+          `${new Date().toISOString()} RESEED queued=${reseed.queued ?? 0}`,
+        );
+      }
+
+      const leased = await callHook(
+        "lease-fetch",
+        { limit: LEASE_LIMIT },
+        20_000,
+      );
+      const leases = Array.isArray(leased.leases) ? leased.leases : [];
+      const maintenanceNow = shouldQueueMaintenance({
+        burstMode: BURST_MODE,
+        lastMaintenanceAtMs: lastMaintenanceAt,
+        nowMs: Date.now(),
+        maintenanceIntervalMs: MAINTENANCE_INTERVAL_MS,
+        fetchLeaseCount: leases.length,
+      });
+      if (maintenanceNow) {
+        await runMaintenance();
+        lastMaintenanceAt = Date.now();
+      }
+      if (leases.length === 0) {
+        console.log(`${new Date().toISOString()} IDLE no fetch tasks due`);
+        if (RUNTIME_MS) break;
+        await sleep(IDLE_DELAY_MS);
+        continue;
+      }
+
+      const results = await mapConcurrent(leases, CONCURRENCY, async (lease) => {
+        try {
+          return await fetchLease(lease);
+        } catch (error) {
+          console.error(
+            `${new Date().toISOString()} COMPLETE_FAILED task=${lease.task_id}:`,
+            error instanceof Error ? error.message : String(error),
+          );
+          return null;
+        }
+      });
+      const completed = results.filter(
+        (result) => result?.result?.status === "COMPLETE",
+      ).length;
+      const retries = results.filter(
+        (result) => result?.result?.status === "RETRY",
+      ).length;
+      const staleResults = results.filter(
+        (result) => result?.result?.status === "STALE",
+      );
+      const stale = staleResults.length;
+      if (staleResults.length) {
+        console.error(
+          `${new Date().toISOString()} FETCH_STALE_DETAILS ${JSON.stringify(
+            staleResults.map((result) => ({
+              task_id: result?.lease?.task_id,
+              stale_reason: result?.result?.stale_reason ?? "unknown",
+            })),
+          )}`,
+        );
+      }
+      console.log(
+        `${new Date().toISOString()} FETCH leased=${leases.length} complete=${completed} retry=${retries} stale=${stale}`,
+      );
+      if (BURST_MODE && stale > 0) {
+        fatalError = new Error(`Burst fetch produced ${stale} stale lease result(s)`);
+        break;
+      }
+      if (Date.now() + ACTIVE_DELAY_MS < stopAt) await sleep(ACTIVE_DELAY_MS);
+    } catch (error) {
+      console.error(
+        `${new Date().toISOString()} worker error:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      if (RUNTIME_MS) {
+        fatalError = error instanceof Error ? error : new Error(String(error));
+        break;
+      }
+      await sleep(ERROR_DELAY_MS);
+    }
+  }
+
+  if (fatalError) {
+    console.error(
+      `Worker failed: ${fatalError instanceof Error ? fatalError.message : String(fatalError)}`,
+    );
+    process.exitCode = 1;
+  } else {
+    console.log("Worker stopped.");
+  }
 }
