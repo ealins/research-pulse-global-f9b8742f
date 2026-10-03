@@ -4,18 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: "*/5 * * * *"
-  workflow_run:
-    workflows: ["GeoAcademic fresh ingestion"]
-    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   deploy:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

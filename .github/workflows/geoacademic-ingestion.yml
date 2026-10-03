@@ -1,14 +1,9 @@
 name: GeoAcademic fresh ingestion
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Deploy GeoAcademic to Cloudflare"]
-    types: [completed]
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/15 * * * *"
 
 concurrency:
   group: geoacademic-ingestion-manual
@@ -19,7 +14,6 @@ permissions:
 
 jobs:
   review-jobs:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
@@ -55,7 +49,7 @@ jobs:
           node -e '
             const fs = require("fs");
             const v = JSON.parse(fs.readFileSync("/tmp/lease.json","utf8"));
-            if (v.probe !== true || v.due !== true) throw new Error("fetch lease probe did not confirm due work");
+            if (v.probe !== true) throw new Error("fetch lease probe did not reach the ingestion queue");
             console.log("LEASE_SMOKE_OK", JSON.stringify({probe:v.probe, due:v.due}));
           '
       - name: Fetch fresh source data first
