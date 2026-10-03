@@ -171,8 +171,8 @@ export function classifyUrlAndText(url: string, title: string, text: string): Cl
   return best;
 }
 
-function categoryForUrl(url: string): string | null {
-  const u = pathOf(url);
+function categoryForUrl(url: string, label = ""): string | null {
+  const u = `${pathOf(url)} ${label.toLowerCase().replace(/\s+/g, "-")}`;
   for (const rule of CATEGORY_RULES) {
     if (rule.words.some((w) => u.includes(w))) return rule.category;
   }
@@ -181,7 +181,7 @@ function categoryForUrl(url: string): string | null {
 
 function isDomainRelevant(url: string, label: string): boolean {
   const s = `${pathOf(url)} ${label}`.toLowerCase().replace(/\s+/g, "-");
-  return DOMAIN_WORDS.some((w) => s.includes(w)) || categoryForUrl(url) !== null;
+  return DOMAIN_WORDS.some((w) => s.includes(w)) || categoryForUrl(url, label) !== null;
 }
 
 async function timedFetch(url: string, init?: RequestInit): Promise<Response> {
@@ -772,7 +772,7 @@ export async function discoverInstitutionSources(
     errors: [],
   };
   const scopes = seeds.map((s) => new URL(s));
-  const candidates = new Map<string, { label: string; from: string }>();
+  const candidates = new Map<string, { label: string; from: string; category: string | null }>();
 
   for (const seed of seeds) {
     try {
@@ -790,15 +790,17 @@ export async function discoverInstitutionSources(
       candidates.set(new URL(finalUrl).toString(), {
         label: extractTitle(html) ?? inst.name,
         from: "seed",
+        category: categoryForUrl(finalUrl),
       });
       for (const link of extractLinks(html, finalUrl)) {
         const u = new URL(link.url);
         const inScope = scopes.some((s) => u.host === s.host);
         if (!inScope) continue;
         if (isJunkDiscoveryUrl(u.toString(), link.label)) continue;
+        const category = categoryForUrl(u.toString(), link.label);
         if (!isDomainRelevant(u.toString(), link.label)) continue;
         if (!candidates.has(u.toString()))
-          candidates.set(u.toString(), { label: link.label, from: finalUrl });
+          candidates.set(u.toString(), { label: link.label, from: finalUrl, category });
       }
     } catch (e) {
       result.errors.push({
@@ -829,7 +831,7 @@ export async function discoverInstitutionSources(
   });
 
   for (const [url, meta] of ranked.slice(0, maxSources)) {
-    const category = categoryForUrl(url) ?? "research";
+    const category = meta.category ?? categoryForUrl(url) ?? "research";
     const sourceType =
       category === "vacancies"
         ? "careers_page"
