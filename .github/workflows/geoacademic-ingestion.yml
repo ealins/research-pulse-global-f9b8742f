@@ -30,6 +30,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate worker
         run: node scripts/job-review-worker.mjs --self-test
+      - name: Require OmniRoute credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OMNIROUTE_API_KEY:-}"
+          echo "OMNIROUTE_CONFIGURED=true"
       - name: Verify fetch lease endpoint
         shell: bash
         env:
