@@ -6,22 +6,15 @@
  * Model output is validated again by the web application before persistence.
  */
 
-const BASE_URL = (
-  process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app"
-).replace(/\/$/, "");
+const BASE_URL = (process.env.GEOACADEMIC_BASE_URL || "https://geoacademic.app").replace(/\/$/, "");
 const HOOK_SECRET = process.env.INGESTION_HOOK_SECRET || "";
-const OMNIROUTE_URL = (process.env.OMNIROUTE_URL || "https://omniroute.geoacademic.app/v1").replace(/\/$/, "");
+const OMNIROUTE_URL = (process.env.OMNIROUTE_URL || "https://omniroute.geoacademic.app/v1").replace(
+  /\/$/,
+  "",
+);
 const OMNIROUTE_API_KEY = process.env.OMNIROUTE_API_KEY || "";
 const OMNIROUTE_MODEL = process.env.OMNIROUTE_MODEL || "auto";
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY || process.env.Google_API_Key || "";
-const GOOGLE_MODEL = process.env.GOOGLE_MODEL || "gemini-2.5-flash";
-const GOOGLE_URL = process.env.GOOGLE_URL || "https://generativelanguage.googleapis.com/v1beta/models";
-const RUNTIME_MS = clamp(
-  process.env.REVIEW_RUNTIME_MS,
-  30_000,
-  4 * 60_000,
-  210_000,
-);
+const RUNTIME_MS = clamp(process.env.REVIEW_RUNTIME_MS, 30_000, 4 * 60_000, 210_000);
 const LEASE_LIMIT = clamp(process.env.REVIEW_LEASE_LIMIT, 1, 10, 4);
 const CONCURRENCY = clamp(process.env.REVIEW_CONCURRENCY, 1, 8, 8);
 const HOOK_TIMEOUT_MS = 90_000;
@@ -43,9 +36,7 @@ Dates are YYYY-MM-DD or null. confidence is 0..1.`;
 
 function clamp(value, min, max, fallback) {
   const number = Number(value);
-  return Number.isFinite(number)
-    ? Math.min(max, Math.max(min, Math.floor(number)))
-    : fallback;
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, Math.floor(number))) : fallback;
 }
 
 function parseJsonObject(value) {
@@ -56,8 +47,7 @@ function parseJsonObject(value) {
     .trim();
   const start = text.indexOf("{");
   const end = text.lastIndexOf("}");
-  if (start < 0 || end <= start)
-    throw new Error("AI response has no JSON object");
+  if (start < 0 || end <= start) throw new Error("AI response has no JSON object");
   return JSON.parse(text.slice(start, end + 1));
 }
 
@@ -113,61 +103,40 @@ async function callHook(action, payload = {}) {
 async function extractWithAI(lease) {
   const pageText = String(lease.text_content || "").slice(0, 8_000);
   if (pageText.length < 120) throw new Error("Page text too short for review");
+  if (!OMNIROUTE_API_KEY) throw new Error("OMNIROUTE_API_KEY is not configured");
   const userContent = `SOURCE URL: ${lease.url || ""}
 PAGE TITLE: ${lease.title || ""}
 PAGE TEXT:
 ${pageText}`;
-  const providers = [
-    { name: "omniroute", url: `${OMNIROUTE_URL}/chat/completions`, model: OMNIROUTE_MODEL, apiKey: OMNIROUTE_API_KEY },
-    { name: "google", url: `${GOOGLE_URL}/${GOOGLE_MODEL}:generateContent`, model: GOOGLE_MODEL, apiKey: GOOGLE_API_KEY },
-  ];
-  const errors = [];
-  for (const provider of providers) {
-    if (provider.name === "google" && !provider.apiKey) continue;
-    try {
-      let content = "";
-      if (provider.name === "google") {
-        const response = await fetch(provider.url, {
-          method: "POST",
-          headers: { "content-type": "application/json", accept: "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: SYSTEM_PROMPT }] },
-            contents: [{ role: "user", parts: [{ text: userContent }] }],
-            generationConfig: { temperature: 0.1, maxOutputTokens: 1800, responseMimeType: "application/json" },
-          }),
-          signal: AbortSignal.timeout(55_000),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(`Google HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
-        content = (body?.candidates?.[0]?.content?.parts || []).map((part) => part?.text || "").join("");
-      } else {
-        const headers = { "content-type": "application/json", accept: "application/json" };
-        if (provider.apiKey) headers.authorization = `Bearer ${provider.apiKey}`;
-        const response = await fetch(provider.url, {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            model: provider.model,
-            temperature: 0.1,
-            max_tokens: 1800,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: userContent },
-            ],
-          }),
-          signal: AbortSignal.timeout(55_000),
-        });
-        const body = await response.json().catch(() => ({}));
-        if (!response.ok) throw new Error(`OmniRoute HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
-        content = body?.choices?.[0]?.message?.content || "";
-      }
-      if (!content) throw new Error(`${provider.name} returned no content`);
-      return { extraction: validateBasicExtraction(parseJsonObject(content)), model: provider.model, provider: provider.name };
-    } catch (error) {
-      errors.push(`${provider.name}: ${error instanceof Error ? error.message : String(error)}`);
-    }
+  const response = await fetch(`${OMNIROUTE_URL}/chat/completions`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json",
+      authorization: `Bearer ${OMNIROUTE_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: OMNIROUTE_MODEL,
+      temperature: 0.1,
+      max_tokens: 1800,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: userContent },
+      ],
+    }),
+    signal: AbortSignal.timeout(55_000),
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(`OmniRoute HTTP ${response.status}: ${JSON.stringify(body).slice(0, 500)}`);
   }
-  throw new Error(errors.join("; ").slice(0, 900) || "No AI provider configured");
+  const content = body?.choices?.[0]?.message?.content || "";
+  if (!content) throw new Error("OmniRoute returned no content");
+  return {
+    extraction: validateBasicExtraction(parseJsonObject(content)),
+    model: OMNIROUTE_MODEL,
+    provider: "omniroute",
+  };
 }
 
 async function processLease(lease) {

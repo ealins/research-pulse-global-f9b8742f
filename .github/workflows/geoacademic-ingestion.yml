@@ -22,8 +22,6 @@ jobs:
       OMNIROUTE_URL: "https://omniroute.geoacademic.app/v1"
       OMNIROUTE_MODEL: "auto"
       OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
-      GOOGLE_API_KEY: ""
-      GOOGLE_MODEL: ""
       REVIEW_RUNTIME_MS: "210000"
       REVIEW_LEASE_LIMIT: "4"
       REVIEW_CONCURRENCY: "8"
@@ -90,11 +88,11 @@ jobs:
         env:
           REVIEW_RUNTIME_MS: "300000"
           REVIEW_LEASE_LIMIT: "10"
-          REVIEW_CONCURRENCY: "8"
+          REVIEW_CONCURRENCY: "4"
         run: node scripts/job-review-worker.mjs
       - name: Review newly fetched job pages
         env:
           REVIEW_RUNTIME_MS: "60000"
           REVIEW_LEASE_LIMIT: "10"
-          REVIEW_CONCURRENCY: "8"
+          REVIEW_CONCURRENCY: "4"
         run: node scripts/job-review-worker.mjs
