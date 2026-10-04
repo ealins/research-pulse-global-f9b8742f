@@ -85,8 +85,11 @@ export function shouldQueueMaintenance({
   maintenanceIntervalMs,
   fetchLeaseCount,
 }) {
-  if (fetchLeaseCount === 0) return true;
-  if (burstMode) return nowMs - lastMaintenanceAtMs >= maintenanceIntervalMs;
+  // In a bounded burst, existing leases must be fetched before any
+  // housekeeping work. If no fetch work is available, perform an initial
+  // refill, then throttle further refills to the configured interval.
+  if (burstMode && fetchLeaseCount > 0) return false;
+  if (lastMaintenanceAtMs === 0) return true;
   return nowMs - lastMaintenanceAtMs >= maintenanceIntervalMs;
 }
 
@@ -531,13 +534,34 @@ async function mapConcurrent(items, concurrency, callback) {
 }
 
 async function runMaintenance() {
-  const [refresh, discovery, insights] = await Promise.all([
-    callHook("refresh-due", { limit: 80 }),
-    callHook("enqueue-discovery", { limit: 8 }),
-    callHook("refresh-insights", { limit: 160 }),
+  // Keep the source-fetch control plane small and bounded. Public insight
+  // projection can perform hundreds of database operations and belongs in a
+  // separate non-critical job; allowing it here previously aborted the whole
+  // worker after the 120-second hook timeout.
+  const [refreshResult, discoveryResult] = await Promise.allSettled([
+    callHook("refresh-due", { limit: 80 }, 30_000),
+    callHook("enqueue-discovery", { limit: 8 }, 30_000),
   ]);
+
+  if (refreshResult.status === "rejected") {
+    console.error(
+      `${new Date().toISOString()} MAINTENANCE_FAILED action=refresh-due`,
+      refreshResult.reason,
+    );
+  }
+  if (discoveryResult.status === "rejected") {
+    console.error(
+      `${new Date().toISOString()} MAINTENANCE_FAILED action=enqueue-discovery`,
+      discoveryResult.reason,
+    );
+  }
+
+  const refresh =
+    refreshResult.status === "fulfilled" ? refreshResult.value : {};
+  const discovery =
+    discoveryResult.status === "fulfilled" ? discoveryResult.value : {};
   console.log(
-    `${new Date().toISOString()} MAINTENANCE refresh_queued=${refresh.queued ?? 0} discovery_queued=${discovery.queued ?? 0} pulse_projected=${insights.pulse?.projected ?? 0} momentum_topics=${insights.insights?.momentum_topics ?? "?"} collaboration_edges=${insights.insights?.collaboration?.edges ?? "?"}`,
+    `${new Date().toISOString()} MAINTENANCE refresh_queued=${refresh.queued ?? 0} discovery_queued=${discovery.queued ?? 0} refresh_ok=${refreshResult.status === "fulfilled"} discovery_ok=${discoveryResult.status === "fulfilled"}`,
   );
 }
 
@@ -577,7 +601,7 @@ if (shouldRunDirectly) {
         { limit: LEASE_LIMIT },
         20_000,
       );
-      const leases = Array.isArray(leased.leases) ? leased.leases : [];
+      let leases = Array.isArray(leased.leases) ? leased.leases : [];
       const maintenanceNow = shouldQueueMaintenance({
         burstMode: BURST_MODE,
         lastMaintenanceAtMs: lastMaintenanceAt,
@@ -588,6 +612,22 @@ if (shouldRunDirectly) {
       if (maintenanceNow) {
         await runMaintenance();
         lastMaintenanceAt = Date.now();
+
+        // A bounded GitHub Actions burst used to exit immediately after this
+        // refill because its first lease was empty. Lease once more so the same
+        // run can fetch the newly queued sources instead of waiting 15 minutes
+        // for the next scheduled execution.
+        if (leases.length === 0) {
+          const refilled = await callHook(
+            "lease-fetch",
+            { limit: LEASE_LIMIT },
+            20_000,
+          );
+          leases = Array.isArray(refilled.leases) ? refilled.leases : [];
+          console.log(
+            `${new Date().toISOString()} REFILL leased=${leases.length}`,
+          );
+        }
       }
       if (leases.length === 0) {
         console.log(`${new Date().toISOString()} IDLE no fetch tasks due`);

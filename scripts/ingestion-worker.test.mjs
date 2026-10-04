@@ -28,3 +28,29 @@ test("steady mode still refills the queue when no fetch tasks are due", () => {
     true,
   );
 });
+
+test("burst mode does not repeat maintenance immediately after a refill", () => {
+  assert.equal(
+    shouldQueueMaintenance({
+      burstMode: true,
+      lastMaintenanceAtMs: 10_000,
+      nowMs: 20_000,
+      maintenanceIntervalMs: 60_000,
+      fetchLeaseCount: 0,
+    }),
+    false,
+  );
+});
+
+test("burst mode prioritizes existing fetch leases over maintenance", () => {
+  assert.equal(
+    shouldQueueMaintenance({
+      burstMode: true,
+      lastMaintenanceAtMs: 0,
+      nowMs: 20_000,
+      maintenanceIntervalMs: 60_000,
+      fetchLeaseCount: 1,
+    }),
+    false,
+  );
+});
