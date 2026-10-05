@@ -19,6 +19,10 @@ curl https://geoacademic.app/api/public/data-health
 
 It must return HTTP 200 with `"ok":true` before starting ingestion.
 
+## Public data read path
+
+Public pages read the canonical Supabase tables by default, because ingestion writes those tables directly. The optional Open Engine projection can lag behind ingestion; enable `VITE_GEOACADEMIC_USE_OPEN_ENGINE=true` only after verifying that projection is current. Changing this browser-visible build variable requires a new web deployment.
+
 ## Production architecture
 
 The intended production split is:
