@@ -82,7 +82,7 @@ export const opportunitiesQuery = queryOptions({
            status, confidence, verification_status,
            last_checked_at, is_demo,
            institutions ( name, slug, abbreviation ),
-           opportunity_topics!inner ( research_topics ( name, slug ) )`,
+           opportunity_topics ( research_topics ( name, slug ) )`,
         )
         .eq("is_demo", false)
         .in("status", LIVE_OPPORTUNITY_STATUSES)
