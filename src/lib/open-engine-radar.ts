@@ -280,15 +280,23 @@ const openEnginePulseQuery = queryOptions({
 export const hybridOpportunitiesQuery = queryOptions({
   queryKey: ["opportunities", "hybrid-public"],
   queryFn: async (context): Promise<OpportunityRow[]> => {
+    const legacy = await runLegacy<OpportunityRow[]>(legacyOpportunitiesQuery, context);
+
     if (openEngineConfigured) {
       try {
         const items = await openEngineOpportunitiesQuery.queryFn!(context as never);
-        if (items.length > 0) return items;
+        // Open Engine is an optional projection. Never replace a complete
+        // public jobs dataset with a partial projection.
+        const expected = legacy.length;
+        const sufficientlyComplete =
+          expected === 0 || items.length >= Math.max(20, Math.floor(expected * 0.9));
+        if (sufficientlyComplete) return items;
       } catch {
-        // Keep the legacy table path as a last-resort availability fallback.
+        // Fall back to the complete public table without blanking the radar.
       }
     }
-    return runLegacy<OpportunityRow[]>(legacyOpportunitiesQuery, context);
+
+    return legacy;
   },
   staleTime: 60_000,
 });
