@@ -66,30 +66,41 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
 export const opportunitiesQuery = queryOptions({
   queryKey: ["opportunities"],
   queryFn: async (): Promise<OpportunityRow[]> => {
-    const { data, error } = await supabase
-      .from("opportunities")
-      .select(
-        `id, title, slug, city, country, opportunity_type, description, requirements,
-         funding_type, salary_text, start_date, application_deadline, application_url,
-         official_source_url, supervisor_name, sector, employer_name, seniority,
-         status, confidence, verification_status,
-         last_checked_at, is_demo,
-         institutions ( name, slug, abbreviation ),
-         opportunity_topics!inner ( research_topics ( name, slug ) )`,
-      )
-      .eq("is_demo", false)
-      .in("status", LIVE_OPPORTUNITY_STATUSES)
-      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
-      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
-      .not("official_source_url", "is", null)
-      .order("is_demo", { ascending: true })
-      .order("application_deadline", { ascending: true, nullsFirst: false })
-      .limit(1000);
-    if (error) throw error;
-    return ((data ?? []) as unknown as OpportunityRow[])
-      .map((row) => ({ ...row, country: canonicalCountry(row.country) }))
-      .filter(isPlausibleOpportunity)
-      .slice(0, 200);
+    // The public opportunities table is currently the complete, quality-gated
+    // source of truth for the Jobs radar. Fetch it in PostgREST-sized pages so
+    // the UI does not silently collapse thousands of public records to the
+    // first 200 rows while the optional Open Engine projection catches up.
+    const pageSize = 1000;
+    const rows: OpportunityRow[] = [];
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase
+        .from("opportunities")
+        .select(
+          `id, title, slug, city, country, opportunity_type, description, requirements,
+           funding_type, salary_text, start_date, application_deadline, application_url,
+           official_source_url, supervisor_name, sector, employer_name, seniority,
+           status, confidence, verification_status,
+           last_checked_at, is_demo,
+           institutions ( name, slug, abbreviation ),
+           opportunity_topics!inner ( research_topics ( name, slug ) )`,
+        )
+        .eq("is_demo", false)
+        .in("status", LIVE_OPPORTUNITY_STATUSES)
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+        .not("official_source_url", "is", null)
+        .order("is_demo", { ascending: true })
+        .order("application_deadline", { ascending: true, nullsFirst: false })
+        .range(offset, offset + pageSize - 1);
+      if (error) throw error;
+      const page = ((data ?? []) as unknown as OpportunityRow[]).map((row) => ({
+        ...row,
+        country: canonicalCountry(row.country),
+      }));
+      rows.push(...page);
+      if (page.length < pageSize) break;
+    }
+    return rows.filter(isPlausibleOpportunity);
   },
 });
 
