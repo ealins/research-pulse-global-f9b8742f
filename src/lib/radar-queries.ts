@@ -44,10 +44,20 @@ const NON_POSTING_PATH =
 export function isPlausibleOpportunity(row: OpportunityRow): boolean {
   if (!row.official_source_url || row.title.trim().length < 8) return false;
   if (["archived", "closed", "needs_review"].includes(row.verification_status)) return false;
+  try {
+    const sourcePath = new URL(row.official_source_url ?? "").pathname.toLowerCase();
+    if (
+      /(?:^|\/)(?:jobs?|vacancies|careers)\/term(?:\/|$)/i.test(sourcePath) ||
+      /(?:^|\/)(?:jobs?|vacancies|careers)\/(?:search|listing|list|all)(?:\/|$)/i.test(sourcePath)
+    ) return false;
+  } catch {
+    return false;
+  }
   // Accuracy wins over coverage: unverified, low-confidence discoveries stay
   // in the review queue instead of appearing as live vacancies.
   if (row.confidence === "low") return false;
   if (NON_POSTING_TITLE.test(row.title.trim())) return false;
+  if (/\b(?:vacancies|job listings?|career(?:s)?)\s*$/i.test(row.title.trim())) return false;
   try {
     const parsedUrl = new URL(row.official_source_url);
     const path = parsedUrl.pathname.replace(/\/+$/, "");
