@@ -150,7 +150,12 @@ export function classifyUrlAndText(url: string, title: string, text: string): Cl
   // prevents job detail pages mentioning professors or teams from being
   // misclassified as researcher profiles without treating arbitrary mentions
   // of those terms as vacancies.
-  if (/(?:^|\/)(?:jobs?|vacancies|careers)(?:\/|$)/i.test(path)) {
+  const vacancyLanding =
+    /(?:^|\/)(?:jobs?|vacancies|careers)\/term(?:\/|$)/i.test(path) ||
+    /(?:^|\/)(?:jobs?|vacancies|careers)\/(?:search|listing|list|all)(?:\/|$)/i.test(path) ||
+    /(?:\bvacancies?\b|\bjob listings?\b|\bcareer(?:s)?\b)\s*$/i.test(heading);
+  if (vacancyLanding) return { classification: "GENERAL", confidence: 0.95 };
+  if (/(?:^|\/)(?:jobs?|vacancies|careers)\/[^/]+/i.test(path)) {
     return { classification: "VACANCY", confidence: 0.95 };
   }
 
@@ -2577,6 +2582,18 @@ export async function normalizeSource(
   // a second semantic validation pass. Keep the source URL and raw snapshot as
   // provenance, extract only interoperable fields deterministically, and let
   // optional semantic enrichment happen after publication.
+  const rawPath = (() => {
+    try { return new URL(raw.final_url ?? "").pathname.toLowerCase(); } catch { return ""; }
+  })();
+  const vacancyLanding =
+    /(?:^|\/)(?:jobs?|vacancies|careers)\/term(?:\/|$)/i.test(rawPath) ||
+    /(?:^|\/)(?:jobs?|vacancies|careers)\/(?:search|listing|list|all)(?:\/|$)/i.test(rawPath) ||
+    /(?:\bvacancies?\b|\bjob listings?\b|\bcareer(?:s)?\b)\s*$/i.test(rawTitle);
+  if (vacancyLanding) {
+    await mark("SKIPPED", "vacancy directory page");
+    return { status: "SKIPPED", reason: "vacancy directory page" };
+  }
+
   const rolling = /(rolling|laufend|jederzeit|until filled|bis zur besetzung)/i.test(text);
   const deterministicDeadline = parseDeadline(text);
   const structuredJob = structuredVacancyFromPayload(raw.payload, raw.final_url ?? "");
