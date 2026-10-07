@@ -10,6 +10,7 @@ import { countriesRollupQuery } from "@/lib/category-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export const Route = createFileRoute("/countries/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(countriesRollupQuery),
   head: () => ({
     meta: [
       { title: "Countries — Research capacity by nation | GeoAcademic Radar" },
