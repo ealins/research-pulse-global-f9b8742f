@@ -23,6 +23,7 @@ import { CardLink } from "@/components/CardLink";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/programmes/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(programmeCatalogueQuery),
   head: () => ({
     meta: [
       { title: "Degree programmes — Geospatial study catalogue | GeoAcademic Radar" },
