@@ -85,10 +85,7 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
     if (!POSTING_PATH.test(parsedUrl.pathname) && !POSTING_TITLE_SIGNAL.test(row.title)) {
       return false;
     }
-    const topicText = (row.opportunity_topics ?? [])
-      .map((t) => t.research_topics?.name ?? "")
-      .join(" ");
-    if (!STRONG_GEOSPATIAL.test([row.title, row.description ?? "", topicText].join("\n"))) {
+    if (!STRONG_GEOSPATIAL.test([row.title, row.description ?? ""].join("\n"))) {
       return false;
     }
     return true;
