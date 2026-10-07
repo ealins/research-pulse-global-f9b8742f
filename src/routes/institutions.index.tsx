@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
 
 export const Route = createFileRoute("/institutions/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(institutionPulseQuery),
   head: () => ({
     meta: [
       { title: "Institutions ranked by academic pulse | GeoAcademic Radar" },
