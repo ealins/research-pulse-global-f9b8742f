@@ -46,6 +46,9 @@ const POSTING_PATH =
 const POSTING_TITLE_SIGNAL =
   /\b(?:ph\.?d|post[- ]?doc(?:toral)?|doctoral|research assistant|research associate|research scientist|research fellow|scientist|engineer|developer|analyst|professor|lecturer|faculty|fellowship|fellow|intern(?:ship)?|technician|manager|coordinator|officer|specialist|principal|director|assistant professor|associate professor)\b/i;
 
+const STRONG_GEOSPATIAL =
+  /(photogrammetr|remote sensing|fernerkundung|geoinformat|geospatial|geographic information systems?|\bgis\b|geodes[yi]|geomatic|earth observation|geoai|lidar|laser scann|point cloud|punktwolke|synthetic aperture radar|\bsar\b|spatial data|surveying|cartograph|mapping|satellite imagery)/i;
+
 /** Final public safety net for legacy rows written before the stricter crawler gate. */
 export function isPlausibleOpportunity(row: OpportunityRow): boolean {
   if (!row.official_source_url || row.title.trim().length < 8) return false;
@@ -80,6 +83,12 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
     // generic web pages from entering the jobs surface merely because a source
     // was categorized as a careers page.
     if (!POSTING_PATH.test(parsedUrl.pathname) && !POSTING_TITLE_SIGNAL.test(row.title)) {
+      return false;
+    }
+    const topicText = (row.opportunity_topics ?? [])
+      .map((t) => t.research_topics?.name ?? "")
+      .join(" ");
+    if (!STRONG_GEOSPATIAL.test([row.title, row.description ?? "", topicText].join("\n"))) {
       return false;
     }
     return true;
