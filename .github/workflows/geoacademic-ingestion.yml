@@ -68,6 +68,24 @@ jobs:
           INGESTION_BURST_MODE: "true"
           INGESTION_WORKER_TRIGGER: "github-actions-fresh-first"
         run: node scripts/ingestion-worker.mjs
+      - name: Queue programme discovery coverage sweep
+        if: github.event_name == 'schedule'
+        shell: bash
+        env:
+          INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          minute="$(date -u +%M)"
+          if [[ "$minute" != "00" ]]; then
+            echo "PROGRAMME_DISCOVERY_SWEEP=SKIP minute=$minute"
+            exit 0
+          fi
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 45 \
+            -H "Authorization: Bearer $INGESTION_HOOK_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{"action":"discover-programmes","limit":10,"trigger":"github-actions-programme-coverage"}' \
+            https://geoacademic.app/api/public/hooks/ingest-batch
       - name: Drain canonical normalization backlog
         shell: bash
         env:
