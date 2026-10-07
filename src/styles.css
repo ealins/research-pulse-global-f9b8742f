@@ -133,15 +133,6 @@
   --foreground: oklch(0.96 0.006 250);
 }
 
-/* Keep third-party builder attribution out of the white-label GeoAcademic UI. */
-#lovable-badge,
-[id*="lovable"],
-[class*="lovable"],
-a[href*="lovable.app"] {
-  display: none !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
 
 @layer base {
   * {
