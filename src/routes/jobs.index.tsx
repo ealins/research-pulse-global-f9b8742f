@@ -270,14 +270,11 @@ function JobsPage() {
                   <p className="mt-1 text-sm text-muted-foreground">
                     {o.institutions?.name ?? o.employer_name ?? "Employer not stated"}
                   </p>
+                  <p className="mt-2 text-[0.7rem] text-muted-foreground">
+                    Open the position for the full description, requirements and application details.
+                  </p>
 
-                  {o.description ? (
-                    <p className="mt-3 text-sm leading-relaxed text-foreground/80">
-                      {o.description}
-                    </p>
-                  ) : null}
-
-                  <div className="mt-4 grid gap-3 text-xs text-muted-foreground sm:grid-cols-4">
+<div className="mt-4 grid gap-3 text-xs text-muted-foreground sm:grid-cols-4">
                     <Meta icon={Timer} label="Deadline">
                       {o.application_deadline ? (
                         <>
