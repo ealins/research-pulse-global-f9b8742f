@@ -1,4 +1,4 @@
-// Server-only NVIDIA Nemotron client. The API key is read inside the call,
+// Server-only OmniRoute OpenAI-compatible client. The API key is read inside the call,
 // never logged, never returned to callers, never written to the database.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -68,7 +68,7 @@ function release(): void {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function isNvidiaConfigured(): boolean {
-  return Boolean(process.env["Nvidia"] ?? process.env[NVIDIA_SECRET_NAME]);
+  return Boolean(process.env["OMNIROUTE_API_KEY"] ?? process.env["OMNIROUTE_URL"]);
 }
 
 async function logRun(row: Record<string, unknown>): Promise<string | null> {
@@ -107,15 +107,16 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
     input_characters: call.system.length + call.user.length,
   };
 
-  const apiKey = process.env["Nvidia"] ?? process.env[NVIDIA_SECRET_NAME];
+  const apiKey = process.env["OMNIROUTE_API_KEY"];
+  const endpoint = process.env["OMNIROUTE_URL"]?.replace(/\/$/, "") ?? "https://omniroute.geoacademic.app/v1";
   if (!apiKey) {
     const runId = await logRun({
       ...base,
       status: "FAILED",
       completed_at: new Date().toISOString(),
       latency_ms: 0,
-      error_code: "NVIDIA_SECRET_NOT_CONFIGURED",
-      error_message: `Secret "${NVIDIA_SECRET_NAME}" is not configured on the server.`,
+      error_code: "OMNIROUTE_API_KEY_NOT_CONFIGURED",
+      error_message: `Secret "OMNIROUTE_API_KEY" is not configured on the server.`,
     });
     return {
       ok: false,
@@ -125,8 +126,8 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       model,
       provider: AI_PROVIDER,
       attempt: 0,
-      errorCode: "NVIDIA_SECRET_NOT_CONFIGURED",
-      errorMessage: `Secret "${NVIDIA_SECRET_NAME}" is not configured on the server.`,
+      errorCode: "OMNIROUTE_API_KEY_NOT_CONFIGURED",
+      errorMessage: `Secret "OMNIROUTE_API_KEY" is not configured on the server.`,
       runId,
     };
   }
@@ -148,7 +149,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
     try {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), NVIDIA_TIMEOUT_BY_TIER[tier]);
-      const response = await fetch(NVIDIA_BASE_URL, {
+      const response = await fetch(`${endpoint}/chat/completions`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -156,7 +157,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
           Accept: "application/json",
         },
         body: JSON.stringify({
-          model,
+          model: process.env["OMNIROUTE_MODEL"] ?? "auto",
           temperature: call.temperature ?? LLM_DEFAULT_TEMPERATURE,
           max_tokens: call.maxTokens ?? LLM_DEFAULT_MAX_TOKENS,
           // GeoAcademic Radar uses Nemotron for terse structured extraction,
