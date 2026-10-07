@@ -11,7 +11,7 @@ import {
 } from "@/components/layout/AppShell";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { formatDate, daysUntil } from "@/lib/radar-queries";
-import { hybridEventsQuery as eventsQuery } from "@/lib/open-engine-radar";
+import { eventsQuery } from "@/lib/radar-queries";
 import { KIND_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CardLink } from "@/components/CardLink";
