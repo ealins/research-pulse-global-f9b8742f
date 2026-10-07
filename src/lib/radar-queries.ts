@@ -137,7 +137,7 @@ export const pulseQuery = queryOptions({
       .select(
         `id, category, title, summary, event_date, importance, link_url, source_url,
          verification_status, confidence, is_demo, country,
-         pulse_event_topics!inner ( research_topics ( name, slug ) )`,
+         pulse_event_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered"])
