@@ -1,9 +1,9 @@
 // Server-only configuration for the GeoAcademic Radar intelligence engine.
-export const AI_PROVIDER = "NVIDIA" as const;
+export const AI_PROVIDER = "OmniRoute" as const;
 export const NVIDIA_SECRET_NAME = "Nvidia" as const;
 export const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
 
-// One NVIDIA API key is used for the whole routing ladder. Model ids can be
+// OmniRoute provides the OpenAI-compatible gateway for the whole routing ladder. Model ids can be
 // overridden per environment without changing source code.
 // Nemotron 3 Nano 30B A3B was retired from the hosted NVIDIA endpoint on
 // 2026-09-01. Lightning 3.5 is the current hosted 30B A3B workhorse model.
