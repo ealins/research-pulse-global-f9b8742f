@@ -38,7 +38,13 @@ export type OpportunityRow = {
 const NON_POSTING_TITLE =
   /^(careers?|jobs?|vacancies|recruitment|work(?:ing)? (?:with|for|at) us|working at|join us|how we hire|search for your career)|academy|careers? in|employee stor(?:y|ies)|learning (?:&|and) development|leadership track|u[.]?gro programme|talent community|graduate programme|programme careers?|privacy|cookie|job alerts?|applicant|candidate privacy|equal opportunity/i;
 const NON_POSTING_PATH =
-  /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant)(\/|$)/i;
+  /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant|job-openings?|employment-opportunities?|employment|opportunities?|job_opportunities|careers?\/?)$/i;
+
+const POSTING_PATH =
+  /\/(?:jobs?|vacancies|careers|recruitment)(?:\/|$)/i;
+
+const POSTING_TITLE_SIGNAL =
+  /\b(?:ph\.?d|post[- ]?doc(?:toral)?|doctoral|research assistant|research associate|research scientist|research fellow|scientist|engineer|developer|analyst|professor|lecturer|faculty|fellowship|fellow|intern(?:ship)?|technician|manager|coordinator|officer|specialist|principal|director|assistant professor|associate professor)\b/i;
 
 /** Final public safety net for legacy rows written before the stricter crawler gate. */
 export function isPlausibleOpportunity(row: OpportunityRow): boolean {
@@ -67,7 +73,16 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
     ) {
       return false;
     }
-    return !NON_POSTING_PATH.test(parsedUrl.pathname);
+    if (NON_POSTING_PATH.test(parsedUrl.pathname)) return false;
+
+    // A public opportunity must carry explicit vacancy evidence. This prevents
+    // institutional articles, NASA content pages, tours, galleries, and other
+    // generic web pages from entering the jobs surface merely because a source
+    // was categorized as a careers page.
+    if (!POSTING_PATH.test(parsedUrl.pathname) && !POSTING_TITLE_SIGNAL.test(row.title)) {
+      return false;
+    }
+    return true;
   } catch {
     return false;
   }
