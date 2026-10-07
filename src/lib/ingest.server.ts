@@ -2513,6 +2513,9 @@ export function looksLikeSinglePosting(
       ok: false,
       reason: "no job-ad signals (deadline, contract, tasks, salary)",
     };
+  if (!STRONG_GEOSPATIAL.test(t + "\n" + body.slice(0, 12000))) {
+    return { ok: false, reason: "no strong geospatial relevance evidence" };
+  }
   return { ok: true };
 }
 
@@ -2595,6 +2598,16 @@ export async function normalizeSource(
   }
 
   const text = raw.text_content ?? "";
+
+  // Never let a source classification bypass the same single-posting gate used
+  // by candidate selection. This is the final write barrier for legacy and
+  // requeued tasks, so listing pages, career hubs and unrelated roles cannot
+  // become canonical opportunities.
+  const postingGate = looksLikeSinglePosting(raw.final_url ?? "", title, text);
+  if (!postingGate.ok) {
+    await mark("SKIPPED", postingGate.reason ?? "not a single relevant vacancy");
+    return { status: "SKIPPED", reason: postingGate.reason ?? "not a single relevant vacancy" };
+  }
 
   // The crawled official page is the authority. Publication must not depend on
   // a second semantic validation pass. Keep the source URL and raw snapshot as
