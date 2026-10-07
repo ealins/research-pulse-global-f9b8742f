@@ -4,7 +4,7 @@ import { ExternalLink, Timer, MapPin, UserRound, AlertTriangle, CalendarPlus } f
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile, TopicPills } from "@/components/layout/AppShell";
 import { EvidenceDrawer, staleness } from "@/components/EvidenceDrawer";
-import { hybridOpportunityDetailQuery as opportunityDetailQuery } from "@/lib/open-engine-radar";
+import { opportunityDetailQuery } from "@/lib/detail-queries";
 import { STATUS_LABEL, TYPE_LABEL, daysUntil, formatDate } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
 import { loadJobLd, jobJsonLd } from "@/lib/jsonld";
