@@ -9,7 +9,7 @@ import {
   daysUntil,
   formatDate,
 } from "@/lib/radar-queries";
-import { hybridOpportunitiesQuery as opportunitiesQuery } from "@/lib/open-engine-radar";
+import { opportunitiesQuery } from "@/lib/radar-queries";
 import { CategoryTabs } from "@/components/CategoryTabs";
 import { SECTOR_LABEL } from "@/lib/relevance-queries";
 import { Skeleton } from "@/components/ui/skeleton";
