@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "*/15 * * * *"
+  workflow_run:
+    workflows: ["Deploy GeoAcademic to Cloudflare"]
+    types: [completed]
 
 concurrency:
   group: geoacademic-ingestion-manual
