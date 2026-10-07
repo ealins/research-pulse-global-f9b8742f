@@ -4,7 +4,7 @@ import { CalendarDays, ExternalLink, MapPin } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/layout/AppShell";
 import { KIND_LABEL, SECTOR_LABEL } from "@/lib/relevance-queries";
-import { eventDetailQuery } from "@/lib/detail-queries";
+import { eventDetailQuery } from "@/lib/relevance-queries";
 import { countrySlug } from "@/lib/category-queries";
 import { daysUntil, formatDate, STATUS_LABEL } from "@/lib/radar-queries";
 import { Skeleton } from "@/components/ui/skeleton";
