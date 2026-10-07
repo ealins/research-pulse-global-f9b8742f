@@ -725,6 +725,18 @@ export async function enqueueProgrammeDiscovery(limit = 100): Promise<{
     .limit(500);
   if (error) throw error;
 
+  const { data: coveredSources, error: coveredError } = await supabaseAdmin
+    .from("sources")
+    .select("institution_id")
+    .in("category", ["programmes", "courses"])
+    .not("institution_id", "is", null);
+  if (coveredError) throw coveredError;
+  const coveredIds = new Set(
+    (coveredSources ?? [])
+      .map((source) => source.institution_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+
   const { data: pending, error: pendingError } = await supabaseAdmin
     .from("ingestion_tasks")
     .select("institution_id")
@@ -734,7 +746,13 @@ export async function enqueueProgrammeDiscovery(limit = 100): Promise<{
   const pendingIds = new Set(
     (pending ?? []).map((task) => task.institution_id).filter((id): id is string => Boolean(id)),
   );
-  const targets = (institutions ?? []).filter((institution) => !pendingIds.has(institution.id));
+
+  // Discovery is a coverage sweep: once an institution has at least one
+  // programme/course source, leave it alone and move to institutions that
+  // still have no study-source coverage.
+  const targets = (institutions ?? []).filter(
+    (institution) => !coveredIds.has(institution.id) && !pendingIds.has(institution.id),
+  );
   for (const institution of targets.slice(0, Math.min(200, Math.max(1, limit)))) {
     await enqueue("DISCOVER", { institution_id: institution.id });
   }
