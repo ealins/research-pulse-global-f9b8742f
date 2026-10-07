@@ -293,7 +293,7 @@ export const eventsQuery = queryOptions({
         `id, title, slug, organization, location, country, recurrence, summary, website,
          start_date, end_date, event_kind, abstract_deadline, paper_deadline,
          verification_status, is_demo,
-         event_topics!inner ( research_topics ( name, slug ) )`,
+         event_topics ( research_topics ( name, slug ) )`,
       )
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
