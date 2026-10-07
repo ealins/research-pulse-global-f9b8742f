@@ -4,7 +4,6 @@ import { openEngine, openEngineConfigured } from "@/lib/open-engine-client";
 import {
   countsQuery as legacyCountsQuery,
   eventsQuery as legacyEventsQuery,
-  opportunitiesQuery as legacyOpportunitiesQuery,
   pulseQuery as legacyPulseQuery,
   type OpportunityRow,
 } from "@/lib/radar-queries";
@@ -273,30 +272,6 @@ const openEnginePulseQuery = queryOptions({
     return [...latestByEntity.values()].sort((a, b) =>
       b.event_date < a.event_date ? -1 : b.event_date > a.event_date ? 1 : 0,
     );
-  },
-  staleTime: 60_000,
-});
-
-export const hybridOpportunitiesQuery = queryOptions({
-  queryKey: ["opportunities", "hybrid-public"],
-  queryFn: async (context): Promise<OpportunityRow[]> => {
-    const legacy = await runLegacy<OpportunityRow[]>(legacyOpportunitiesQuery, context);
-
-    if (openEngineConfigured) {
-      try {
-        const items = await openEngineOpportunitiesQuery.queryFn!(context as never);
-        // Open Engine is an optional projection. Never replace a complete
-        // public jobs dataset with a partial projection.
-        const expected = legacy.length;
-        const sufficientlyComplete =
-          expected === 0 || items.length >= Math.max(20, Math.floor(expected * 0.9));
-        if (sufficientlyComplete) return items;
-      } catch {
-        // Fall back to the complete public table without blanking the radar.
-      }
-    }
-
-    return legacy;
   },
   staleTime: 60_000,
 });
