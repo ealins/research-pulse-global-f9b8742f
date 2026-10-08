@@ -80,8 +80,7 @@ async function fetchPublicOpportunities(): Promise<OpportunityRow[]> {
       description: null,
       requirements: null,
       country: canonicalCountry(row.country),
-    }))
-    .filter((row) => isPublicOpportunityEvidence(row));
+    }));
 }
 
 export const opportunitiesQuery = queryOptions({
