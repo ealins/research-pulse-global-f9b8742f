@@ -1661,7 +1661,15 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
       .eq("id", source.id);
     await recordRun(false, false, message);
 
-    const dead = task.attempts >= task.max_attempts;
+    const permanentlyUnavailable = statusCode === 404 || statusCode === 410;
+    if (permanentlyUnavailable) {
+      await supabaseAdmin
+        .from("sources")
+        .update({ active: false })
+        .eq("id", source.id);
+    }
+    // 404/410 means the source was removed, so retire it instead of retrying it.
+    const dead = permanentlyUnavailable || task.attempts >= task.max_attempts;
     const backoffMinutes = Math.min(60 * 12, 2 ** Math.max(1, task.attempts));
     const { data: updated } = await supabaseAdmin
       .from("ingestion_tasks")
