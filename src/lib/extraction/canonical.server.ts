@@ -283,6 +283,7 @@ export async function normalizeNonVacancy(
         return { status: "SKIPPED", reason: "missing institution for programme" };
       if (ex.degree_level !== "master" && ex.degree_level !== "doctoral") {
         return { status: "SKIPPED", reason: "programme is not Master's or Doctoral" };
+      }
 
       const { data: existing } = await supabaseAdmin
         .from("courses")
