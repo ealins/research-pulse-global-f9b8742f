@@ -99,8 +99,11 @@ export async function runExtraction<T>(args: {
   let lastOutputTokens: number | null = null;
   let lastModel: string | null = null;
 
-  for (const tier of NVIDIA_MODEL_CHAIN[args.operation]) {
-    const model = modelName(tier);
+  const fallbackModels = NVIDIA_MODEL_CHAIN[args.operation].map(modelName);
+  const candidateModels = ["auto", ...fallbackModels.filter((model) => model !== "auto")];
+
+  for (const model of candidateModels) {
+    const tier = NVIDIA_MODEL_CHAIN[args.operation].find((candidate) => modelName(candidate) === model) ?? "NANO";
     modelsTried.push(model);
     lastModel = model;
 
