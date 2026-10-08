@@ -445,7 +445,10 @@ export async function normalizeNonVacancy(
         abstract_deadline: ex.abstract_deadline,
         paper_deadline: ex.paper_deadline,
         registration_deadline: ex.registration_deadline,
-        website: url,
+        // Prefer the exact event page extracted from the source page. The raw
+        // page remains provenance in `source`, so listing/calendar pages do
+        // not become the user's click destination.
+        website: ex.event_url ?? url,
         summary: ex.summary,
         source: url,
         event_kind: ex.event_kind ?? "other",
