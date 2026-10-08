@@ -653,6 +653,19 @@ if (shouldRunDirectly) {
       const retries = results.filter(
         (result) => result?.result?.status === "RETRY",
       ).length;
+      const retryDetails = results
+        .filter((result) => result?.result?.status === "RETRY")
+        .slice(0, 5)
+        .map((result) => ({
+          task_id: result?.lease?.task_id,
+          url: result?.lease?.url,
+          error: result?.completion?.error ?? "unknown",
+        }));
+      if (retryDetails.length) {
+        console.warn(
+          `${new Date().toISOString()} FETCH_RETRY_DETAILS ${JSON.stringify(retryDetails)}`,
+        );
+      }
       const staleResults = results.filter(
         (result) => result?.result?.status === "STALE",
       );
