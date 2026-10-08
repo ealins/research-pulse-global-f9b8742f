@@ -6,6 +6,7 @@ import {
   PUBLIC_VERIFICATION_STATUSES,
   canonicalCountry,
   countrySlug,
+  isPublicOpportunityEvidence,
 } from "@/lib/public-data";
 
 export const OPEN_STATUSES = [
@@ -96,7 +97,7 @@ async function fetchLandscape() {
     supabase
       .from("opportunities")
       .select(
-        "id, institution_id, country, status, application_deadline, opportunity_topics(topic_id)",
+        "id, institution_id, country, status, application_deadline, title, description, official_source_url, confidence, verification_status, is_demo, opportunity_topics(topic_id)",
       )
       .eq("is_demo", false)
       .in("status", LIVE_OPPORTUNITY_STATUSES)
@@ -144,10 +145,12 @@ async function fetchLandscape() {
       ...row,
       country: canonicalCountry(row.country),
     })),
-    opportunities: (opps.data ?? []).map((row) => ({
-      ...row,
-      country: canonicalCountry(row.country),
-    })),
+    opportunities: (opps.data ?? [])
+      .filter((row) => isPublicOpportunityEvidence(row))
+      .map((row) => ({
+        ...row,
+        country: canonicalCountry(row.country),
+      })),
     courses: courses.data ?? [],
     projects: projects.data ?? [],
     publications: pubs.data ?? [],
