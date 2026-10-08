@@ -133,7 +133,7 @@ export function institutionDetailQuery(slug: string) {
           supabase
             .from("opportunities")
             .select(
-              "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics!inner(topic_id)",
+              "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics(topic_id)",
             )
             .eq("institution_id", id)
             .eq("is_demo", false)
@@ -250,7 +250,7 @@ export function researcherDetailQuery(slug: string) {
         supabase
           .from("opportunities")
           .select(
-            "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics!inner(topic_id)",
+            "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics(topic_id)",
           )
           .eq("supervisor_id", id)
           .eq("is_demo", false)
@@ -504,7 +504,7 @@ export function projectDetailQuery(slug: string) {
         supabase
           .from("opportunities")
           .select(
-            "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics!inner(topic_id)",
+            "id, title, slug, opportunity_type, status, application_deadline, application_url, official_source_url, verification_status, confidence, opportunity_topics(topic_id)",
           )
           .eq("project_id", id)
           .eq("is_demo", false)
