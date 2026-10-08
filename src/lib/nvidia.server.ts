@@ -66,7 +66,7 @@ function release(): void {
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export function isAIConfigured(): boolean {
-  return Boolean(process.env["OPENAI_API_KEY"] || process.env["OMNIROUTE_API_KEY"] || process.env["OMNIROUTE_URL"]);
+  return Boolean(process.env["OMNIROUTE_API_KEY"] || process.env["OMNIROUTE_URL"]);
 }
 export const isNvidiaConfigured = isAIConfigured;
 
@@ -85,10 +85,7 @@ async function logRun(row: Record<string, unknown>): Promise<string | null> {
  * llm_processing_runs. Retries only on 429 / 5xx / network errors.
  */
 export async function callNemotron(call: NemotronCall): Promise<NemotronResult> {
-  const requestedModel =
-    call.model ?? (call.modelTier ? NVIDIA_MODEL_BY_TIER[call.modelTier] : NVIDIA_MODEL);
-  const useOpenAI = Boolean(process.env["OPENAI_API_KEY"]);
-  const model = useOpenAI ? (process.env["OPENAI_MODEL"] ?? "gpt-6-luna") : requestedModel;
+  const model = call.model ?? (call.modelTier ? NVIDIA_MODEL_BY_TIER[call.modelTier] : (process.env["OMNIROUTE_MODEL"] ?? "auto"));
   const tier: NvidiaModelTier =
     call.modelTier ??
     (model === NVIDIA_MODEL_BY_TIER.ULTRA
@@ -108,11 +105,9 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
     input_characters: call.system.length + call.user.length,
   };
 
-  const apiKey = useOpenAI ? process.env["OPENAI_API_KEY"] : process.env["OMNIROUTE_API_KEY"];
-  const endpoint = useOpenAI
-    ? (process.env["OPENAI_BASE_URL"]?.replace(/\/$/, "") ?? "https://api.openai.com/v1")
-    : (process.env["OMNIROUTE_URL"]?.replace(/\/$/, "") ?? "https://omniroute.geoacademic.app/v1");
-  const providerModel = useOpenAI ? model : (process.env["OMNIROUTE_MODEL"] ?? "auto");
+  const apiKey = process.env["OMNIROUTE_API_KEY"];
+  const endpoint = process.env["OMNIROUTE_URL"]?.replace(/\/$/, "") ?? "https://omniroute.geoacademic.app/v1";
+  const providerModel = model;
   if (!apiKey) {
     const runId = await logRun({
       ...base,
@@ -120,7 +115,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       completed_at: new Date().toISOString(),
       latency_ms: 0,
       error_code: "AI_PROVIDER_NOT_CONFIGURED",
-      error_message: `No AI provider is configured. Set OPENAI_API_KEY or OMNIROUTE_API_KEY on the server.`,
+      error_message: `OmniRoute is not configured. Set OMNIROUTE_API_KEY or OMNIROUTE_URL on the server.`,
     });
     return {
       ok: false,
@@ -168,7 +163,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
           // not open-ended reasoning. Nemotron 3 enables thinking by default;
           // disabling it avoids spending most of the time/token budget before
           // the JSON payload is produced.
-          ...(useOpenAI ? {} : { chat_template_kwargs: { enable_thinking: false } }),
+          chat_template_kwargs: { enable_thinking: false },
           messages: [
             { role: "system", content: call.system },
             { role: "user", content: call.user },
