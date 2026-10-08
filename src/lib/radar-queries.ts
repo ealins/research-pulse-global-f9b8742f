@@ -312,7 +312,10 @@ export const projectsQuery = queryOptions({
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
 
-    const rows = data ?? [];
+    // The public catalogue is for current/recent research, not an archive of historical grants.
+    const rows = (data ?? []).filter((row) =>
+      row.status === "planned" || row.status === "active" || (row.start_date && row.start_date >= "2020-01-01"),
+    );
     if (!rows.length) return rows;
     const ids = rows.map((row) => row.id);
     const { data: evidence, error: evidenceError } = await supabase
