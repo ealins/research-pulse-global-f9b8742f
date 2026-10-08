@@ -77,7 +77,7 @@ export const Route = createFileRoute("/sitemap.xml")({
               .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
             supabase
               .from("opportunities")
-              .select("slug, opportunity_topics!inner(topic_id)")
+              .select("slug, opportunity_topics(topic_id)")
               .eq("is_demo", false)
               .in("status", LIVE_OPPORTUNITY_STATUSES)
               .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
