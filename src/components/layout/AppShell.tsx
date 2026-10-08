@@ -23,7 +23,7 @@ import {
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
-import { openJobCountQuery } from "@/lib/radar-queries";
+import { countsQuery } from "@/lib/radar-queries";
 import { CommandPalette } from "@/components/CommandPalette";
 
 const NAV_GROUPS = [
@@ -64,7 +64,7 @@ const NAV_GROUPS = [
 ] as const;
 
 export function AppShell({ children }: { children: ReactNode }) {
-  const { data: openJobs } = useQuery(openJobCountQuery);
+  const { data: surfaceCounts } = useQuery(countsQuery);
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[16.5rem_1fr]">
@@ -104,9 +104,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   >
                     <Icon className="h-4 w-4" />
                     <span className="whitespace-nowrap">{label}</span>
-                    {to === "/jobs" && openJobs ? (
+                    {to === "/jobs" && surfaceCounts?.opportunities ? (
                       <span className="mono-num ml-auto hidden rounded-full bg-primary/15 px-2 py-0.5 text-[0.65rem] text-primary lg:inline">
-                        {openJobs}
+                        {surfaceCounts.opportunities}
                       </span>
                     ) : null}
                   </Link>
