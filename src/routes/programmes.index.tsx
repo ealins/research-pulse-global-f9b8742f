@@ -69,7 +69,7 @@ function ProgrammesPage() {
     );
     return [
       { key: "all", label: "All levels", count: rows.length },
-      ...ordered.map(([k, v]) => ({ key: k, label: degreeLabel(k), count: v })),
+      ...ordered.map(([k, v]) => ({ key: k, label: k, count: v })),
     ];
   }, [rows]);
 
@@ -111,7 +111,7 @@ function ProgrammesPage() {
 
   const filtered = rows.filter(
     (c) =>
-      (level === "all" || c.degree_type === level) &&
+      (level === "all" || degreeLabel(c.degree_type) === level) &&
       (family === "all" || c.family === family) &&
       (country === "all" || c.country === country) &&
       (language === "all" || (c.language ?? "Not stated") === language) &&
