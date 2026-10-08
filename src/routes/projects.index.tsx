@@ -1,5 +1,4 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { ExternalLink } from "lucide-react";
 
 import { AppShell, PageHeader, ProvenanceChips, TopicPills } from "@/components/layout/AppShell";
@@ -8,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CardLink } from "@/components/CardLink";
 
 export const Route = createFileRoute("/projects/")({
+  loader: ({ context }) => context.queryClient.ensureQueryData(projectsQuery),
   head: () => ({
     meta: [
       { title: "Research Projects — GeoAcademic Radar" },
@@ -46,7 +46,9 @@ function money(amount: number | null, currency: string | null) {
 }
 
 function ProjectsPage() {
-  const { data, isLoading, error } = useQuery(projectsQuery);
+  const data = Route.useLoaderData();
+  const isLoading = false;
+  const error = null;
 
   return (
     <AppShell>
