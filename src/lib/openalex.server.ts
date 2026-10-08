@@ -796,7 +796,7 @@ export async function importInstitutionProjects(
   for (const query of queries) {
     const url =
       `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}` +
-      `&search=${encodeURIComponent(query)}&pageSize=${pageSize}` +
+      `&search=${encodeURIComponent(query)}&fromStartYear=2020&pageSize=${pageSize}` +
       `&sortBy=${encodeURIComponent("startDate DESC")}`;
     const payload = await getJson<{ results?: OpenAireProject[] }>(url, "openaire");
 
