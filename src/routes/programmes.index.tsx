@@ -60,8 +60,10 @@ function ProgrammesPage() {
 
   const levelTabs = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const c of rows)
-      const label = degreeLabel(c.degree_type);\n      if (label) counts.set(label, (counts.get(label) ?? 0) + 1);
+    for (const c of rows) {
+      const label = degreeLabel(c.degree_type);
+      if (label) counts.set(label, (counts.get(label) ?? 0) + 1);
+    }
     const ordered = [...counts.entries()].sort(
       (a, b) => DEGREE_ORDER.indexOf(a[0] as (typeof DEGREE_ORDER)[number]) - DEGREE_ORDER.indexOf(b[0] as (typeof DEGREE_ORDER)[number]),
     );
