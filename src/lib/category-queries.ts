@@ -56,23 +56,33 @@ export function programmeFamily(title: string): string {
   return "Interdisciplinary";
 }
 
-export const DEGREE_ORDER = ["BSc", "MSc", "MEng", "PhD", "Certificate"];
+export const DEGREE_ORDER = ["Master's", "Doctoral"] as const;
 
-export function degreeLabel(degree: string | null): string {
-  switch (degree) {
-    case "BSc":
-      return "Bachelor";
-    case "MSc":
-      return "Master";
-    case "MEng":
-      return "Engineering master";
-    case "PhD":
-      return "Doctoral";
-    case "Certificate":
-      return "Diploma / certificate";
-    default:
-      return "Other";
+const POSTGRADUATE_DEGREE_TYPES = new Set([
+  "Master",
+  "MSc",
+  "MA",
+  "MPhil",
+  "MASt",
+  "MEng",
+  "Doctoral",
+  "PhD",
+  "DPhil",
+]);
+
+export function isPostgraduateProgramme(degree: string | null): boolean {
+  return Boolean(degree && POSTGRADUATE_DEGREE_TYPES.has(degree));
+}
+
+export function degreeLabel(degree: string | null): "Master's" | "Doctoral" | null {
+  if (!degree) return null;
+  if (["Master", "MSc", "MA", "MPhil", "MASt", "MEng"].includes(degree)) {
+    return "Master's";
   }
+  if (["Doctoral", "PhD", "DPhil"].includes(degree)) {
+    return "Doctoral";
+  }
+  return null;
 }
 
 type Rollup = {
@@ -120,7 +130,8 @@ async function fetchLandscape() {
         .from("courses")
         .select("id, institution_id, degree_type, course_topics(topic_id)")
         .eq("is_demo", false)
-        .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+        .in("degree_type", ["Master", "MSc", "MA", "MPhil", "MASt", "MEng", "Doctoral", "PhD", "DPhil"]),
 
       supabase
         .from("projects")
@@ -172,7 +183,7 @@ async function fetchLandscape() {
         ...row,
         country: canonicalCountry(row.country),
       })),
-    courses: courses.data ?? [],
+    courses: (courses.data ?? []).filter((row) => isPostgraduateProgramme(row.degree_type)),
     projects: projects.data ?? [],
     publications: pubs.data ?? [],
     researchers: researchers.data ?? [],
@@ -505,6 +516,7 @@ export const programmeCatalogueQuery = queryOptions({
       )
       .eq("is_demo", false)
       .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+      .in("degree_type", ["Master", "MSc", "MA", "MPhil", "MASt", "MEng", "Doctoral", "PhD", "DPhil"])
       .order("is_demo", { ascending: true })
       .order("title");
 
@@ -537,6 +549,7 @@ export function programmeDetailQuery(slug: string) {
         .eq("slug", slug)
         .eq("is_demo", false)
         .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+        .in("degree_type", ["Master", "MSc", "MA", "MPhil", "MASt", "MEng", "Doctoral", "PhD", "DPhil"])
         .maybeSingle();
 
       if (error) throw error;
@@ -573,6 +586,7 @@ export function programmeDetailQuery(slug: string) {
               .eq("institution_id", instId)
               .eq("is_demo", false)
               .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+              .in("degree_type", ["Master", "MSc", "MA", "MPhil", "MASt", "MEng", "Doctoral", "PhD", "DPhil"])
               .neq("slug", slug)
               .limit(8)
           : Promise.resolve({ data: [], error: null }),
