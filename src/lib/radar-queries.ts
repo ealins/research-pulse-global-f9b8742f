@@ -309,10 +309,29 @@ export const projectsQuery = queryOptions({
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .in("status", ["planned", "active", "completed"])
-      .order("is_demo", { ascending: true })
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
-    return data ?? [];
+
+    const rows = data ?? [];
+    if (!rows.length) return rows;
+    const ids = rows.map((row) => row.id);
+    const { data: evidence, error: evidenceError } = await supabase
+      .from("record_sources")
+      .select("entity_id, source_url, source_organization, last_checked_at, last_verified_at, is_primary")
+      .eq("entity_type", "project")
+      .in("entity_id", ids)
+      .order("is_primary", { ascending: false })
+      .order("last_checked_at", { ascending: false });
+    if (evidenceError) throw evidenceError;
+
+    const latestEvidence = new Map<string, (typeof evidence)[number]>();
+    for (const item of evidence ?? []) {
+      if (!latestEvidence.has(item.entity_id)) latestEvidence.set(item.entity_id, item);
+    }
+    return rows.map((row) => ({
+      ...row,
+      evidence: latestEvidence.get(row.id) ?? null,
+    }));
   },
 });
 
