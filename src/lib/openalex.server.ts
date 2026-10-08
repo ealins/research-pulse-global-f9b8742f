@@ -794,11 +794,25 @@ export async function importInstitutionProjects(
   const pageSize = Math.min(50, opts.perQuery ?? 25);
 
   for (const query of queries) {
-    const url =
-      `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}` +
+    const base =
       `&search=${encodeURIComponent(query)}&fromStartDate=2020-01-01&pageSize=${pageSize}` +
       `&sortBy=${encodeURIComponent("startDate DESC")}`;
-    const payload = await getJson<{ results?: OpenAireProject[] }>(url, "openaire");
+    const idUrl =
+      `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}${base}`;
+    let payload = await getJson<{ results?: OpenAireProject[] }>(idUrl, "openaire");
+
+    // OpenAIRE organization identifiers can lag ROR changes. If the ID query
+    // returns no modern projects, retry by the canonical institution name.
+    const hasModern = (payload?.results ?? []).some((project) => {
+      const start = text(project.startDate);
+      return Boolean(start && start >= "2020-01-01");
+    });
+    if (!hasModern) {
+      const nameUrl =
+        `${OPENAIRE_API}/projects?relOrganizationName=${encodeURIComponent(inst.name)}${base}`;
+      const byName = await getJson<{ results?: OpenAireProject[] }>(nameUrl, "openaire");
+      if ((byName?.results ?? []).length) payload = byName;
+    }
 
     for (const project of payload?.results ?? []) {
       out.seen += 1;
