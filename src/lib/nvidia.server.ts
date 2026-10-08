@@ -80,7 +80,7 @@ async function logRun(row: Record<string, unknown>): Promise<string | null> {
 }
 
 /**
- * Single entry point for every Nemotron request.
+ * Single entry point for every semantic AI request.
  * Every attempt — success, failure or missing secret — is recorded in
  * llm_processing_runs. Retries only on 429 / 5xx / network errors.
  */
@@ -120,7 +120,7 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       completed_at: new Date().toISOString(),
       latency_ms: 0,
       error_code: "AI_PROVIDER_NOT_CONFIGURED",
-      error_message: `Secret "OMNIROUTE_API_KEY" is not configured on the server.`,
+      error_message: `No AI provider is configured. Set OPENAI_API_KEY or OMNIROUTE_API_KEY on the server.`,
     });
     return {
       ok: false,
