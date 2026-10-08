@@ -797,21 +797,23 @@ export async function importInstitutionProjects(
     const base =
       `&search=${encodeURIComponent(query)}&fromStartDate=2020-01-01&pageSize=${pageSize}` +
       `&sortBy=${encodeURIComponent("startDate DESC")}`;
-    const idUrl =
-      `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}${base}`;
-    let payload = await getJson<{ results?: OpenAireProject[] }>(idUrl, "openaire");
+    // Prefer the canonical institution name. ROR/OpenAIRE organization mappings can
+    // point to a parent or stale organization and produce unrelated historical grants.
+    const nameUrl =
+      `${OPENAIRE_API}/projects?relOrganizationName=${encodeURIComponent(inst.name)}${base}`;
+    let payload = await getJson<{ results?: OpenAireProject[] }>(nameUrl, "openaire");
 
-    // OpenAIRE organization identifiers can lag ROR changes. If the ID query
-    // returns no modern projects, retry by the canonical institution name.
+    // Fall back to the ROR-linked OpenAIRE organization only when the name query
+    // returns no modern projects.
     const hasModern = (payload?.results ?? []).some((project) => {
       const start = text(project.startDate);
       return Boolean(start && start >= "2020-01-01");
     });
     if (!hasModern) {
-      const nameUrl =
-        `${OPENAIRE_API}/projects?relOrganizationName=${encodeURIComponent(inst.name)}${base}`;
-      const byName = await getJson<{ results?: OpenAireProject[] }>(nameUrl, "openaire");
-      if ((byName?.results ?? []).length) payload = byName;
+      const idUrl =
+        `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}${base}`;
+      const byId = await getJson<{ results?: OpenAireProject[] }>(idUrl, "openaire");
+      if ((byId?.results ?? []).length) payload = byId;
     }
 
     for (const project of payload?.results ?? []) {
