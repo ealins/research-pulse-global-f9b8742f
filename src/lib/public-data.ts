@@ -54,7 +54,7 @@ export function isPublicOpportunityEvidence(row: PublicOpportunityEvidence): boo
   } catch {
     return false;
   }
-  return PUBLIC_GEOSPATIAL.test([row.title, row.description ?? ""].join("\n"));
+  return PUBLIC_GEOSPATIAL.test([row.title, row.description?.slice(0, 2000) ?? ""].join("\n"));
 }
 
 
