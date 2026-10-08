@@ -1,7 +1,6 @@
 // Server-only configuration for the GeoAcademic Radar intelligence engine.
-export const AI_PROVIDER = "OmniRoute" as const;
-export const NVIDIA_SECRET_NAME = "Nvidia" as const;
-export const NVIDIA_BASE_URL = "https://integrate.api.nvidia.com/v1/chat/completions";
+export const AI_PROVIDER = process.env["OPENAI_API_KEY"] ? "OpenAI" : "OmniRoute";
+export const AI_DEFAULT_MODEL = process.env["OPENAI_MODEL"] ?? "gpt-6-luna";
 
 // OmniRoute provides the OpenAI-compatible gateway for the whole routing ladder. Model ids can be
 // overridden per environment without changing source code.
