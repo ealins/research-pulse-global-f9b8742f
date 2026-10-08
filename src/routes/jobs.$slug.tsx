@@ -157,6 +157,16 @@ function OpportunityDetail() {
           />
         </div>
 
+        {!["open", "closing_soon", "rolling", "possibly_open"].includes(o.status) ? (
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-border bg-muted/40 p-3 text-[0.72rem] leading-relaxed text-muted-foreground">
+            <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              This position is no longer marked as live in our source data. The record is kept for
+              traceability; use the official source below to confirm whether applications are still accepted.
+            </span>
+          </div>
+        ) : null}
+
         <div className="mt-6 flex flex-wrap items-center gap-3">
           {o.application_url ? (
             <a
