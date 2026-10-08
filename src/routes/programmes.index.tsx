@@ -30,7 +30,7 @@ export const Route = createFileRoute("/programmes/")({
       {
         name: "description",
         content:
-          "Categorised catalogue of bachelor, master, engineering and doctoral programmes in photogrammetry, remote sensing, geodesy and geoinformatics worldwide.",
+          "Categorised catalogue of Master's and Doctoral programmes in photogrammetry, remote sensing, geodesy and geoinformatics worldwide.",
       },
       { property: "og:title", content: "Degree programmes — GeoAcademic Radar" },
       {
@@ -61,9 +61,9 @@ function ProgrammesPage() {
   const levelTabs = useMemo(() => {
     const counts = new Map<string, number>();
     for (const c of rows)
-      counts.set(c.degree_type ?? "Other", (counts.get(c.degree_type ?? "Other") ?? 0) + 1);
+      const label = degreeLabel(c.degree_type);\n      if (label) counts.set(label, (counts.get(label) ?? 0) + 1);
     const ordered = [...counts.entries()].sort(
-      (a, b) => DEGREE_ORDER.indexOf(a[0]) - DEGREE_ORDER.indexOf(b[0]),
+      (a, b) => DEGREE_ORDER.indexOf(a[0] as (typeof DEGREE_ORDER)[number]) - DEGREE_ORDER.indexOf(b[0] as (typeof DEGREE_ORDER)[number]),
     );
     return [
       { key: "all", label: "All levels", count: rows.length },
@@ -192,7 +192,7 @@ function ProgrammesPage() {
                           {c.title}
                         </Link>
                         <span className="mono-num shrink-0 rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-[0.62rem] text-primary">
-                          {c.degree_type ?? "n/a"}
+                          {degreeLabel(c.degree_type) ?? ""}
                         </span>
                       </div>
                       <p className="mt-1.5 text-[0.72rem] text-muted-foreground">
