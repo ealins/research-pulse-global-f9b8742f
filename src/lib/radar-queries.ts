@@ -94,45 +94,43 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
   }
 }
 
-export const opportunitiesQuery = queryOptions({
-  queryKey: ["opportunities"],
-  queryFn: async (): Promise<OpportunityRow[]> => {
-    // The public opportunities table is currently the complete, quality-gated
-    // source of truth for the Jobs radar. Fetch it in PostgREST-sized pages so
-    // the UI does not silently collapse thousands of public records to the
-    // first 200 rows while the optional Open Engine projection catches up.
-    const pageSize = 1000;
-    const rows: OpportunityRow[] = [];
-    for (let offset = 0; ; offset += pageSize) {
-      const { data, error } = await supabase
-        .from("opportunities")
-        .select(
-          `id, title, slug, city, country, opportunity_type, description, requirements,
-           funding_type, salary_text, start_date, application_deadline, application_url,
-           official_source_url, supervisor_name, sector, employer_name, seniority,
-           status, confidence, verification_status,
-           last_checked_at, is_demo,
-           institutions ( name, slug, abbreviation ),
-           opportunity_topics ( research_topics ( name, slug ) )`,
-        )
-        .eq("is_demo", false)
-        .in("status", LIVE_OPPORTUNITY_STATUSES)
-        .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
-        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
-        .not("official_source_url", "is", null)
-        .order("is_demo", { ascending: true })
-        .order("application_deadline", { ascending: true, nullsFirst: false })
-        .range(offset, offset + pageSize - 1);
-      if (error) throw error;
-      const page = ((data ?? []) as unknown as OpportunityRow[]).map((row) => ({
+async function fetchPublicOpportunities(): Promise<OpportunityRow[]> {
+  const pageSize = 1000;
+  const rows: OpportunityRow[] = [];
+  for (let offset = 0; ; offset += pageSize) {
+    const { data, error } = await supabase
+      .from("opportunities")
+      .select(
+        `id, title, slug, city, country, opportunity_type, description, requirements,
+         funding_type, salary_text, start_date, application_deadline, application_url,
+         official_source_url, supervisor_name, sector, employer_name, seniority,
+         status, confidence, verification_status,
+         last_checked_at, is_demo,
+         institutions ( name, slug, abbreviation ),
+         opportunity_topics ( research_topics ( name, slug ) )`,
+      )
+      .eq("is_demo", false)
+      .in("status", LIVE_OPPORTUNITY_STATUSES)
+      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("official_source_url", "is", null)
+      .order("application_deadline", { ascending: true, nullsFirst: false })
+      .range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    rows.push(
+      ...((data ?? []) as unknown as OpportunityRow[]).map((row) => ({
         ...row,
         country: canonicalCountry(row.country),
-      }));
-      rows.push(...page);
-      if (page.length < pageSize) break;
-    }
-    return rows.filter(isPlausibleOpportunity);
-  },
+      })),
+    );
+    if ((data ?? []).length < pageSize) break;
+  }
+  return rows.filter(isPlausibleOpportunity);
+}
+
+export const opportunitiesQuery = queryOptions({
+  queryKey: ["opportunities"],
+  queryFn: fetchPublicOpportunities,
 });
 
 export const pulseQuery = queryOptions({
@@ -159,76 +157,21 @@ export const pulseQuery = queryOptions({
 export const countsQuery = queryOptions({
   queryKey: ["entity-counts"],
   queryFn: async () => {
-    // One database round trip keeps the hub counts consistent with the public
-    // topic/relevance gates used by the list pages. Keep the legacy fallback so
-    // a deployment remains usable while the accompanying migration is applied.
-    const { data: surfaceCounts, error: surfaceCountsError } =
-      await supabase.rpc("public_surface_counts");
-    if (!surfaceCountsError && surfaceCounts && typeof surfaceCounts === "object") {
-      const counts = surfaceCounts as Record<string, unknown>;
-      return {
-        institutions: Number(counts["institutions"] ?? 0),
-        researchers: Number(counts["researchers"] ?? 0),
-        opportunities: Number(counts["opportunities"] ?? 0),
-        publications: Number(counts["publications"] ?? 0),
-        projects: Number(counts["projects"] ?? 0),
-        events: Number(counts["events"] ?? 0),
-      };
-    }
-
-    const tables = [
-      "institutions",
-      "researchers",
-      "opportunities",
-      "publications",
-      "projects",
-      "events",
-    ] as const;
-    const entries = await Promise.all(
-      tables.map(async (t) => {
-        // NOTE: never use `head: true` here. PostgREST answers HEAD with a
-        // Content-Length body, which Chromium rejects as net::ERR_ABORTED, so
-        // every count would fail and the UI would fall back to empty states.
-        const { count, error } = await supabase
-          .from(t)
-          .select("id", { count: "exact" })
-          .eq("is_demo", false)
-          .limit(1);
-        if (error) throw error;
-        return [t, count ?? 0] as const;
-      }),
-    );
-    const { count: publicOpportunities, error: publicOpportunityError } = await supabase
-      .from("opportunities")
-      .select("id, opportunity_topics!inner(topic_id)", { count: "exact" })
-      .eq("is_demo", false)
-      .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
-      .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
-      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
-      .not("official_source_url", "is", null)
-      .limit(1);
-    if (publicOpportunityError) throw publicOpportunityError;
-    return {
-      ...(Object.fromEntries(entries) as Record<(typeof tables)[number], number>),
-      opportunities: publicOpportunities ?? 0,
-    };
-  },
-});
-
-export const openJobCountQuery = queryOptions({
-  queryKey: ["open-job-count"],
-  queryFn: async () => {
-    const { count, error } = await supabase
-      .from("opportunities")
-      .select("id, opportunity_topics!inner(topic_id)", { count: "exact" })
-      .in("status", ["open", "closing_soon", "rolling"])
-      .in("verification_status", ["verified", "auto_discovered"])
-      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
-      .not("official_source_url", "is", null)
-      .eq("is_demo", false)
-      .limit(1);
+    const { data: surfaceCounts, error } = await supabase.rpc("public_surface_counts");
     if (error) throw error;
-    return count ?? 0;
+    if (!surfaceCounts || typeof surfaceCounts !== "object") {
+      throw new Error("Public surface counts returned no data");
+    }
+    const counts = surfaceCounts as Record<string, unknown>;
+    const opportunities = await fetchPublicOpportunities();
+    return {
+      institutions: Number(counts["institutions"] ?? 0),
+      researchers: Number(counts["researchers"] ?? 0),
+      opportunities: opportunities.length,
+      publications: Number(counts["publications"] ?? 0),
+      projects: Number(counts["projects"] ?? 0),
+      events: Number(counts["events"] ?? 0),
+    };
   },
 });
 
