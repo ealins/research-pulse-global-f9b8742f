@@ -308,11 +308,10 @@ export function opportunityDetailQuery(slug: string) {
            research_groups ( name ),
            researchers ( full_name, slug, current_position ),
            projects ( name, slug, acronym ),
-           opportunity_topics!inner ( research_topics ( name, slug ) )`,
+           opportunity_topics ( research_topics ( name, slug ) )`,
         )
         .eq("slug", slug)
         .eq("is_demo", false)
-        .in("status", LIVE_OPPORTUNITY_STATUSES)
         .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
         .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
         .not("official_source_url", "is", null)
