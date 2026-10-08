@@ -97,6 +97,7 @@ type Rollup = {
   researchers: number;
   events: number;
   pulse: number;
+  pulseSignals: number;
   topInstitutions: { name: string; slug: string }[];
 };
 
@@ -298,6 +299,7 @@ export const countriesRollupQuery = queryOptions({
           researchers: 0,
           events: 0,
           pulse: 0,
+          pulseSignals: 0,
           topInstitutions: [],
         } satisfies Rollup);
 
@@ -307,7 +309,6 @@ export const countriesRollupQuery = queryOptions({
       row.projects += i.projects;
       row.publications += i.publications;
       row.researchers += i.researchers;
-      row.pulse += i.pulse;
 
       if (row.topInstitutions.length < 3) {
         row.topInstitutions.push({
@@ -319,6 +320,26 @@ export const countriesRollupQuery = queryOptions({
       map.set(key, row);
     }
 
+    const { data: pulseEvents, error: pulseError } = await supabase
+      .from("pulse_events")
+      .select("country")
+      .eq("is_demo", false)
+      .in("verification_status", ["verified", "auto_discovered"])
+      .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+      .not("source_url", "is", null);
+
+    if (pulseError) throw pulseError;
+
+    for (const event of pulseEvents ?? []) {
+      const eventCountry = canonicalCountry(event.country);
+      if (!eventCountry) continue;
+      const row = map.get(eventCountry);
+      if (row) {
+        row.pulseSignals += 1;
+        row.pulse += 1;
+      }
+    }
+
     for (const e of l.events) {
       const eventCountry = canonicalCountry(e.country);
       if (!eventCountry) continue;
@@ -327,7 +348,7 @@ export const countriesRollupQuery = queryOptions({
       if (row) row.events += 1;
     }
 
-    return [...map.values()].sort((a, b) => b.pulse - a.pulse);
+    return [...map.values()].sort((a, b) => b.pulse - a.pulse || a.country.localeCompare(b.country));
   },
   staleTime: 60_000,
 });
