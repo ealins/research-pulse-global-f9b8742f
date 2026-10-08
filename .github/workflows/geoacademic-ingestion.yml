@@ -23,9 +23,6 @@ jobs:
     env:
       GEOACADEMIC_BASE_URL: https://geoacademic.app
       INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_MODEL: "gpt-6-luna"
-      OPENAI_BASE_URL: "https://api.openai.com/v1"
       OMNIROUTE_URL: "https://omniroute.geoacademic.app/v1"
       OMNIROUTE_MODEL: "auto"
       OMNIROUTE_API_KEY: ${{ secrets.OMNIROUTE_API_KEY }}
@@ -37,18 +34,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Validate worker
         run: node scripts/job-review-worker.mjs --self-test
-      - name: Require AI provider credentials
+      - name: Require OmniRoute credentials
         shell: bash
         run: |
           set -euo pipefail
-          if [[ -n "${OPENAI_API_KEY:-}" ]]; then
-            echo "AI_PROVIDER=OpenAI"
-          elif [[ -n "${OMNIROUTE_API_KEY:-}" ]]; then
-            echo "AI_PROVIDER=OmniRoute"
-          else
-            echo "No AI provider credential configured" >&2
-            exit 1
-          fi
+          test -n "${OMNIROUTE_API_KEY:-}"
+          echo "AI_PROVIDER=OmniRoute"
       - name: Verify fetch lease endpoint
         shell: bash
         env:
