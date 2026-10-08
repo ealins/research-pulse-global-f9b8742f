@@ -1,4 +1,4 @@
-// Server-only OmniRoute OpenAI-compatible client. The API key is read inside the call,
+// Server-only AI provider client. OpenAI is preferred; OmniRoute is the controlled fallback. The API key is read inside the call,
 // never logged, never returned to callers, never written to the database.
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 import {
@@ -65,9 +65,10 @@ function release(): void {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export function isNvidiaConfigured(): boolean {
-  return Boolean(process.env["OMNIROUTE_API_KEY"] ?? process.env["OMNIROUTE_URL"]);
+export function isAIConfigured(): boolean {
+  return Boolean(process.env["OPENAI_API_KEY"] || process.env["OMNIROUTE_API_KEY"] || process.env["OMNIROUTE_URL"]);
 }
+export const isNvidiaConfigured = isAIConfigured;
 
 async function logRun(row: Record<string, unknown>): Promise<string | null> {
   const { data } = await supabaseAdmin
@@ -84,8 +85,10 @@ async function logRun(row: Record<string, unknown>): Promise<string | null> {
  * llm_processing_runs. Retries only on 429 / 5xx / network errors.
  */
 export async function callNemotron(call: NemotronCall): Promise<NemotronResult> {
-  const model =
+  const requestedModel =
     call.model ?? (call.modelTier ? NVIDIA_MODEL_BY_TIER[call.modelTier] : NVIDIA_MODEL);
+  const useOpenAI = Boolean(process.env["OPENAI_API_KEY"]);
+  const model = useOpenAI ? (process.env["OPENAI_MODEL"] ?? "gpt-6-luna") : requestedModel;
   const tier: NvidiaModelTier =
     call.modelTier ??
     (model === NVIDIA_MODEL_BY_TIER.ULTRA
@@ -105,15 +108,18 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
     input_characters: call.system.length + call.user.length,
   };
 
-  const apiKey = process.env["OMNIROUTE_API_KEY"];
-  const endpoint = process.env["OMNIROUTE_URL"]?.replace(/\/$/, "") ?? "https://omniroute.geoacademic.app/v1";
+  const apiKey = useOpenAI ? process.env["OPENAI_API_KEY"] : process.env["OMNIROUTE_API_KEY"];
+  const endpoint = useOpenAI
+    ? (process.env["OPENAI_BASE_URL"]?.replace(/\/$/, "") ?? "https://api.openai.com/v1")
+    : (process.env["OMNIROUTE_URL"]?.replace(/\/$/, "") ?? "https://omniroute.geoacademic.app/v1");
+  const providerModel = useOpenAI ? model : (process.env["OMNIROUTE_MODEL"] ?? "auto");
   if (!apiKey) {
     const runId = await logRun({
       ...base,
       status: "FAILED",
       completed_at: new Date().toISOString(),
       latency_ms: 0,
-      error_code: "OMNIROUTE_API_KEY_NOT_CONFIGURED",
+      error_code: "AI_PROVIDER_NOT_CONFIGURED",
       error_message: `Secret "OMNIROUTE_API_KEY" is not configured on the server.`,
     });
     return {
@@ -124,8 +130,8 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
       model,
       provider: AI_PROVIDER,
       attempt: 0,
-      errorCode: "OMNIROUTE_API_KEY_NOT_CONFIGURED",
-      errorMessage: `Secret "OMNIROUTE_API_KEY" is not configured on the server.`,
+      errorCode: "AI_PROVIDER_NOT_CONFIGURED",
+      errorMessage: `No AI provider is configured. Set OPENAI_API_KEY or OMNIROUTE_API_KEY on the server.`,
       runId,
     };
   }
@@ -155,14 +161,14 @@ export async function callNemotron(call: NemotronCall): Promise<NemotronResult> 
           Accept: "application/json",
         },
         body: JSON.stringify({
-          model: process.env["OMNIROUTE_MODEL"] ?? "auto",
+          model: providerModel,
           temperature: call.temperature ?? LLM_DEFAULT_TEMPERATURE,
           max_tokens: call.maxTokens ?? LLM_DEFAULT_MAX_TOKENS,
           // GeoAcademic Radar uses Nemotron for terse structured extraction,
           // not open-ended reasoning. Nemotron 3 enables thinking by default;
           // disabling it avoids spending most of the time/token budget before
           // the JSON payload is produced.
-          chat_template_kwargs: { enable_thinking: false },
+          ...(useOpenAI ? {} : { chat_template_kwargs: { enable_thinking: false } }),
           messages: [
             { role: "system", content: call.system },
             { role: "user", content: call.user },
