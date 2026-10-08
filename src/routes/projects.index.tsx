@@ -38,6 +38,14 @@ const STATUS_TONE: Record<string, string> = {
   unknown: "border-border bg-muted/50 text-muted-foreground",
 };
 
+function relativeEvidence(value: string | null | undefined) {
+  if (!value) return "Evidence date not stated";
+  const days = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 86_400_000));
+  if (days === 0) return "Evidence checked today";
+  if (days === 1) return "Evidence checked 1 day ago";
+  return `Evidence checked ${days} days ago`;
+}
+
 function money(amount: number | null, currency: string | null) {
   if (amount === null) return "Budget not stated";
   return `${new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(
@@ -122,6 +130,10 @@ function ProjectsPage() {
                     confidence={p.confidence}
                     isDemo={p.is_demo}
                   />
+                  <p className="mt-2 text-[0.68rem] text-muted-foreground">
+                    {relativeEvidence(p.evidence?.last_checked_at ?? p.evidence?.last_verified_at)}
+                    {p.evidence?.source_organization ? ` · ${p.evidence.source_organization}` : ""}
+                  </p>
                   {p.website ? (
                     <a
                       href={p.website}
