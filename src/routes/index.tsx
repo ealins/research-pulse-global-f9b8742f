@@ -21,7 +21,7 @@ const hubGlobeQuery = queryOptions({
       supabase.from("institutions").select("id, name, slug, country, latitude, longitude").eq("is_demo", false),
       supabase
         .from("opportunities")
-        .select("institution_id, title, description, official_source_url, confidence, verification_status, is_demo, status")
+        .select("institution_id, title, description, official_source_url, confidence, verification_status, is_demo, status, application_deadline")
         .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
         .eq("is_demo", false),
       supabase

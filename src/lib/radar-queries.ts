@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+﻿import { supabase } from "@/integrations/supabase/client";
 import { queryOptions } from "@tanstack/react-query";
 import {
   LIVE_OPPORTUNITY_STATUSES,
@@ -45,7 +45,7 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
 async function fetchPublicOpportunities(): Promise<OpportunityRow[]> {
   const { data: evidence, error: evidenceError } = await supabase
     .from("opportunities")
-    .select("id, title, description, official_source_url, confidence, verification_status, status, is_demo")
+    .select("id, title, description, official_source_url, confidence, verification_status, status, application_deadline, is_demo")
     .eq("is_demo", false)
     .in("status", LIVE_OPPORTUNITY_STATUSES)
     .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
@@ -226,7 +226,7 @@ export const publicationsQuery = queryOptions({
     const { data, error } = await supabase
       .from("publications")
       .select(
-        // NOTE: `abstract` is deliberately excluded — abstracts made this list
+        // NOTE: `abstract` is deliberately excluded â€” abstracts made this list
         // response ~500KB. They are fetched per row on expand.
         `id, title, doi, venue, year, publication_date, authors_text, citation_count,
          citation_source, is_open_access, landing_url, source,
@@ -372,3 +372,4 @@ export function formatDate(date: string | null): string {
     year: "numeric",
   });
 }
+
