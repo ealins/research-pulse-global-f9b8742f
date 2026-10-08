@@ -12,7 +12,7 @@ import {
   type LlmOperation,
   type NvidiaModelTier,
 } from "../llm-config.server";
-import { callNemotron, isNvidiaConfigured } from "../nvidia.server";
+import { callNemotron, isAIConfigured } from "../nvidia.server";
 import { findCachedResult, logCacheHit, recordValidatedResult } from "./validate.server";
 import type { ValidationOutcome } from "./shared.server";
 
@@ -63,7 +63,7 @@ export async function runExtraction<T>(args: {
     errorMessage: null,
   };
   if (!LLM_EXTRACTION_ENABLED) return none;
-  if (!isNvidiaConfigured()) return { ...none, errorCode: "NVIDIA_SECRET_NOT_CONFIGURED" };
+  if (!isAIConfigured()) return { ...none, errorCode: "AI_PROVIDER_NOT_CONFIGURED" };
 
   // A previous validated result remains valid regardless of which Nemotron
   // tier produced it. This preserves the large Ultra-era cache.
