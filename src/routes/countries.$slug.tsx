@@ -112,7 +112,7 @@ function CountryDetail() {
       />
       <div className="mx-auto w-full max-w-7xl px-6 py-8">
         <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-          <StatTile label="Academic pulse" value={data.totals.pulse} tone="signal" />
+          <StatTile\n            label="Pulse score"\n            value={data.totals.pulse}\n            tone="signal"\n            hint="Weighted: 4×calls + 2×active projects + 1.5×papers + researchers + 0.5×programmes"\n          />
           <StatTile label="Institutions" value={data.totals.institutions} />
           <StatTile label="Open calls" value={data.totals.openCalls} tone="deadline" />
           <StatTile label="Programmes" value={data.totals.programmes} />
@@ -172,7 +172,7 @@ function CountryDetail() {
                   </p>
                 </div>
                 <div className="mono-num shrink-0 text-right text-[0.68rem] text-muted-foreground">
-                  <p className="text-primary">{Math.round(i.pulse)} pulse</p>
+                  <p className="text-primary">{Math.round(i.pulse)} score</p>
                   <p>
                     {i.openCalls} calls · {i.programmes} progs
                   </p>
