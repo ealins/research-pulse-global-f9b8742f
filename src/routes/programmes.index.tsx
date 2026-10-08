@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
 import { GraduationCap, Search } from "lucide-react";
 
 import {
@@ -48,7 +47,9 @@ export const Route = createFileRoute("/programmes/")({
 });
 
 function ProgrammesPage() {
-  const { data, isLoading, error } = useQuery(programmeCatalogueQuery);
+  const data = Route.useLoaderData();
+  const isLoading = false;
+  const error = null;
   const [level, setLevel] = useState("all");
   const [family, setFamily] = useState("all");
   const [country, setCountry] = useState("all");
