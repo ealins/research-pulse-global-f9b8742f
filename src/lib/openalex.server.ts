@@ -796,7 +796,7 @@ export async function importInstitutionProjects(
   for (const query of queries) {
     const url =
       `${OPENAIRE_API}/projects?relOrganizationId=${encodeURIComponent(openAireOrgId)}` +
-      `&search=${encodeURIComponent(query)}&fromStartYear=2020&pageSize=${pageSize}` +
+      `&search=${encodeURIComponent(query)}&fromStartDate=2020-01-01&pageSize=${pageSize}` +
       `&sortBy=${encodeURIComponent("startDate DESC")}`;
     const payload = await getJson<{ results?: OpenAireProject[] }>(url, "openaire");
 
@@ -821,6 +821,12 @@ export async function importInstitutionProjects(
       const today = new Date().toISOString().slice(0, 10);
       const start = text(project.startDate);
       const end = text(project.endDate);
+      // Never promote historical projects into the current catalogue. The API filter is
+      // an optimization; this local barrier protects us if a provider ignores a filter.
+      if (!start || start < "2020-01-01") {
+        out.skipped += 1;
+        continue;
+      }
       const status =
         start && start > today ? "planned" : end && end < today ? "completed" : "active";
       const funder = project.fundings?.[0]?.name ?? project.fundings?.[0]?.shortName ?? null;
