@@ -148,14 +148,14 @@ export const pulseQuery = queryOptions({
 
 export const countsQuery = queryOptions({
   queryKey: ["entity-counts"],
-  queryFn: async () => {
+  queryFn: async ({ client }) => {
     const { data: surfaceCounts, error } = await supabase.rpc("public_surface_counts");
     if (error) throw error;
     if (!surfaceCounts || typeof surfaceCounts !== "object") {
       throw new Error("Public surface counts returned no data");
     }
     const counts = surfaceCounts as Record<string, unknown>;
-    const opportunities = await fetchPublicOpportunities();
+    const opportunities = await client.fetchQuery(opportunitiesQuery);
     return {
       institutions: Number(counts["institutions"] ?? 0),
       researchers: Number(counts["researchers"] ?? 0),
