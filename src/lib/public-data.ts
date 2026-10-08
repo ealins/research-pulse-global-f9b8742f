@@ -26,7 +26,7 @@ export type PublicOpportunityEvidence = {
 const PUBLIC_NON_POSTING_TITLE =
   /^(careers?|jobs?|vacancies|recruitment|working at|join us|how we hire|search for your career|academy|careers? in|employee stor(?:y|ies)|learning (?:&|and) development|leadership track|u[.]?gro programme|talent community|graduate programme|programme careers?|privacy|cookie|job alerts?|applicant|candidate privacy|equal opportunity)/i;
 const PUBLIC_NON_POSTING_PATH =
-  /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant|job-openings?|employment-opportunities?|employment|opportunities?|job_opportunities|careers?\/? )$/i;
+  /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant|job-openings?|employment-opportunities?|employment|opportunities?|job_opportunities|careers?\/?)$/i;
 const PUBLIC_POSTING_PATH =
   /\/(?:jobs?|vacancies|careers|recruitment)(?:\/|$)/i;
 const PUBLIC_POSTING_TITLE =
