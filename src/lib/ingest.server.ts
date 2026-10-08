@@ -168,6 +168,19 @@ export function classifyUrlAndText(url: string, title: string, text: string): Cl
     return { classification: "VACANCY", confidence: 0.95 };
   }
 
+  // Programme/course classification is deliberately stricter than a generic
+  // "programme" keyword. Job titles such as "Programme Manager" and internship
+  // pages must never become degree programmes.
+  const internshipPage = /(?:intern|internship|fellowship|job|career|vacanc)/i.test(
+    `${path} ${heading}`,
+  );
+  if (!internshipPage && /(?:^|\/)(?:courses?|stud(?:y|ies)|degree(?:-program)?s?|programmes?|programs?|education|admissions|undergraduate|graduate|postgraduate)(?:\/|$)/i.test(path)) {
+    return { classification: path.includes("course") ? "COURSE" : "PROGRAMME", confidence: 0.92 };
+  }
+  if (!internshipPage && /\b(?:bachelor|master|msc|meng|ba|ma|bsc|degree|study programme|study program|degree programme|degree program|postgraduate study|undergraduate study)\b/i.test(heading)) {
+    return { classification: "PROGRAMME", confidence: 0.9 };
+  }
+
   let best: Classification = { classification: "UNKNOWN", confidence: 0 };
   for (const rule of CATEGORY_RULES) {
     let score = 0;
