@@ -201,6 +201,24 @@ export const trendsQuery = queryOptions({
   },
 });
 
+function isLikelyEventListingUrl(value: string | null): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    const path = url.pathname.replace(/\/+$/, "").toLowerCase();
+    return (
+      path === "/events" ||
+      path === "/event" ||
+      path === "/calendar" ||
+      path === "/calendar/events" ||
+      /\/calendar\/\d{4}$/.test(path) ||
+      /\/events\/(calendar|archive|upcoming|past|all)$/.test(path)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export const eventsQuery = queryOptions({
   queryKey: ["events"],
   queryFn: async () => {
@@ -226,6 +244,7 @@ export const eventsQuery = queryOptions({
         if (!e.end_date && e.start_date && e.start_date < today) return false;
         return true;
       })
+      .filter((event) => !isLikelyEventListingUrl(event.website))
       .map((event) => ({
         ...event,
         country: canonicalCountry(event.country),
