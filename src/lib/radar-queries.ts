@@ -5,6 +5,7 @@ import {
   PUBLIC_CONFIDENCE_LEVELS,
   PUBLIC_VERIFICATION_STATUSES,
   canonicalCountry,
+  isPublicOpportunityEvidence,
 } from "@/lib/public-data";
 
 export type OpportunityRow = {
@@ -35,19 +36,10 @@ export type OpportunityRow = {
   opportunity_topics: { research_topics: { name: string; slug: string } | null }[];
 };
 
-const NON_POSTING_TITLE =
-  /^(careers?|jobs?|vacancies|recruitment|work(?:ing)? (?:with|for|at) us|working at|join us|how we hire|search for your career)|academy|careers? in|employee stor(?:y|ies)|learning (?:&|and) development|leadership track|u[.]?gro programme|talent community|graduate programme|programme careers?|privacy|cookie|job alerts?|applicant|candidate privacy|equal opportunity/i;
-const NON_POSTING_PATH =
-  /\/(privacy|polic(?:y|ies)|how-we-hire|hiring-process|job-alerts?|candidate|applicant|job-openings?|employment-opportunities?|employment|opportunities?|job_opportunities|careers?\/?)$/i;
-
-const POSTING_PATH =
-  /\/(?:jobs?|vacancies|careers|recruitment)(?:\/|$)/i;
-
-const POSTING_TITLE_SIGNAL =
-  /\b(?:ph\.?d|post[- ]?doc(?:toral)?|doctoral|research assistant|research associate|research scientist|research fellow|scientist|engineer|developer|analyst|professor|lecturer|faculty|fellowship|fellow|intern(?:ship)?|technician|manager|coordinator|officer|specialist|principal|director|assistant professor|associate professor)\b/i;
-
-const STRONG_GEOSPATIAL =
-  /(photogrammetr|remote sensing|fernerkundung|geoinformat|geospatial|geographic information systems?|\bgis\b|geodes[yi]|geomatic|earth observation|geoai|lidar|laser scann|point cloud|punktwolke|synthetic aperture radar|\bsar\b|spatial data|surveying|cartograph|mapping|satellite imagery)/i;
+/** Final public safety net for legacy rows written before the stricter crawler gate. */
+export function isPlausibleOpportunity(row: OpportunityRow): boolean {
+  return isPublicOpportunityEvidence(row);
+}
 
 /** Final public safety net for legacy rows written before the stricter crawler gate. */
 export function isPlausibleOpportunity(row: OpportunityRow): boolean {
