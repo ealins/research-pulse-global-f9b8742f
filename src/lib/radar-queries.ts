@@ -91,21 +91,34 @@ export const opportunitiesQuery = queryOptions({
 export const pulseQuery = queryOptions({
   queryKey: ["pulse-events"],
   queryFn: async () => {
-    const { data, error } = await supabase
-      .from("pulse_events")
-      .select(
-        `id, category, title, summary, event_date, importance, link_url, source_url,
-         verification_status, confidence, is_demo, country,
-         pulse_event_topics ( research_topics ( name, slug ) )`,
-      )
-      .eq("is_demo", false)
-      .in("verification_status", ["verified", "auto_discovered"])
-      .order("is_demo", { ascending: true })
-      .order("importance", { ascending: false })
-      .order("event_date", { ascending: false })
-      .limit(60);
+    const [{ data, error }, opportunities] = await Promise.all([
+      supabase
+        .from("pulse_events")
+        .select(
+          `id, category, title, summary, event_date, importance, link_url, source_url,
+           verification_status, confidence, is_demo, country, entity_type, entity_id,
+           pulse_event_topics ( research_topics ( name, slug ) )`,
+        )
+        .eq("is_demo", false)
+        .in("verification_status", ["verified", "auto_discovered"])
+        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+        .not("source_url", "is", null)
+        .order("is_demo", { ascending: true })
+        .order("importance", { ascending: false })
+        .order("event_date", { ascending: false })
+        .limit(100),
+      fetchPublicOpportunities(),
+    ]);
     if (error) throw error;
-    return data ?? [];
+
+    const publicOpportunityIds = new Set(opportunities.map((row) => row.id));
+    return (data ?? [])
+      .filter((event) =>
+        event.entity_type === "opportunity"
+          ? publicOpportunityIds.has(event.entity_id)
+          : true,
+      )
+      .slice(0, 60);
   },
 });
 
