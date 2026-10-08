@@ -42,6 +42,48 @@ export function isPlausibleOpportunity(row: OpportunityRow): boolean {
 }
 
 /** Final public safety net for legacy rows written before the stricter crawler gate. */
+async function fetchPublicOpportunities(): Promise<OpportunityRow[]> {
+  const { data: evidence, error: evidenceError } = await supabase
+    .from("opportunities")
+    .select("id, title, description, official_source_url, confidence, verification_status, status, is_demo")
+    .eq("is_demo", false)
+    .in("status", LIVE_OPPORTUNITY_STATUSES)
+    .in("verification_status", PUBLIC_VERIFICATION_STATUSES)
+    .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+    .not("official_source_url", "is", null);
+  if (evidenceError) throw evidenceError;
+
+  const publicIds = (evidence ?? [])
+    .filter((row) => isPublicOpportunityEvidence(row))
+    .map((row) => row.id);
+
+  if (publicIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("opportunities")
+    .select(
+      `id, title, slug, city, country, opportunity_type,
+       funding_type, salary_text, start_date, application_deadline, application_url,
+       official_source_url, supervisor_name, sector, employer_name, seniority,
+       status, confidence, verification_status,
+       last_checked_at, is_demo,
+       institutions ( name, slug, abbreviation ),
+       opportunity_topics ( research_topics ( name, slug ) )`,
+    )
+    .in("id", publicIds)
+    .order("application_deadline", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+
+  return ((data ?? []) as unknown as Omit<OpportunityRow, "description" | "requirements">[])
+    .map((row) => ({
+      ...row,
+      description: null,
+      requirements: null,
+      country: canonicalCountry(row.country),
+    }))
+    .filter((row) => isPublicOpportunityEvidence(row));
+}
+
 export const opportunitiesQuery = queryOptions({
   queryKey: ["opportunities"],
   queryFn: fetchPublicOpportunities,
