@@ -41,7 +41,9 @@ const PUBLIC_POSTING_PATH =
 const PUBLIC_POSTING_TITLE =
   /\b(?:p[.]?h[.]?d|post[- ]?doc(?:toral)?|doctoral|research assistant|research associate|research scientist|research fellow|scientist|engineer|developer|analyst|professor|lecturer|faculty|fellowship|fellow|intern(?:ship)?|technician|manager|coordinator|officer|specialist|principal|director|assistant professor|associate professor)\b/i;
 
-const PUBLIC_ACADEMIC_ROLE = /\\b(?:phd|doctoral|postdoc|post-doctoral|research (?:assistant|associate|scientist|fellow)|professor|lecturer|faculty|fellowship|academic)\\b/i;\n\nconst PUBLIC_GEOSPATIAL =
+const PUBLIC_ACADEMIC_ROLE = /\b(?:phd|doctoral|postdoc|post-doctoral|research (?:assistant|associate|scientist|fellow)|professor|lecturer|faculty|fellowship|academic)\b/i;
+
+const PUBLIC_GEOSPATIAL =
   /(photogrammetr|remote sensing|fernerkundung|geoinformat|geospatial|geographic information systems?|\bgis\b|geodes[yi]|geomatic|earth observation|geoai|lidar|laser scann|point cloud|punktwolke|synthetic aperture radar|\bsar\b|spatial data|surveying|cartograph|mapping|satellite imagery)/i;
 
 /** Single source of truth for whether an opportunity is allowed on public surfaces. */
