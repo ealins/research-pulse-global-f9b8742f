@@ -1,6 +1,5 @@
 // Server-only configuration for the GeoAcademic Radar intelligence engine.
-export const AI_PROVIDER = process.env["OPENAI_API_KEY"] ? "OpenAI" : "OmniRoute";
-export const AI_DEFAULT_MODEL = process.env["OPENAI_MODEL"] ?? "gpt-6-luna";
+export const AI_PROVIDER = "OmniRoute";
 
 // OmniRoute provides the OpenAI-compatible gateway for the whole routing ladder. Model ids can be
 // overridden per environment without changing source code.
