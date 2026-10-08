@@ -108,7 +108,7 @@ async function fetchLandscape() {
     .toISOString()
     .slice(0, 10);
 
-  const [inst, opps, courses, projects, pubs, researchers, events] =
+  const [inst, opps, courses, projects, pubs, researchers, events, pulseEvents] =
     await Promise.all([
       supabase
         .from("institutions")
@@ -159,6 +159,14 @@ async function fetchLandscape() {
         .select("id, country, start_date, event_topics(topic_id)")
         .eq("is_demo", false)
         .in("verification_status", PUBLIC_VERIFICATION_STATUSES),
+
+      supabase
+        .from("pulse_events")
+        .select("id, institution_id, country, entity_type, entity_id, event_date, source_url")
+        .eq("is_demo", false)
+        .in("verification_status", ["verified", "auto_discovered"])
+        .in("confidence", PUBLIC_CONFIDENCE_LEVELS)
+        .not("source_url", "is", null),
     ]);
 
   const err =
@@ -168,7 +176,8 @@ async function fetchLandscape() {
     projects.error ||
     pubs.error ||
     researchers.error ||
-    events.error;
+    events.error ||
+    pulseEvents.error;
 
   if (err) throw err;
 
@@ -192,6 +201,7 @@ async function fetchLandscape() {
       ...row,
       country: canonicalCountry(row.country),
     })),
+    pulseEvents: pulseEvents.data ?? [],
   };
 }
 
@@ -242,6 +252,10 @@ function scoreInstitutions(
         (r) => r.institution_id === i.id,
       ).length;
 
+      const pulse = l.pulseEvents.filter(
+        (event) => event.institution_id === i.id,
+      ).length;
+
       return {
         id: i.id,
         name: i.name,
@@ -255,12 +269,7 @@ function scoreInstitutions(
         projects,
         publications,
         researchers,
-        pulse:
-          openCalls * 4 +
-          projects * 2 +
-          publications * 1.5 +
-          researchers +
-          programmes * 0.5,
+        pulse,
       };
     })
     .sort((a, b) => b.pulse - a.pulse || a.name.localeCompare(b.name));
