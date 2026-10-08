@@ -7,6 +7,7 @@ import { AppShell, PageHeader, ProvenanceChips, StatTile } from "@/components/la
 import { EmptyState } from "@/components/EmptyState";
 import { CardExternalLink } from "@/components/CardLink";
 import { countsQuery, pulseQuery } from "@/lib/radar-queries";
+import { isPublicOpportunityEvidence } from "@/lib/public-data";
 import { InstitutionSnapshot } from "@/components/InstitutionSnapshot";
 import { PulseHub, type Cluster } from "@/components/PulseHub";
 import type { GlobeArc, GlobePoint } from "@/components/Globe";
@@ -20,7 +21,7 @@ const hubGlobeQuery = queryOptions({
       supabase.from("institutions").select("id, name, slug, country, latitude, longitude").eq("is_demo", false),
       supabase
         .from("opportunities")
-        .select("institution_id")
+        .select("institution_id, title, description, official_source_url, confidence, verification_status, is_demo, status")
         .in("status", ["open", "closing_soon", "rolling", "possibly_open"])
         .eq("is_demo", false),
       supabase
@@ -85,7 +86,7 @@ function AcademicPulse() {
 
   const points: GlobePoint[] = useMemo(() => {
     if (!globe) return [];
-    const live = new Set(globe.opportunities.map((o: any) => o.institution_id));
+    const live = new Set(globe.opportunities.filter((o: any) => isPublicOpportunityEvidence(o)).map((o: any) => o.institution_id));
     return globe.institutions
       .filter((i: any) => i.latitude !== null && i.longitude !== null)
       .map((i: any) => ({
