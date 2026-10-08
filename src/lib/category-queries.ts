@@ -97,7 +97,6 @@ type Rollup = {
   researchers: number;
   events: number;
   pulse: number;
-  pulseSignals: number;
   topInstitutions: { name: string; slug: string }[];
 };
 
@@ -308,7 +307,6 @@ export const countriesRollupQuery = queryOptions({
           researchers: 0,
           events: 0,
           pulse: 0,
-          pulseSignals: 0,
           topInstitutions: [],
         } satisfies Rollup);
 
@@ -344,7 +342,6 @@ export const countriesRollupQuery = queryOptions({
       if (!eventCountry) continue;
       const row = map.get(eventCountry);
       if (row) {
-        row.pulseSignals += 1;
         row.pulse += 1;
       }
     }
@@ -523,9 +520,9 @@ export function countryDetailQuery(slug: string) {
             (s, i) => s + i.researchers,
             0,
           ),
-          pulse: Math.round(
-            institutions.reduce((s, i) => s + i.pulse, 0),
-          ),
+          pulse: l.pulseEvents.filter(
+            (event) => canonicalCountry(event.country) === country,
+          ).length,
         },
       };
     },
