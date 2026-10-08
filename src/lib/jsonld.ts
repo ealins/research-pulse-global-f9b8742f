@@ -134,7 +134,7 @@ export async function loadJobLd(slug: string): Promise<JobLd | null> {
       `title, slug, description, requirements, first_discovered_at, application_deadline,
        employer_name, city, country, opportunity_type, application_url,
        institutions!opportunities_institution_id_fkey ( name ),
-       opportunity_topics!inner(topic_id)`,
+       opportunity_topics (topic_id)`,
     )
     .eq("slug", slug)
     .eq("is_demo", false)
