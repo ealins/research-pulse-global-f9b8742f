@@ -309,13 +309,12 @@ export const projectsQuery = queryOptions({
       .eq("is_demo", false)
       .in("verification_status", ["verified", "auto_discovered", "possibly_outdated"])
       .in("status", ["planned", "active", "completed"])
+      .gte("start_date", "2020-01-01")
       .order("start_date", { ascending: false, nullsFirst: false });
     if (error) throw error;
 
     // The public catalogue is for current/recent research, not an archive of historical grants.
-    const rows = (data ?? []).filter((row) =>
-      row.status === "planned" || row.status === "active" || (row.start_date && row.start_date >= "2020-01-01"),
-    );
+    const rows = (data ?? []).filter((row) => row.start_date && row.start_date >= "2020-01-01");
     if (!rows.length) return rows;
     const ids = rows.map((row) => row.id);
     const { data: evidence, error: evidenceError } = await supabase
