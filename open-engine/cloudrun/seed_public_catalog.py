@@ -88,7 +88,6 @@ async def main() -> None:
                     fetch_queued += 1
 
             for row in INSTITUTIONS:
-            for row in INSTITUTIONS:
                 slug, name, country_code, continent, official_url, careers_url, research_url, institution_type = row
                 institution_id = await conn.fetchval(
                     """
