@@ -68,7 +68,7 @@ export function eventDetailQuery(slug: string) {
           ? supabase
               .from("opportunities")
               .select(
-                "id, title, slug, sector, status, application_deadline, employer_name, official_source_url, opportunity_topics!inner(topic_id)",
+                "id, title, slug, sector, status, application_deadline, employer_name, official_source_url, opportunity_topics(topic_id)",
               )
               .in("country", countryVariants(event.country))
               .eq("is_demo", false)
@@ -197,7 +197,7 @@ export const topPicksQuery = queryOptions({
         .select(
           `id, title, slug, sector, seniority, employer_name, country, status, opportunity_type,
            application_deadline, official_source_url, institutions ( name, slug ),
-           opportunity_topics!inner(topic_id)`,
+           opportunity_topics(topic_id)`,
         )
         .eq("sector", "academic")
         .eq("is_demo", false)
@@ -215,7 +215,7 @@ export const topPicksQuery = queryOptions({
         .select(
           `id, title, slug, sector, seniority, employer_name, country, status, opportunity_type,
            application_deadline, official_source_url, institutions ( name, slug ),
-           opportunity_topics!inner(topic_id)`,
+           opportunity_topics(topic_id)`,
         )
         .eq("sector", "industry")
         .eq("is_demo", false)
@@ -268,7 +268,7 @@ export const topPicksQuery = queryOptions({
     // Rank courses by how much live activity their host institution has.
     const { data: liveCalls } = await supabase
       .from("opportunities")
-      .select("institution_id, opportunity_topics!inner(topic_id)")
+      .select("institution_id, opportunity_topics(topic_id)")
       .in(
         "status",
         LIVE_STATUSES as unknown as ("open" | "closing_soon" | "rolling" | "possibly_open")[],
