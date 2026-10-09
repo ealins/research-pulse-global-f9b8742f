@@ -1324,7 +1324,9 @@ export async function runQueueBatch(
       const ap = NORMALIZE_CLASS_PRIORITY[queuedClassification(a)] ?? fallbackPriority;
       const bp = NORMALIZE_CLASS_PRIORITY[queuedClassification(b)] ?? fallbackPriority;
       if (ap !== bp) return ap - bp;
-      return new Date(a.run_after).getTime() - new Date(b.run_after).getTime();
+      // Prefer the newest queued source within the same entity type. Fresh
+      // discovery is the product goal; old retryable pages can drain later.
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
     });
     // Vacancy records are source-backed and must not wait for semantic review.
     // The canonical writer publishes the crawled source first; semantic enrichment
