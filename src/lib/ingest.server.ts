@@ -417,7 +417,7 @@ function likelyDetailLink(
   const cleanLabel = label.replace(/\s+/g, " ").trim();
   const text = `${child.pathname} ${child.search} ${cleanLabel}`.toLowerCase();
   const generic =
-    /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|projects|events|courses|programmes?|research|news|contact)$/i;
+    /^(more|read more|learn more|overview|home|back|next|previous|all|view all|people|team|staff|faculty|academic staff|research staff|professional services|technical staff|emeritus(?: faculty)?|post[- ]?docs?|graduate students?|projects|events|courses|programmes?|research|news|contact)$/i;
   if (!cleanLabel || generic.test(cleanLabel)) return false;
 
   const depth = child.pathname.split("/").filter(Boolean).length;
@@ -440,12 +440,17 @@ function likelyDetailLink(
   // evidence is therefore accepted here; the deterministic entity gate still
   // decides whether the fetched page is a real record before any model call.
   switch (category) {
-    case "people":
-      return (
-        /(people|staff|team|faculty|profile|person|member|researcher|professor|mitarbeiter)/i.test(
-          text,
-        ) || personLike
-      );
+    case "people": {
+      const listingPath =
+        /\/(?:people|staff|faculty|team|members?)(?:\/(?:academic|research|professional|technical|emeritus|post[-_ ]?docs?|graduate|staff))?\/?$/i.test(
+          child.pathname,
+        );
+      return !listingPath && (personLike ||
+        /\/(?:people|staff|faculty|profile|person|member|researcher|professor|mitarbeiter)\//i.test(
+          child.pathname,
+        ) ||
+        /[?&](?:person|profile|uid|id)=/i.test(child.search));
+    }
     case "projects":
       return (
         /(project|projekt|research[-_/ ]?project)/i.test(text) ||
