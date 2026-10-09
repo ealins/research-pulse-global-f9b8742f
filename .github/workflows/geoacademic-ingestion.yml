@@ -157,7 +157,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$INGESTION_HOOK_SECRET"
-          deadline=$((SECONDS+60))
+          deadline=$((SECONDS+300))
           processed=0
           while [ "$SECONDS" -lt "$deadline" ]; do
             response="$(curl --fail-with-body --silent --show-error \
