@@ -68,6 +68,29 @@ jobs:
           INGESTION_BURST_MODE: "true"
           INGESTION_WORKER_TRIGGER: "github-actions-fresh-first"
         run: node scripts/ingestion-worker.mjs
+      - name: Reseed high-value discovery pages
+        shell: bash
+        env:
+          INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$INGESTION_HOOK_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 45 \
+            -H "Authorization: Bearer $INGESTION_HOOK_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{"action":"reseed-high-value","limit":100,"trigger":"github-actions-deep-discovery-v7"}' \
+            https://geoacademic.app/api/public/hooks/ingest-batch
+
+      - name: Fetch reseeded discovery pages
+        env:
+          INGESTION_FETCH_CONCURRENCY: "6"
+          INGESTION_LEASE_LIMIT: "12"
+          INGESTION_RUNTIME_MS: "120000"
+          INGESTION_BURST_MODE: "true"
+          INGESTION_WORKER_TRIGGER: "github-actions-deep-discovery-v7"
+        run: node scripts/ingestion-worker.mjs
+
       - name: Queue programme discovery coverage sweep
         if: github.event_name == 'schedule'
         shell: bash
