@@ -313,10 +313,10 @@ function decodeEntities(value) {
 }
 
 function extractTitle(html) {
-  const match = /<title[^>]*>([\\s\\S]*?)<\\/title>/i.exec(html)
-    || /<(?:rss:title|atom:title|title)\\b[^>]*>([\\s\\S]*?)<\\/(?:rss:title|atom:title|title)>/i.exec(html);
+  const match = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)
+    || /<(?:rss:title|atom:title|title)\b[^>]*>([\s\S]*?)<\/(?:rss:title|atom:title|title)>/i.exec(html);
   return match?.[1]
-    ? decodeEntities(match[1].replace(/<[^>]+>/g, " ")).replace(/\\s+/g, " ").trim().slice(0, 300)
+    ? decodeEntities(match[1].replace(/<[^>]+>/g, " ")).replace(/\s+/g, " ").trim().slice(0, 300)
     : null;
 }
 
@@ -345,24 +345,24 @@ function extractLinks(html, baseUrl) {
       seen.add(url.toString());
       links.push({
         url: url.toString(),
-        label: decodeEntities(label || "").replace(/<[^>]+>/g, " ").replace(/\\s+/g, " ").trim().slice(0, 200),
+        label: decodeEntities(label || "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 200),
       });
     } catch {
       // Ignore malformed links.
     }
   };
-  const anchors = /<a\\b[^>]*href=["']([^"'#]+)["'][^>]*>([\\s\\S]*?)<\\/a>/gi;
+  const anchors = /<a\b[^>]*href=["']([^"'#]+)["'][^>]*>([\s\S]*?)<\/a>/gi;
   let match;
   while ((match = anchors.exec(html)) !== null && links.length < 200) add(match[1], match[2]);
 
   // RSS/Atom entries become individual discovered source links, not one feed-sized pulse.
-  const entries = /<(?:item|entry)\\b[^>]*>([\\s\\S]*?)<\\/(?:item|entry)>/gi;
+  const entries = /<(?:item|entry)\b[^>]*>([\s\S]*?)<\/(?:item|entry)>/gi;
   let entry;
   while ((entry = entries.exec(html)) !== null && links.length < 200) {
     const block = entry[1] || "";
-    const label = /<title\\b[^>]*>([\\s\\S]*?)<\\/title>/i.exec(block)?.[1] || "";
-    const href = /<link\\b[^>]*href=["']([^"']+)["'][^>]*\\/?\\s*>/i.exec(block)?.[1]
-      || /<link\\b[^>]*>([\\s\\S]*?)<\\/link>/i.exec(block)?.[1];
+    const label = /<title\b[^>]*>([\s\S]*?)<\/title>/i.exec(block)?.[1] || "";
+    const href = /<link\b[^>]*href=["']([^"']+)["'][^>]*\/?\s*>/i.exec(block)?.[1]
+      || /<link\b[^>]*>([\s\S]*?)<\/link>/i.exec(block)?.[1];
     add(href, label);
   }
   return links;
