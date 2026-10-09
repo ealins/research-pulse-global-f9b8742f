@@ -40,7 +40,6 @@ const CATEGORY_RULES: { category: string; kind: string; words: string[] }[] = [
       "personen",
       "professor",
       "faculty",
-      "members",
     ],
   },
   {
