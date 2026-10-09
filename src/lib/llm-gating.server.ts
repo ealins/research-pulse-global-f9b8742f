@@ -153,7 +153,7 @@ export function selectCandidate(input: {
     }
     case "PROGRAMME":
     case "COURSE": {
-      const gate = programmeGate(url, title, text);
+      const gate = programmeGate(url, title, text, input.classification);
       if (!gate.ok) return { candidate: "NOT_A_CANDIDATE", reason: `deterministic programme gate rejected: ${gate.reason}` };
       return { candidate: "PROGRAMME_CANDIDATE", reason: "single degree programme page passed the deterministic gate" };
     }
