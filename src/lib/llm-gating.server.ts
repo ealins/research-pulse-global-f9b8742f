@@ -65,7 +65,7 @@ const PROGRAMME_BODY =
 const NON_COURSE_MEDIA =
   /\b(video|movie|multimedia|image|photo gallery|flyby|launch|rollout|press release|news article|spacecraft|satellite launch)\b/i;
 
-export function programmeGate(url: string, title: string, text: string): Gate {
+export function programmeGate(url: string, title: string, text: string, classification: string | null = null): Gate {
   const t = (title || "").trim();
   if (!t) return { ok: false, reason: "no title" };
   if (NON_COURSE_MEDIA.test(t) || /\/(?:multimedia|images?|videos?|news|press-releases?)\//i.test(pathOf(url)))
@@ -75,8 +75,11 @@ export function programmeGate(url: string, title: string, text: string): Gate {
   if (text.length < 600) return { ok: false, reason: "page too thin to be a programme description" };
   const degreeEvidence = DEGREE_TITLE.test(t) || DEGREE_TITLE.test(text.slice(0, 2500));
   const researchProgramme = /\b(research|doctoral training|graduate training|scientific|training) (programme|program)\b/i.test(t);
-  if (!degreeEvidence && !researchProgramme)
-    return { ok: false, reason: "no degree level or explicit research/training programme stated" };
+  const specificCourse = classification === "COURSE"
+    && !GENERIC_STUDY_TITLE.test(t)
+    && (/\/(?:courses?|modules?|lectures?)\//i.test(pathOf(url)) || /\b(course|module|lecture|lab|practical|seminar)\b/i.test(t));
+  if (!degreeEvidence && !researchProgramme && !specificCourse)
+    return { ok: false, reason: "no degree level, explicit research/training programme, or specific course stated" };
   if (!PROGRAMME_BODY.test(text))
     return { ok: false, reason: "no programme signals (ECTS, semesters, curriculum, admission, training)" };
   return { ok: true };
