@@ -42,6 +42,23 @@ function errorMessage(error: unknown): string {
   }
 }
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(
+          () => reject(new Error(label + " timed out after " + timeoutMs + "ms")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
 function safeEqual(left: string, right: string): boolean {
   if (!left || left.length !== right.length) return false;
   let mismatch = 0;
@@ -297,10 +314,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
           // so it is safe to run on its own cheap cadence.
           if (action === "drain-providers") {
             const { runQueueBatch } = await import("@/lib/ingest.server");
-            const result = await runQueueBatch(
-              Math.min(30, Math.max(1, body.limit ?? 12)),
-              ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"],
-              2,
+            const result = await withTimeout(
+              runQueueBatch(
+                Math.min(30, Math.max(1, body.limit ?? 12)),
+                ["PROMOTE_INSTITUTION", "IMPORT_PUBLICATIONS", "IMPORT_PROJECTS"],
+                2,
+              ),
+              15_000,
+              "structured provider drain",
             );
             return json({ action, ...result });
           }
@@ -419,10 +440,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
               Date.now() - startedAt.getTime() < normalizeBudgetMs
             ) {
               const remaining = normalizeTarget - result.processed;
-              const wave = await runQueueBatch(
-                Math.min(normalizeWave, remaining),
-                ["NORMALIZE"],
-                queueState.mode === "BACKLOG" ? 3 : 2,
+              const wave = await withTimeout(
+                runQueueBatch(
+                  Math.min(normalizeWave, remaining),
+                  ["NORMALIZE"],
+                  queueState.mode === "BACKLOG" ? 3 : 2,
+                ),
+                15_000,
+                "normalization wave",
               );
               normalizeWaves += 1;
               result.processed += wave.processed;
@@ -445,7 +470,11 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
               // production does not inherit the legacy Fly-only environment flag,
               // and a second consumer would invalidate the external worker lease.
               taskGroup = "DISCOVER";
-              const collection = await runQueueBatch(batch, ["DISCOVER"]);
+              const collection = await withTimeout(
+                runQueueBatch(batch, ["DISCOVER"]),
+                15_000,
+                "discovery batch",
+              );
               result.processed = collection.processed;
               result.ok = collection.ok;
               result.failed = collection.failed;
