@@ -424,8 +424,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             // Backlog draining is adaptive: process NORMALIZE in small waves with
             // Use bounded parallelism on the paid Workers plan while keeping each
             // invocation below the six simultaneous outgoing-connection limit.
-            const normalizeTarget =
-              queueState.mode === "BACKLOG" ? Math.min(6, batch) : Math.min(3, batch);
+            const normalizeTarget = 1;
             // Vacancy normalization is deterministic and source-backed.
             // Keep requests below the Cloudflare request budget while using
             // parallel workers; semantic enrichment remains asynchronous.
