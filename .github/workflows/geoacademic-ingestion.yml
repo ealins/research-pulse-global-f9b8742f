@@ -113,6 +113,20 @@ jobs:
           done
           echo "PROVIDER_DRAIN_PROCESSED=$processed"
 
+      - name: Recover transient semantic failures
+        shell: bash
+        env:
+          INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
+        run: |
+          set -euo pipefail
+          test -n "$INGESTION_HOOK_SECRET"
+          curl --fail-with-body --silent --show-error \
+            --connect-timeout 10 --max-time 45 \
+            -H "Authorization: Bearer $INGESTION_HOOK_SECRET" \
+            -H "Content-Type: application/json" \
+            --data '{"action":"recover-semantic-failures","limit":500,"trigger":"github-actions-semantic-recovery"}' \
+            https://geoacademic.app/api/public/hooks/ingest-batch
+
       - name: Recover semantic detail pages
         shell: bash
         env:
