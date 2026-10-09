@@ -13,6 +13,7 @@ type Body = {
     | "drain-providers"
     | "reseed-high-value"
     | "recover-detail-sources"
+    | "recover-semantic-failures"
     | "worker-status"
     | "lease-fetch"
     | "complete-fetch"
@@ -231,6 +232,14 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             const { enqueueHighValueReseed } = await import("@/lib/ingest.server");
             const result = await enqueueHighValueReseed(
               Math.min(300, Math.max(10, body.limit ?? 150)),
+            );
+            return json({ action, ...result });
+          }
+
+          if (action === "recover-semantic-failures") {
+            const { enqueueSemanticFailureRecovery } = await import("@/lib/ingest.server");
+            const result = await enqueueSemanticFailureRecovery(
+              Math.min(1000, Math.max(10, body.limit ?? 500)),
             );
             return json({ action, ...result });
           }
