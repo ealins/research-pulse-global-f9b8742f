@@ -524,6 +524,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             });
           } catch (e) {
             const message = errorMessage(e);
+            const timedOut = /timed out after \\d+ms/i.test(message);
             if (run?.id) {
               await supabaseAdmin
                 .from("pipeline_runs")
@@ -532,8 +533,26 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
                   duration_ms: Date.now() - startedAt.getTime(),
                   errors: 1,
                   error_message: message.slice(0, 1000),
+                  details: {
+                    mode: queueState.mode,
+                    partial: timedOut,
+                    timeout: timedOut,
+                    error: message.slice(0, 1000),
+                  } as never,
                 })
                 .eq("id", run.id);
+            }
+            // A single slow normalization/discovery batch must not abort the
+            // entire ingestion workflow. The next scheduled tick can recover
+            // its stale lease and continue from the remaining queue.
+            if (timedOut) {
+              return json({
+                action: "drain",
+                run_id: run?.id ?? null,
+                partial: true,
+                timed_out: true,
+                error: message,
+              });
             }
             return json({ error: message }, 500);
           }
