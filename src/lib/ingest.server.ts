@@ -964,7 +964,7 @@ export async function enqueueHighValueReseed(limit = 150): Promise<{
   queued: number;
   by_category: Record<string, number>;
 }> {
-  const marker = "deep-discovery-v6.1";
+  const marker = "deep-discovery-v7.0";
   const { data: sources, error } = await supabaseAdmin
     .from("sources")
     .select(
@@ -1111,6 +1111,63 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
     fetch_queued: fetchQueued,
     already_normalized: alreadyNormalized,
   };
+}
+
+/** Requeue only non-vacancy pages whose semantic extraction failed transiently. */
+export async function enqueueSemanticFailureRecovery(limit = 500): Promise<{
+  scanned: number;
+  queued: number;
+  skipped: number;
+}> {
+  const retryable =
+    /(?:NVIDIA_SECRET_NOT_CONFIGURED|AI_PROVIDER_NOT_CONFIGURED|HTTP_(?:429|5\d\d)|TIMEOUT|NETWORK_ERROR|UNPARSEABLE_RESPONSE|OUTPUT_TRUNCATED|EMPTY_COMPLETION)/i;
+
+  const { data: raws, error } = await supabaseAdmin
+    .from("raw_records")
+    .select("id, source_id, institution_id, classification, normalization_status, normalization_error, fetched_at")
+    .in("classification", ["PROJECT", "RESEARCHER", "EVENT", "PROGRAMME", "COURSE"])
+    .eq("normalization_status", "SKIPPED")
+    .order("fetched_at", { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 1000)));
+  if (error) throw error;
+
+  let queued = 0;
+  let skipped = 0;
+  for (const raw of raws ?? []) {
+    if (!raw.source_id || !retryable.test(raw.normalization_error ?? "")) {
+      skipped += 1;
+      continue;
+    }
+    const { data: source } = await supabaseAdmin
+      .from("sources")
+      .select("active, status")
+      .eq("id", raw.source_id)
+      .maybeSingle();
+    if (!source?.active || source.status === "BLOCKED") {
+      skipped += 1;
+      continue;
+    }
+
+    await supabaseAdmin
+      .from("raw_records")
+      .update({
+        normalization_status: "PENDING",
+        normalization_error: null,
+      } as never)
+      .eq("id", raw.id);
+
+    await enqueue("NORMALIZE", {
+      source_id: raw.source_id,
+      institution_id: raw.institution_id ?? undefined,
+      payload: {
+        classification: raw.classification,
+        reason: "semantic-failure-recovery-v7",
+      },
+    });
+    queued += 1;
+  }
+
+  return { scanned: (raws ?? []).length, queued, skipped };
 }
 
 /* ------------------------------------------------------------------ */
