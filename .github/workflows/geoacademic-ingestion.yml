@@ -150,20 +150,6 @@ jobs:
             --data '{"action":"recover-semantic-failures","limit":500,"trigger":"github-actions-semantic-recovery"}' \
             https://geoacademic.app/api/public/hooks/ingest-batch
 
-      - name: Recover semantic detail pages
-        shell: bash
-        env:
-          INGESTION_HOOK_SECRET: ${{ secrets.INGESTION_HOOK_SECRET }}
-        run: |
-          set -euo pipefail
-          test -n "$INGESTION_HOOK_SECRET"
-          curl --fail-with-body --silent --show-error \
-            --connect-timeout 10 --max-time 30 \
-            -H "Authorization: Bearer $INGESTION_HOOK_SECRET" \
-            -H "Content-Type: application/json" \
-            --data '{"action":"recover-detail-sources","limit":300,"trigger":"github-actions-detail-recovery"}' \
-            https://geoacademic.app/api/public/hooks/ingest-batch
-
       - name: Drain canonical normalization backlog
         shell: bash
         env:
