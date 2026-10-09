@@ -173,8 +173,8 @@ export function classifyUrlAndText(url: string, title: string, text: string): Cl
   // Explicit media/editorial paths and headlines outrank generic lexical
   // matches like "course to Jupiter" or "programme" in article text.
   if (
-    /\\/(?:multimedia|images?|videos?|news|press-releases?)\\//i.test(path) ||
-    /\\b(video|movie|multimedia|image|flyby|launch|rollout|press release|spacecraft|satellite launch)\\b/i.test(heading)
+    /\/(?:multimedia|images?|videos?|news|press-releases?)\//i.test(path) ||
+    /\b(video|movie|multimedia|image|flyby|launch|rollout|press release|spacecraft|satellite launch)\b/i.test(heading)
   ) {
     return { classification: "GENERAL", confidence: 0.95 };
   }
