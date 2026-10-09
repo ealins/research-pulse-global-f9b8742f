@@ -212,7 +212,7 @@ async function fetchWithTimeout(url, init = {}) {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       headers: {
         "user-agent": USER_AGENT,
-        accept: "text/html,application/xhtml+xml,text/plain;q=0.8",
+        accept: "text/html,application/xhtml+xml,text/plain,application/rss+xml,application/atom+xml,application/xml,text/xml;q=0.9",
         ...(init.headers || {}),
       },
     });
