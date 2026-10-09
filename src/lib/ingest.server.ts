@@ -1037,6 +1037,9 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
     .limit(Math.max(1, Math.min(limit, 1000)));
   if (error) throw error;
 
+  const RETRYABLE_EXTRACTION_ERROR =
+    /(?:NVIDIA_SECRET_NOT_CONFIGURED|AI_PROVIDER_NOT_CONFIGURED|HTTP_(?:429|5\d\d)|TIMEOUT|NETWORK_ERROR|UNPARSEABLE_RESPONSE|OUTPUT_TRUNCATED|EMPTY_COMPLETION)/i;
+
   let normalizeQueued = 0;
   let fetchQueued = 0;
   let alreadyNormalized = 0;
@@ -1047,7 +1050,7 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
 
     const { data: raw } = await supabaseAdmin
       .from("raw_records")
-      .select("id, normalization_status, classification, classification_confidence")
+      .select("id, normalization_status, classification, classification_confidence, normalization_error")
       .eq("source_id", source.id)
       .order("fetched_at", { ascending: false })
       .limit(1)
@@ -1058,6 +1061,16 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
         alreadyNormalized += 1;
         continue;
       }
+
+      // Only retry pages whose semantic extraction actually failed or was
+      // unavailable. Listing/gate rejections are intentional and should not
+      // churn every 15 minutes.
+      const retrySemanticFailure =
+        raw.normalization_status === "PENDING" ||
+        RETRYABLE_EXTRACTION_ERROR.test(raw.normalization_error ?? "");
+
+      if (!retrySemanticFailure) continue;
+
       await supabaseAdmin
         .from("raw_records")
         .update({
@@ -1067,10 +1080,11 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
           normalization_error: null,
         } as never)
         .eq("id", raw.id);
+
       await enqueue("NORMALIZE", {
         source_id: source.id,
         institution_id: source.institution_id ?? undefined,
-        payload: { classification, reason: "detail-recovery-v6.1" },
+        payload: { classification, reason: "detail-semantic-recovery-v7" },
       });
       normalizeQueued += 1;
       continue;
@@ -1080,7 +1094,7 @@ export async function enqueueExistingDetailRecovery(limit = 300): Promise<{
       await enqueue("FETCH", {
         source_id: source.id,
         institution_id: source.institution_id ?? undefined,
-        payload: { reason: "detail-recovery-v6.1" },
+        payload: { reason: "detail-semantic-recovery-v7" },
       });
       fetchQueued += 1;
     }
@@ -1796,7 +1810,7 @@ export async function completeExternalFetch(input: ExternalFetchCompletion): Pro
   // additional Supabase reads. Bound the completion fan-out so the fetch itself
   // can always commit successfully; the next scheduled discovery pass can expand
   // the remaining links without losing the canonical raw snapshot.
-  const links = externalLinks(input.links).slice(0, 12);
+  const links = externalLinks(input.links).slice(0, 18);
   await registerDetailSourcesFromLinks({
     links,
     finalUrl,
