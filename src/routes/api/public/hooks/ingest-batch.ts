@@ -532,7 +532,7 @@ export const Route = createFileRoute("/api/public/hooks/ingest-batch")({
             });
           } catch (e) {
             const message = errorMessage(e);
-            const timedOut = /timed out after \\d+ms/i.test(message);
+            const timedOut = /timed out after \d+ms/i.test(message);
             if (run?.id) {
               await supabaseAdmin
                 .from("pipeline_runs")
